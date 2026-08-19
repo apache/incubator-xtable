@@ -493,7 +493,7 @@ public class ITIcebergTableFormat {
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
                         finalTargetOptions.put(
                             "hoodie.datasource.read.extract.partition.values.from.path", "true");
-                        // TODO: https://app.clickup.com/t/18029943/ENG-23336
+                        // The file group reader returns unexpected results for these reads.
                         finalTargetOptions.put(
                             HoodieReaderConfig.FILE_GROUP_READER_ENABLED.key(), "false");
                       }
@@ -506,12 +506,18 @@ public class ITIcebergTableFormat {
                           .filter(filterCondition);
                     }));
 
-    String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
-    List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+    List<String> dataset1Rows =
+        sourceRows
+            .selectExpr(getSelectColumnsArr(sourceTable.getColumnsToSelect(), sourceFormat))
+            .toJSON()
+            .collectAsList();
     targetRowsByFormat.forEach(
         (format, targetRows) -> {
           List<String> dataset2Rows =
-              targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+              targetRows
+                  .selectExpr(getSelectColumnsArr(sourceTable.getColumnsToSelect(), format))
+                  .toJSON()
+                  .collectAsList();
           assertEquals(
               dataset1Rows.size(),
               dataset2Rows.size(),
@@ -594,6 +600,31 @@ public class ITIcebergTableFormat {
                 row1, row2));
       }
     }
+  }
+
+  private static String[] getSelectColumnsArr(List<String> columnsToSelect, String format) {
+    boolean isHudi = format.equals(HUDI);
+    boolean isIceberg = format.equals(ICEBERG);
+    return columnsToSelect.stream()
+        .map(
+            colName -> {
+              if (colName.startsWith("timestamp_local_millis")) {
+                if (isHudi) {
+                  return String.format(
+                      "unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+                } else if (isIceberg) {
+                  // iceberg is showing up as micros, so we need to divide by 1000 to get millis
+                  return String.format("%s div 1000 AS %s", colName, colName);
+                } else {
+                  return colName;
+                }
+              } else if (isHudi && colName.startsWith("timestamp_local_micros")) {
+                return String.format("unix_micros(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+              } else {
+                return colName;
+              }
+            })
+        .toArray(String[]::new);
   }
 
   private boolean containsUUIDFields(List<String> rows) {
