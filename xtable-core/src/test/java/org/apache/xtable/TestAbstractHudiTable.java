@@ -154,6 +154,7 @@ public abstract class TestAbstractHudiTable
       this.typedProperties = new TypedProperties();
       typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
       typedProperties.put(HoodieMetadataConfig.ENABLE.key(), "true");
+      typedProperties.putAll(tableFormatOverrides());
       if (partitionConfig == null) {
         this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
         this.partitionFieldNames = Collections.emptyList();
@@ -621,6 +622,26 @@ public abstract class TestAbstractHudiTable
         keyGenProperties, hoodieTableType, conf, populateMetaFields, new Properties());
   }
 
+  /**
+   * Table-level properties selecting the pluggable table format named by the {@code
+   * hoodie.table.format} system property, empty when it is unset. A module whose tests all run
+   * against one format sets the property once for the JVM rather than threading properties through
+   * every table constructor.
+   */
+  protected static Properties tableFormatOverrides() {
+    Properties overrides = new Properties();
+    String tableFormat = System.getProperty(HoodieTableConfig.TABLE_FORMAT.key());
+    if (tableFormat != null) {
+      overrides.put(HoodieTableConfig.TABLE_FORMAT.key(), tableFormat);
+      // A pluggable format reconstructs the timeline from its own metadata, which needs the v2
+      // timeline layout, and supplies the file listing that the Hudi metadata table would.
+      overrides.put(
+          HoodieTableConfig.VERSION.key(), String.valueOf(HoodieTableVersion.EIGHT.versionCode()));
+      overrides.put(HoodieMetadataConfig.ENABLE.key(), "false");
+    }
+    return overrides;
+  }
+
   private static HoodieTableVersion tableVersion(Properties tableProperties) {
     String configured = tableProperties.getProperty(HoodieTableConfig.VERSION.key());
     return configured == null
@@ -655,15 +676,17 @@ public abstract class TestAbstractHudiTable
     }
     @SuppressWarnings("unchecked")
     Map<String, Object> keyGenPropsMap = (Map) keyGenProperties;
+    Properties effectiveTableProperties = tableFormatOverrides();
+    effectiveTableProperties.putAll(tableProperties);
     return HoodieTableMetaClient.newTableBuilder()
         .set(keyGenPropsMap)
-        .fromProperties(tableProperties)
+        .fromProperties(effectiveTableProperties)
         .setTableName(tableName)
         .setTableType(hoodieTableType)
         // Pin test tables to table version 6 to match the conversion target. Table version 9
         // support will be added in a follow-up PR. A test may override this through
         // tableProperties, for example a pluggable table format that needs the v2 timeline.
-        .setTableVersion(tableVersion(tableProperties))
+        .setTableVersion(tableVersion(effectiveTableProperties))
         .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
         .setPartitionFields(String.join(",", partitionFieldNames))
         .setRecordKeyFields(RECORD_KEY_FIELD_NAME)
