@@ -159,6 +159,9 @@ public abstract class TestAbstractHudiTable
       this.typedProperties = new TypedProperties();
       typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
       typedProperties.put(HoodieMetadataConfig.ENABLE.key(), "true");
+      Properties tableFormatOverrides = tableFormatOverrides();
+      typedProperties.putAll(tableFormatOverrides);
+      this.tableVersion = tableVersionFrom(tableFormatOverrides, tableVersion);
       if (partitionConfig == null) {
         this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
         this.partitionFieldNames = Collections.emptyList();
@@ -622,6 +625,26 @@ public abstract class TestAbstractHudiTable
   }
 
   /**
+   * Table-level properties selecting the pluggable table format named by the {@code
+   * hoodie.table.format} system property, empty when it is unset. A module whose tests all run
+   * against one format sets the property once for the JVM rather than threading properties through
+   * every table constructor.
+   */
+  protected static Properties tableFormatOverrides() {
+    Properties overrides = new Properties();
+    String tableFormat = System.getProperty(HoodieTableConfig.TABLE_FORMAT.key());
+    if (tableFormat != null) {
+      overrides.put(HoodieTableConfig.TABLE_FORMAT.key(), tableFormat);
+      // A pluggable format reconstructs the timeline from its own metadata, which needs the v2
+      // timeline layout, and supplies the file listing that the Hudi metadata table would.
+      overrides.put(
+          HoodieTableConfig.VERSION.key(), String.valueOf(HoodieTableVersion.EIGHT.versionCode()));
+      overrides.put(HoodieMetadataConfig.ENABLE.key(), "false");
+    }
+    return overrides;
+  }
+
+  /**
    * Returns the table version named by {@code hoodie.table.version} in the given table-level
    * properties, or {@code defaultVersion} when the properties do not set one.
    */
@@ -660,9 +683,11 @@ public abstract class TestAbstractHudiTable
     }
     @SuppressWarnings("unchecked")
     Map<String, Object> keyGenPropsMap = (Map) keyGenProperties;
+    Properties effectiveTableProperties = tableFormatOverrides();
+    effectiveTableProperties.putAll(tableProperties);
     return HoodieTableMetaClient.newTableBuilder()
         .set(keyGenPropsMap)
-        .fromProperties(tableProperties)
+        .fromProperties(effectiveTableProperties)
         .setTableName(tableName)
         .setTableType(hoodieTableType)
         // Use the configured table version (default 6) so tests can exercise both the legacy and

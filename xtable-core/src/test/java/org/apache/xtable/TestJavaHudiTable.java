@@ -263,7 +263,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         hoodieTableType,
         archivalConfig,
         addFieldIds,
-        tableVersionFrom(tableProperties, HoodieTableVersion.SIX),
+        HoodieTableVersion.SIX,
         tableProperties);
   }
 
@@ -278,7 +278,10 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieTableVersion tableVersion,
       Properties tableProperties) {
     super(name, schema, tempDir, partitionConfig);
-    this.tableVersion = tableVersion;
+    // The caller's table properties win over the module-wide format overrides, which win over the
+    // version the factory asked for.
+    this.tableVersion =
+        tableVersionFrom(tableProperties, tableVersionFrom(tableFormatOverrides(), tableVersion));
     this.conf = new Configuration();
     this.conf.set("parquet.avro.write-old-list-structure", "false");
     this.addFieldIds = addFieldIds;
