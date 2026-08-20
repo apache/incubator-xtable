@@ -29,19 +29,125 @@ on:
     branches:
       - "main"
 
+# The build cache extension does not hash the JDK, so it is part of every cache
+# key below. Defined once here rather than repeated, so that changing the JDK
+# cannot leave a key asserting the old one.
+env:
+  JDK_VERSION: '11'
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A cold build is ~27 min, which left no headroom under the previous 30.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK 11
+      - name: Set up JDK ${{ env.JDK_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: '11'
+          java-version: ${{ env.JDK_VERSION }}
           distribution: 'temurin'
-          cache: maven
+
+      # Restore only. License Check writes this cache, and only on `main`: it
+      # finishes in a couple of minutes against this job's 27, and it stops at
+      # `package` so the entry never carries this project's artifacts. It
+      # resolves the reactor explicitly for this job's benefit; its own license
+      # steps reach only part of it.
+      # Previously both jobs used setup-java's `cache: maven`, which gave them
+      # the same key, and whichever finished first reserved it - this job then
+      # logged "Unable to reserve cache with key" on every single run. Making
+      # the reader explicit removes the race rather than winning it.
+      #
+      # A warm start, not a guarantee: `install` here runs plugins that a build
+      # stopping at `package` never resolves, so expect a delta every run.
+      - name: Restore Maven repository cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/repository
+          key: m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          restore-keys: |
+            m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
+
+      - name: Restore Maven wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/wrapper/dists
+          key: m2-wrapper-${{ runner.os }}-${{ hashFiles('**/.mvn/wrapper/maven-wrapper.properties') }}
+
+      # A separate cache from the repository above: the build cache extension
+      # configured in .mvn/extensions.xml writes to ~/.m2/build-cache, so
+      # without this it starts empty every run and never restores a module.
+      # Only `main` writes an entry, so pull requests warm up from `main` instead
+      # of each branch filling the repository-wide cache budget.
+      #
+      # The modules producing large bundled jars opt out of the cache entirely
+      # with <maven.build.cache.enabled>false</maven.build.cache.enabled> in their
+      # own poms, which keeps this entry around 12 MB. Without that opt-out the
+      # entry is 1.2 GB, 97% of it three shaded jars that account for only ~3 of
+      # the 27 minutes a cold build takes.
+      #
+      # Note: a cache-restored xtable-service does not reproduce
+      # target/quarkus-app. No step consumes that directory today; anything added
+      # later that does must not rely on it being present.
+      - name: Restore Maven build cache
+        id: build-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/build-cache
+          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
+          restore-keys: |
+            maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
 
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
+
+      # Guard against a module starting to cache large artifacts again: warn and
+      # skip the save rather than churn the repository-wide 10 GB cache budget,
+      # which is otherwise mostly the ~/.m2/repository entries above. Checking the
+      # size rather than specific paths keeps this working across module renames.
+      - name: Check Maven build cache size
+        id: build-cache-size
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          size_mb=$(du -sm ~/.m2/build-cache 2>/dev/null | cut -f1)
+          size_mb=${size_mb:-0}
+          echo "size_mb=${size_mb}" >> "$GITHUB_OUTPUT"
+          echo "~/.m2/build-cache is ${size_mb} MB"
+          # The two bounds below are what the save step gates on, so they have to
+          # cover the whole range between them: 0 means the extension wrote
+          # nothing and there is no path for the save action to read.
+          if [ "${size_mb}" -eq 0 ]; then
+            echo "::warning title=Maven build cache not saved::~/.m2/build-cache is empty or absent. The build cache extension did not write anything; check that .mvn/extensions.xml is still in effect."
+          elif [ "${size_mb}" -ge 100 ]; then
+            echo "::warning title=Maven build cache not saved::~/.m2/build-cache is ${size_mb} MB (limit 100 MB). A module is caching large artifacts; opt it out with <maven.build.cache.enabled>false</maven.build.cache.enabled> in its pom."
+          fi
+
+      # Skipped when the exact key already hit on restore - a re-run of the same
+      # commit would otherwise try to write over an immutable entry and log the
+      # "Unable to reserve cache with key" that splitting these jobs removed.
+      - name: Save Maven build cache
+        if: >
+          success() && github.ref == 'refs/heads/main'
+          && steps.build-cache.outputs.cache-hit != 'true'
+          && steps.build-cache-size.outputs.size_mb > 0
+          && steps.build-cache-size.outputs.size_mb < 100
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.m2/build-cache
+          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
+
+      # `install` above puts this project's own artifacts into ~/.m2/repository,
+      # including the bundled jars (~1.2 GB, xtable-utilities alone is ~1 GB).
+      # actions/setup-java caches that whole directory with no way to exclude a
+      # path, so drop them before its post step runs. They are rebuilt from
+      # source on every run and can never produce a useful cache hit, and a
+      # stale SNAPSHOT left in the local repository can shadow a reactor build.
+      # Source Build Check clears the same path for the same reason.
+      #
+      # This job no longer saves that cache, so nothing depends on this today.
+      # It is kept so the invariant holds by construction rather than by which
+      # step happens to write last.
+      - name: Drop this project's own artifacts from the Maven repository
+        if: always()
+        run: rm -rf ~/.m2/repository/org/apache/xtable
