@@ -242,8 +242,12 @@ for module in "${SHADE_MODULES[@]}"; do
   done
 
   sort -u "${expected_file}" -o "${expected_file}"
+  # Curated texts are named LICENSE-<artifactId> with no extension. The *.txt
+  # files beside them are license texts a dependency ships for code it embeds,
+  # checked in so the bundle has one licenses directory rather than two (#701);
+  # they answer to no coordinate of ours, so they are not matched here.
   for license_text in "${licenses_dir}"/*; do
-    if [[ -f "${license_text}" ]]; then
+    if [[ -f "${license_text}" && "${license_text}" != *.txt ]]; then
       basename "${license_text}"
     fi
   done | sort -u > "${actual_file}"
