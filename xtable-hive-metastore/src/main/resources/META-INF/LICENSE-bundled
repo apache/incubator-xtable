@@ -272,8 +272,6 @@ javax.inject:javax.inject:1
 javax.jdo:jdo-api:3.0.1
 javax.servlet:jsp-api:2.0
 javax.servlet:servlet-api:2.4
-javax.transaction:jta:1.1
-javax.transaction:transaction-api:1.1
 joda-time:joda-time:2.8.1
 net.hydromatic:eigenbase-properties:1.1.5
 net.sf.jpam:jpam:1.1
@@ -406,6 +404,8 @@ stax:stax-api:1.0.1
 CDDL
 ----
 javax.mail:mail:1.4.1
+javax.transaction:jta:1.1
+javax.transaction:transaction-api:1.1
 
 Common Public License Version 1.0
 ---------------------------------

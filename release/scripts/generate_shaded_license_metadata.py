@@ -276,7 +276,9 @@ GROUP_OVERRIDES = {
     "javax.mail": "CDDL",
     "javax.servlet": "Apache License 2.0",
     "javax.servlet.jsp": "Apache License 2.0",
-    "javax.transaction": "Apache License 2.0",
+    # jta and transaction-api declare no license in their poms. Both ship the
+    # CDDL 1.0 text, which is what licenses/LICENSE-jta reproduces.
+    "javax.transaction": "CDDL",
     "org.apache.hbase": "Apache License 2.0",
     "org.apache.velocity": "Apache License 2.0",
     "org.apache.zookeeper": "Apache License 2.0",
