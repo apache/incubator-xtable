@@ -39,6 +39,7 @@ FAMILY_ORDER = [
     "CDDL + GPLv2 with classpath exception",
     "CDDL",
     "EPL 2.0",
+    "EPL 1.0",
     "Common Public License Version 1.0",
     "Mozilla Public License 2.0",
     "Public Domain",
@@ -279,6 +280,10 @@ GROUP_OVERRIDES = {
     # jta and transaction-api declare no license in their poms. Both ship the
     # CDDL 1.0 text, which is what licenses/LICENSE-jta reproduces.
     "javax.transaction": "CDDL",
+    # hadoop-project's pom is not namespace-well-formed -- it contains an
+    # <Xlint:-unchecked/> element that Maven tolerates and ElementTree rejects --
+    # so the licenses of everything inheriting from it cannot be read.
+    "org.apache.hadoop": "Apache License 2.0",
     "org.apache.hbase": "Apache License 2.0",
     "org.apache.velocity": "Apache License 2.0",
     "org.apache.zookeeper": "Apache License 2.0",
@@ -394,6 +399,8 @@ def normalize_family(group: str, artifact: str, version: str) -> str:
         return "Common Public License Version 1.0"
     if "EPL 2.0" in joined or "Eclipse Public License 2.0" in joined:
         return "EPL 2.0"
+    if "EPL 1.0" in joined or "Eclipse Public License 1.0" in joined:
+        return "EPL 1.0"
     if "CDDL + GPLv2 with classpath exception" in joined or "CDDL/GPLv2+CE" in joined:
         return "CDDL + GPLv2 with classpath exception"
     if "CDDL" in joined or "GPL2 w/ CPE" in joined:
