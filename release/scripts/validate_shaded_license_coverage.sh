@@ -67,33 +67,11 @@ SKIPPED_SHADE_MODULES=(
   "xtable-utilities"
 )
 
-# Modules whose shade <includes> are known to have drifted from their runtime
-# dependency tree. Reported as a warning rather than a failure so the rest of
-# the license checks stay enforced while the drift is worked through.
-#
-# TODO xtable-hive-metastore: the includes still describe the Hive 2.3.9 tree
-# that predates the 3.1.3 upgrade in #772. Regenerating them changes what the
-# bundle actually ships, so it is tracked separately.
-WHITELIST_DRIFT_ALLOWED=(
-  "xtable-hive-metastore"
-)
-
 should_skip_module() {
   local module="$1"
   local skipped_module
   for skipped_module in "${SKIPPED_SHADE_MODULES[@]}"; do
     if [[ "${module}" == "${skipped_module}" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-allows_whitelist_drift() {
-  local module="$1"
-  local drifted_module
-  for drifted_module in "${WHITELIST_DRIFT_ALLOWED[@]}"; do
-    if [[ "${module}" == "${drifted_module}" ]]; then
       return 0
     fi
   done
@@ -187,13 +165,9 @@ for module in "${SHADE_MODULES[@]}"; do
   printf '%s\n' "${runtime_includes[@]}" | sort -u > "${runtime_set_file}"
 
   if ! diff -u "${runtime_set_file}" "${include_set_file}" > "${diff_output_file}"; then
-    if allows_whitelist_drift "${module}"; then
-      echo "WARN ${module}: shade <includes> do not match runtime dependencies from ${tree_file} (known drift)."
-    else
-      echo "FAIL ${module}: shade <includes> must exactly match runtime dependencies from ${tree_file}."
-      sed 's/^/  /' "${diff_output_file}"
-      overall_status=1
-    fi
+    echo "FAIL ${module}: shade <includes> must exactly match runtime dependencies from ${tree_file}."
+    sed 's/^/  /' "${diff_output_file}"
+    overall_status=1
   fi
 
   rm -f "${include_set_file}" "${runtime_set_file}" "${diff_output_file}"
