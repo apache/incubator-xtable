@@ -276,7 +276,7 @@ GROUP_OVERRIDES = {
     "javax.inject": "Apache License 2.0",
     "javax.mail": "CDDL",
     "javax.servlet": "Apache License 2.0",
-    "javax.servlet.jsp": "Apache License 2.0",
+    "javax.servlet.jsp": "CDDL + GPLv2 with classpath exception",
     # jta and transaction-api declare no license in their poms. Both ship the
     # CDDL 1.0 text, which is what licenses/LICENSE-jta reproduces.
     "javax.transaction": "CDDL",
@@ -291,8 +291,8 @@ GROUP_OVERRIDES = {
     "oro": "Apache Software License 1.1",
     "software.amazon.awssdk": "Apache License 2.0",
     "software.amazon.eventstream": "Apache License 2.0",
-    "stax": "CDDL + GPLv2 with classpath exception",
-    "xml-apis": "Apache Software License 1.1",
+    "stax": "Apache License 2.0",
+    "xml-apis": "Apache License 2.0",
     "xmlenc": "BSD 3-Clause",
 }
 

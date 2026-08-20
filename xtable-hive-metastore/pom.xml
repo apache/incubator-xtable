@@ -230,6 +230,28 @@
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
+                            <!--
+                              Two dependencies put license texts somewhere other than
+                              META-INF/licenses, which left the bundle with three separate
+                              license directories (#701). Their texts are carried under
+                              META-INF/licenses instead: netty's ten verbatim, and xml-apis'
+                              W3C and SAX notices inside LICENSE-xml-apis. The bundle is
+                              left with one directory and nothing is lost.
+                            -->
+                            <filters combine.children="append">
+                                <filter>
+                                    <artifact>io.netty:netty</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/license/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>xml-apis:xml-apis</artifact>
+                                    <excludes>
+                                        <exclude>license/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <artifactSet>
                                 <includes>
                                     <include>aopalliance:aopalliance</include>
