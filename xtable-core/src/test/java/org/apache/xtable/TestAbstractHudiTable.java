@@ -629,14 +629,21 @@ public abstract class TestAbstractHudiTable
    * every table constructor.
    */
   protected static Properties tableFormatOverrides() {
+    return tableFormatOverrides(System.getProperty(HoodieTableConfig.TABLE_FORMAT.key()));
+  }
+
+  /** @param tableFormat the requested pluggable format, or null for Hudi's native format. */
+  static Properties tableFormatOverrides(String tableFormat) {
     Properties overrides = new Properties();
-    String tableFormat = System.getProperty(HoodieTableConfig.TABLE_FORMAT.key());
     if (tableFormat != null) {
       overrides.put(HoodieTableConfig.TABLE_FORMAT.key(), tableFormat);
       // A pluggable format reconstructs the timeline from its own metadata, which needs the v2
       // timeline layout, and supplies the file listing that the Hudi metadata table would.
       overrides.put(
           HoodieTableConfig.VERSION.key(), String.valueOf(HoodieTableVersion.EIGHT.versionCode()));
+      // FileSystemBackedTableMetadata, which IcebergBackedTableMetadata extends, throws on every
+      // index lookup, so leaving the metadata table on fails with "Unsupported operation:
+      // getColumnsStats".
       overrides.put(HoodieMetadataConfig.ENABLE.key(), "false");
     }
     return overrides;

@@ -31,7 +31,9 @@ import lombok.SneakyThrows;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 import org.apache.hudi.common.table.timeline.versioning.v2.ActiveTimelineV2;
 import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
@@ -76,6 +78,30 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
 
   public IcebergActiveTimeline() {}
 
+  @Override
+  public HoodieActiveTimeline reload() {
+    return new IcebergActiveTimeline(metaClient);
+  }
+
+  /**
+   * Whether an action adds or removes data files, and therefore has to be recorded in an Iceberg
+   * snapshot before it counts as completed. Savepoint and restore change no data, so an Iceberg
+   * snapshot never records them and their state is taken from the Hudi timeline as-is.
+   */
+  static boolean changesDataFiles(String action) {
+    return !HoodieTimeline.SAVEPOINT_ACTION.equals(action)
+        && !HoodieTimeline.RESTORE_ACTION.equals(action);
+  }
+
+  /**
+   * Requested time alone does not identify an instant: savepointing a commit produces a savepoint
+   * instant at that commit's own requested time, so the action has to be part of the key or the two
+   * collide and one is dropped from the reconstructed timeline.
+   */
+  static String instantKey(HoodieInstant instant) {
+    return instant.requestedTime() + "." + instant.getAction();
+  }
+
   @SneakyThrows
   protected List<HoodieInstant> getInstantsFromFileSystem(
       HoodieTableMetaClient metaClient,
@@ -102,12 +128,12 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
           InstantDTO.toInstant(
               MAPPER.readValue(syncMetadata.getLatestTableOperationId(), InstantDTO.class),
               metaClient.getInstantGenerator());
-      instantsFromIceberg.put(hoodieInstant.requestedTime(), hoodieInstant);
+      instantsFromIceberg.put(instantKey(hoodieInstant), hoodieInstant);
     }
     List<HoodieInstant> inflightInstantsInIceberg =
         instantsFromHoodieTimeline.stream()
-            .filter(
-                hoodieInstant -> !instantsFromIceberg.containsKey(hoodieInstant.requestedTime()))
+            .filter(hoodieInstant -> !instantsFromIceberg.containsKey(instantKey(hoodieInstant)))
+            .filter(hoodieInstant -> changesDataFiles(hoodieInstant.getAction()))
             .map(
                 instant -> {
                   if (instant.isCompleted()) {
@@ -125,7 +151,15 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
         instantsFromIceberg.values().stream()
             .filter(instantsFromHoodieTimeline::contains)
             .collect(Collectors.toList());
-    return Stream.concat(completedInstantsInIceberg.stream(), inflightInstantsInIceberg.stream())
+    List<HoodieInstant> instantsWithoutDataFileChanges =
+        instantsFromHoodieTimeline.stream()
+            .filter(hoodieInstant -> !changesDataFiles(hoodieInstant.getAction()))
+            .collect(Collectors.toList());
+    return Stream.of(
+            completedInstantsInIceberg.stream(),
+            inflightInstantsInIceberg.stream(),
+            instantsWithoutDataFileChanges.stream())
+        .flatMap(stream -> stream)
         .sorted(InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR)
         .collect(Collectors.toList());
   }

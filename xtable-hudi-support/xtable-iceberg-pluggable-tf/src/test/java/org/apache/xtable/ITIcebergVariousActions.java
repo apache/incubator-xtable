@@ -49,7 +49,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -584,10 +583,6 @@ public class ITIcebergVariousActions {
 
   @ParameterizedTest
   @MethodSource("testsForAllPartitions")
-  @Disabled(
-      "A savepoint changes no data, so no Iceberg snapshot records it. IcebergActiveTimeline"
-          + " therefore treats the completed savepoint instant as inflight and Hudi restore fails"
-          + " with 'No savepoint for instantTime'.")
   public void testsForSavepointRestore(HudiTestUtil.PartitionConfig partitionConfig) {
     String tableName = "test_table_" + UUID.randomUUID();
     HudiConversionSource hudiClient = null;
