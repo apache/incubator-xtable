@@ -100,10 +100,12 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
@@ -155,6 +157,16 @@ public class ITConversionController {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceFormat, syncMode, isPartitioned));
         }
+      }
+    }
+    return arguments.stream();
+  }
+
+  private static Stream<Arguments> generateTestParametersForSyncModesAndPartitioning() {
+    List<Arguments> arguments = new ArrayList<>();
+    for (SyncMode syncMode : SyncMode.values()) {
+      for (boolean isPartitioned : new boolean[] {true, false}) {
+        arguments.add(Arguments.of(syncMode, isPartitioned));
       }
     }
     return arguments.stream();
@@ -226,6 +238,51 @@ public class ITConversionController {
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
       String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
+    runVariousOperationsTest(
+        sourceTableFormat,
+        syncMode,
+        isPartitioned,
+        getConversionSourceProvider(sourceTableFormat),
+        false);
+  }
+
+  // Runs the same equivalence checks as testVariousOperations above, but forces the Delta Kernel
+  // conversion source rather than resolving the provider from sourceTableFormat. This covers the
+  // Kernel source path against the same assertions the Standalone source is validated with today,
+  // per https://github.com/apache/incubator-xtable/issues/886. A targeted (sync mode x
+  // partitioning) subset is used here rather than folding DELTA_KERNEL into
+  // generateTestParametersForFormatsSyncModesAndPartitioning, since sourceTableFormat there also
+  // drives GenericTable selection, Spark format-name reads, and target-format exclusion for every
+  // other format, none of which differ for Kernel vs Standalone.
+  @ParameterizedTest
+  @MethodSource("generateTestParametersForSyncModesAndPartitioning")
+  public void testVariousOperationsDeltaKernelSource(SyncMode syncMode, boolean isPartitioned) {
+    ConversionSourceProvider<Long> deltaKernelConversionSourceProvider =
+        new DeltaKernelConversionSourceProvider();
+    deltaKernelConversionSourceProvider.init(jsc.hadoopConfiguration());
+    runVariousOperationsTest(
+        DELTA, syncMode, isPartitioned, deltaKernelConversionSourceProvider, false);
+  }
+
+  // Runs the same equivalence checks as testVariousOperations, but with the DELTA leg of the
+  // target formats routed through DeltaKernelConversionTarget instead of the default Standalone
+  // target, by setting DeltaConversionTargetConfig.USE_KERNEL on that target's properties. Source
+  // is fixed to HUDI, which is a simple, always-available source unrelated to what's under test
+  // here (the target-side dispatch). Covers the "as a target" half of prerequisite #1 in
+  // https://github.com/apache/incubator-xtable/issues/886.
+  @ParameterizedTest
+  @MethodSource("generateTestParametersForSyncModesAndPartitioning")
+  public void testVariousOperationsDeltaKernelTarget(SyncMode syncMode, boolean isPartitioned) {
+    runVariousOperationsTest(
+        HUDI, syncMode, isPartitioned, getConversionSourceProvider(HUDI), true);
+  }
+
+  private void runVariousOperationsTest(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      boolean isPartitioned,
+      ConversionSourceProvider<?> conversionSourceProvider,
+      boolean useDeltaKernelTarget) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
     if (sourceTableFormat.equals(PAIMON)) {
@@ -237,8 +294,6 @@ public class ITConversionController {
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
     }
-    ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(sourceTableFormat);
     List<?> insertRecords;
     try (GenericTable table =
         GenericTable.getInstance(
@@ -253,7 +308,8 @@ public class ITConversionController {
               table,
               targetTableFormats,
               partitionConfig,
-              null);
+              null,
+              useDeltaKernelTarget);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
@@ -285,7 +341,8 @@ public class ITConversionController {
               tableWithUpdatedSchema,
               targetTableFormats,
               partitionConfig,
-              null);
+              null,
+              useDeltaKernelTarget);
       List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
       tableWithUpdatedSchema.reload();
       conversionController.sync(conversionConfig, conversionSourceProvider);
@@ -1194,6 +1251,32 @@ public class ITConversionController {
       List<String> targetTableFormats,
       String partitionConfig,
       Duration metadataRetention) {
+    return getTableSyncConfig(
+        sourceTableFormat,
+        syncMode,
+        tableName,
+        table,
+        targetTableFormats,
+        partitionConfig,
+        metadataRetention,
+        false);
+  }
+
+  // Same as above, but when useDeltaKernelTarget is true, routes any DELTA target through
+  // ConversionTargetFactory's DeltaKernelConversionTarget rather than the default Standalone one,
+  // by setting DeltaConversionTargetConfig.USE_KERNEL on that target's additional properties. This
+  // lets a test validate the Kernel target writer through the same dispatch path (and the same
+  // equivalence assertions) a Standalone target is validated with, per
+  // https://github.com/apache/incubator-xtable/issues/886.
+  private static ConversionConfig getTableSyncConfig(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      String tableName,
+      GenericTable table,
+      List<String> targetTableFormats,
+      String partitionConfig,
+      Duration metadataRetention,
+      boolean useDeltaKernelTarget) {
     Properties sourceProperties = new Properties();
     if (partitionConfig != null) {
       sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
@@ -1210,15 +1293,20 @@ public class ITConversionController {
     List<TargetTable> targetTables =
         targetTableFormats.stream()
             .map(
-                formatName ->
-                    TargetTable.builder()
-                        .name(tableName)
-                        .formatName(formatName)
-                        // set the metadata path to the data path as the default (required by Hudi)
-                        .basePath(table.getDataPath())
-                        .metadataRetention(metadataRetention)
-                        .additionalProperties(new TypedProperties())
-                        .build())
+                formatName -> {
+                  TypedProperties targetProperties = new TypedProperties();
+                  if (useDeltaKernelTarget && formatName.equals(DELTA)) {
+                    targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
+                  }
+                  return TargetTable.builder()
+                      .name(tableName)
+                      .formatName(formatName)
+                      // set the metadata path to the data path as the default (required by Hudi)
+                      .basePath(table.getDataPath())
+                      .metadataRetention(metadataRetention)
+                      .additionalProperties(targetProperties)
+                      .build();
+                })
             .collect(Collectors.toList());
 
     return ConversionConfig.builder()
