@@ -28,6 +28,9 @@
     <artifactId>xtable-aws</artifactId>
     <name>XTable AWS</name>
     <properties>
+        <!-- Mirrors the shade includes below; feeds the bundled LICENSE render. -->
+        <xtable.bundled.resources.skip>false</xtable.bundled.resources.skip>
+        <xtable.bundled.artifactIds>annotations,apache-client,auth,avro,aws-core,aws-json-protocol,checker-qual,checksums,checksums-spi,commons-pool,endpoints-spi,error_prone_annotations,eventstream,failureaccess,glue,guava,http-auth,http-auth-aws,http-auth-aws-eventstream,http-auth-spi,http-client-spi,identity-spi,j2objc-annotations,jackson-annotations,jackson-core,jackson-databind,jackson-datatype-jsr310,jackson-module-scala_${scala.binary.version},javax.annotation-api,json-utils,listenablefuture,log4j-1.2-api,log4j-api,metrics-spi,netty-codec-http,netty-codec-http2,netty-nio-client,paranamer,parquet-avro,parquet-column,parquet-common,parquet-encoding,parquet-format-structures,parquet-hadoop,parquet-jackson,profiles,protocol-core,reactive-streams,regions,retries,retries-spi,scala-library,sdk-core,third-party-jackson-core,utils,xtable-api,xtable-core_${scala.binary.version},xtable-hudi-support-utils,zstd-jni</xtable.bundled.artifactIds>
         <!--
           This module produces a large bundled jar (~42 MB). Keep it out of the
           maven-build-cache entirely: the property disables both restore and save
@@ -126,21 +129,24 @@
                         </goals>
                         <configuration>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"> </transformer>
+                                <!-- Must run before DontIncludeResourceTransformer, or there are no NOTICEs left to merge. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <projectName>Apache XTable (incubating)</projectName>
+                                    <inceptionYear>2024</inceptionYear>
+                                </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                                     <resources>
                                         <resource>LICENSE</resource>
+                                        <resource>LICENSE.txt</resource>
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
+                                        <resource>META-INF/LICENSE.txt</resource>
                                     </resources>
                                 </transformer>
+                                <!-- ALv2 plus a pointer to each bundled non-ALv2 licence text. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE-bundled</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                    <file>target/bundled-archive-resources/META-INF/LICENSE</file>
                                 </transformer>
                             </transformers>
                             <artifactSet>
