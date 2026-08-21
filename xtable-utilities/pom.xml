@@ -454,7 +454,6 @@
                             <include>io.grpc:grpc-services</include>
                             <include>io.grpc:grpc-stub</include>
                             <include>io.grpc:grpc-util</include>
-                            <include>io.grpc:grpc-xds</include>
                             <include>io.javalin:javalin</include>
                             <include>io.netty:netty</include>
                             <include>io.netty:netty-all</include>
@@ -678,7 +677,6 @@
                             <include>org.bouncycastle:bcprov-jdk18on</include>
                             <include>org.checkerframework:checker-compat-qual</include>
                             <include>org.checkerframework:checker-qual</include>
-                            <include>org.codehaus.groovy:groovy-all</include>
                             <include>org.codehaus.jackson:jackson-core-asl</include>
                             <include>org.codehaus.jackson:jackson-jaxrs</include>
                             <include>org.codehaus.jackson:jackson-mapper-asl</include>
