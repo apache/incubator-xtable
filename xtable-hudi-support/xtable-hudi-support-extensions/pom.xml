@@ -28,6 +28,11 @@
 
     <artifactId>xtable-hudi-support-extensions_${scala.binary.version}</artifactId>
     <name>XTable Project Hudi Support Extensions</name>
+    <properties>
+        <!-- Mirrors the shade includes below; feeds the bundled LICENSE render. -->
+        <xtable.bundled.resources.skip>false</xtable.bundled.resources.skip>
+        <xtable.bundled.artifactIds>checker-qual,error_prone_annotations,failureaccess,guava,iceberg-parquet,j2objc-annotations,jackson-module-scala_${scala.binary.version},listenablefuture,log4j-1.2-api,log4j-api,paranamer,scala-library,slf4j-api,xtable-api,xtable-core_${scala.binary.version},xtable-hudi-support-utils</xtable.bundled.artifactIds>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -229,21 +234,24 @@
                         </goals>
                         <configuration>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"> </transformer>
+                                <!-- Must run before DontIncludeResourceTransformer, or there are no NOTICEs left to merge. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <projectName>Apache XTable (incubating)</projectName>
+                                    <inceptionYear>2024</inceptionYear>
+                                </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                                     <resources>
                                         <resource>LICENSE</resource>
+                                        <resource>LICENSE.txt</resource>
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
+                                        <resource>META-INF/LICENSE.txt</resource>
                                     </resources>
                                 </transformer>
+                                <!-- ALv2 plus a pointer to each bundled non-ALv2 licence text. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE-bundled</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                    <file>src/license/LICENSE</file>
                                 </transformer>
                             </transformers>
                             <artifactSet>

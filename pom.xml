@@ -101,6 +101,10 @@
         <target.dir.pattern>**/target/**</target.dir.pattern>
         <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
         <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
+        <xtable.license.templates>${maven.multiModuleProjectDirectory}/release/license/bundled</xtable.license.templates>
+        <!-- Only the shaded modules render a bundled LICENSE. -->
+        <xtable.bundled.resources.skip>true</xtable.bundled.resources.skip>
+        <xtable.bundled.artifactIds></xtable.bundled.artifactIds>
         <apache-incubator-disclaimer-resource-bundle.version>1.7</apache-incubator-disclaimer-resource-bundle.version>
         <scala-collection-compat.version>2.12.0</scala-collection-compat.version>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
@@ -699,6 +703,38 @@
                             <resourceBundles>
                                 <resourceBundle>org.apache.apache.resources:apache-jar-resource-bundle:${apache-jar-resource-bundle.version}</resourceBundle>
                                 <resourceBundle>org.apache.apache.resources:apache-incubator-disclaimer-resource-bundle:${apache-incubator-disclaimer-resource-bundle.version}</resourceBundle>
+                            </resourceBundles>
+                        </configuration>
+                    </execution>
+                    <!--
+                      Renders the bundled jar's LICENSE for the shaded modules.
+                      Must run before process-resource-bundles, or that execution
+                      copies its own META-INF/LICENSE verbatim and the render is
+                      skipped.
+                    -->
+                    <execution>
+                        <id>process-bundled-resources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>process</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${xtable.bundled.resources.skip}</skip>
+                            <outputDirectory>${project.build.directory}/bundled-archive-resources</outputDirectory>
+                            <appendedResourcesDirectory>${xtable.license.templates}</appendedResourcesDirectory>
+                            <supplementalModels>
+                                <supplementalModel>${xtable.license.templates}/supplemental-models.xml</supplementalModel>
+                            </supplementalModels>
+                            <properties>
+                                <projectName>Apache XTable (incubating)</projectName>
+                            </properties>
+                            <includeScope>runtime</includeScope>
+                            <!-- The runtime tree is wider than what shade bundles, so mirror the shade includes. -->
+                            <includeArtifactIds>${xtable.bundled.artifactIds}</includeArtifactIds>
+                            <attachToMain>false</attachToMain>
+                            <attachToTest>false</attachToTest>
+                            <resourceBundles>
+                                <resourceBundle>org.apache.apache.resources:apache-jar-resource-bundle:${apache-jar-resource-bundle.version}</resourceBundle>
                             </resourceBundles>
                         </configuration>
                     </execution>

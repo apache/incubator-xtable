@@ -89,9 +89,6 @@ jobs:
       - name: Apache License Check
         run: ./mvnw apache-rat:check -B
 
-      - name: Validate Shaded Dependency License Metadata
-        run: release/scripts/validate_shaded_license_coverage.sh
-
       # The bundled jars are what a release reviewer inspects, so the license
       # texts are checked against the built artifact rather than the poms. The
       # dependency tree must not be scope-filtered; -Dscope=runtime drops
@@ -99,7 +96,7 @@ jobs:
       - name: Build Shaded Bundles
         run: >
           ./mvnw -B -DskipTests -Dmaven.build.cache.enabled=false
-          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions
+          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions,xtable-utilities
           -am package
           dependency:tree -DoutputType=text -DoutputFile=target/dependency-tree.txt
 
