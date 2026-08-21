@@ -21,7 +21,6 @@ package org.apache.xtable.hudi;
 import java.util.Collections;
 import java.util.Iterator;
 
-import lombok.AllArgsConstructor;
 import lombok.Value;
 
 import org.apache.hudi.common.model.HoodieCommitMetadata;
@@ -39,7 +38,6 @@ import org.apache.xtable.model.storage.InternalFilesDiff;
  * table and new completed instant added to the timeline.
  */
 @Value
-@AllArgsConstructor
 public class HudiIncrementalTableChangeExtractor {
   HoodieTableMetaClient metaClient;
   HudiTableExtractor tableExtractor;
@@ -52,11 +50,12 @@ public class HudiIncrementalTableChangeExtractor {
     InternalFilesDiff dataFilesDiff;
     if (commitMetadata instanceof HoodieReplaceCommitMetadata) {
       dataFilesDiff =
-          dataFileExtractor.getDiffForReplaceCommit(
+          dataFileExtractor.getDiffFromReplaceCommitMetadata(
               internalTable, (HoodieReplaceCommitMetadata) commitMetadata, completedInstant);
     } else {
       dataFilesDiff =
-          dataFileExtractor.getDiffForCommit(internalTable, commitMetadata, completedInstant);
+          dataFileExtractor.getDiffFromCommitMetadata(
+              internalTable, commitMetadata, completedInstant);
     }
 
     Iterator<TableChange> tableChangeIterator =

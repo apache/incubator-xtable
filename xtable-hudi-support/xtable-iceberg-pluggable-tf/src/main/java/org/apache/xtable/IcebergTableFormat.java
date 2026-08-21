@@ -39,8 +39,6 @@ import org.apache.hudi.common.table.timeline.TimelineFactory;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
 import org.apache.hudi.metadata.TableMetadataFactory;
 
-import com.google.common.collect.ImmutableMap;
-
 import org.apache.xtable.conversion.ConversionTargetFactory;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.UpdateException;
@@ -150,30 +148,16 @@ public class IcebergTableFormat implements HoodieTableFormat {
     completeInstant(metaClient, hudiTableExtractor.extractTableChanges(rollbackInstant));
   }
 
-  /**
-   * A savepoint changes no data files, so there is nothing for Iceberg to record. Materializing it
-   * as a snapshot would put a non-data snapshot at the tip whose completion time is later than the
-   * commits it protects, which breaks the rollback path. {@link
-   * org.apache.xtable.timeline.IcebergActiveTimeline} takes savepoint instants from the Hudi
-   * timeline directly instead.
-   */
   @Override
   public void savepoint(
       HoodieInstant instant,
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
-      FileSystemViewManager viewManager) {}
-
-  /**
-   * The per-instant rollbacks a restore performs already moved the Iceberg table back, and the
-   * restore instant itself changes no data files.
-   */
-  @Override
-  public void restore(
-      HoodieInstant restoreCompletedInstant,
-      HoodieEngineContext engineContext,
-      HoodieTableMetaClient metaClient,
-      FileSystemViewManager viewManager) {}
+      FileSystemViewManager viewManager) {
+    HudiIncrementalTableChangeExtractor hudiTableExtractor =
+        getHudiTableExtractor(metaClient, viewManager);
+    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(instant));
+  }
 
   @Override
   public TimelineFactory getTimelineFactory() {
@@ -192,7 +176,7 @@ public class IcebergTableFormat implements HoodieTableFormat {
             .getTableMetadata()
             .orElse(TableSyncMetadata.of(Instant.MIN, Collections.emptyList()));
     try {
-      tableFormatSync.syncChanges(ImmutableMap.of(target, tableSyncMetadata), changes);
+      tableFormatSync.syncChanges(Collections.singletonMap(target, tableSyncMetadata), changes);
     } catch (Exception e) {
       throw new UpdateException("Failed to update iceberg metadata", e);
     }

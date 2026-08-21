@@ -94,25 +94,15 @@ public class ConversionTargetFactory {
     while (true) {
       ConversionTarget target;
       try {
-        // hasNext() also resolves provider classes lazily, so it can throw
-        // ServiceConfigurationError too - it must be inside the guard alongside next().
+        // hasNext() resolves provider classes lazily, so it throws too and has to be guarded.
         if (!iterator.hasNext()) {
           break;
         }
         target = iterator.next();
       } catch (ServiceConfigurationError | LinkageError error) {
-        // A registered target whose engine library is not on the classpath (e.g. Delta when only
-        // Hudi/Iceberg are provided). Skip it so a subset of engines can still be used; a missing
-        // engine for the requested format surfaces below as NotSupportedException. The offending
-        // provider is consumed before the error is thrown, so the next hasNext() advances past it.
-        log.warn(
-            "Skipping a registered ConversionTarget whose engine library is not on the classpath "
-                + "({}: {}); provide the missing engine if you need this target format. This is "
-                + "expected when an engine is intentionally absent, but indicates a linkage problem "
-                + "if the engine is present.",
-            error.getClass().getName(),
-            error.getMessage(),
-            error);
+        // A registered target whose engine library is absent. Skip it so a subset of engines works;
+        // a missing engine for the requested format still fails below as NotSupportedException.
+        log.warn("Skipping a ConversionTarget whose engine library is not on the classpath", error);
         continue;
       }
       if (target.getTableFormat().equalsIgnoreCase(tableFormatName)

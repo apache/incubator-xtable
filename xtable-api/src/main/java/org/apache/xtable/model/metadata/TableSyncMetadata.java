@@ -28,6 +28,7 @@ import lombok.AllArgsConstructor;
 import lombok.Value;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -46,6 +47,10 @@ public class TableSyncMetadata {
       new ObjectMapper()
           .registerModule(new JavaTimeModule())
           .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+          // A reader on an older version has to tolerate fields a newer writer added, since this
+          // blob is persisted in target-table metadata and is read back by whichever version
+          // happens to open the table next.
+          .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
           .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
   /** Property name for the XTABLE metadata in the table metadata/properties */
@@ -56,7 +61,12 @@ public class TableSyncMetadata {
   int version;
   String sourceTableFormat;
   String sourceIdentifier;
-  String latestTableOperationId;
+  /**
+   * Identifies the source-table operation this sync corresponds to. The contents are specific to
+   * the source format, so a target must treat them as opaque. See {@link
+   * org.apache.xtable.model.InternalTable#latestTableOperationIdentifier}.
+   */
+  String latestTableOperationIdentifier;
 
   /**
    * @deprecated Use {@link #of(Instant, List, String, String)} instead. This method exists for
@@ -86,14 +96,14 @@ public class TableSyncMetadata {
       List<Instant> instantsToConsiderForNextSync,
       String sourceTableFormat,
       String sourceIdentifier,
-      String latestTableOperationId) {
+      String latestTableOperationIdentifier) {
     return new TableSyncMetadata(
         lastInstantSynced,
         instantsToConsiderForNextSync,
         CURRENT_VERSION,
         sourceTableFormat,
         sourceIdentifier,
-        latestTableOperationId);
+        latestTableOperationIdentifier);
   }
 
   public String toJson() {

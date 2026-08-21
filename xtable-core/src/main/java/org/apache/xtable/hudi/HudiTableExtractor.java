@@ -76,7 +76,7 @@ public class HudiTableExtractor {
   }
 
   public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
-    InternalSchema canonicalSchema = getCanonicalSchema(metaClient, commit);
+    InternalSchema canonicalSchema = getCanonicalSchemaFromTimeline(metaClient, commit);
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -95,7 +95,7 @@ public class HudiTableExtractor {
         .readSchema(canonicalSchema)
         .latestMetadataPath(metaClient.getMetaPath().toString())
         .latestCommitTime(HudiInstantUtils.parseFromInstantTime(commit.requestedTime()))
-        .latestTableOperationId(generateTableOperationId(commit))
+        .latestTableOperationIdentifier(generateTableOperationId(commit))
         .build();
   }
 
@@ -103,7 +103,8 @@ public class HudiTableExtractor {
       HoodieTableMetaClient metaClient,
       HoodieCommitMetadata commitMetadata,
       HoodieInstant completedInstant) {
-    InternalSchema canonicalSchema = getCanonicalSchema(commitMetadata);
+    InternalSchema canonicalSchema =
+        getCanonicalSchemaFromCommitMetadata(metaClient, commitMetadata, completedInstant);
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -121,20 +122,39 @@ public class HudiTableExtractor {
         .partitioningFields(partitionFields)
         .readSchema(canonicalSchema)
         .latestMetadataPath(metaClient.getMetaPath().toString())
+        // Completion time, not requested time as the timeline-based overload uses. A pluggable
+        // table format is called once an instant completes and orders by completion time, so this
+        // is the clock its incremental-sync decision has to compare against.
         .latestCommitTime(
             HudiInstantUtils.parseFromInstantTime(completedInstant.getCompletionTime()))
-        .latestTableOperationId(generateTableOperationId(completedInstant))
+        .latestTableOperationIdentifier(generateTableOperationId(completedInstant))
         .build();
   }
 
-  private InternalSchema getCanonicalSchema(HoodieCommitMetadata commitMetadata) {
-    HoodieSchema writerSchema =
-        HoodieSchema.parse(commitMetadata.getExtraMetadata().get(SCHEMA_KEY));
-    return schemaExtractor.schema(
-        HoodieSchemaUtils.addMetadataFields(writerSchema, false).toAvroSchema());
+  private InternalSchema getCanonicalSchemaFromCommitMetadata(
+      HoodieTableMetaClient metaClient, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
+    String writerSchemaJson = commitMetadata.getExtraMetadata().get(SCHEMA_KEY);
+    if (writerSchemaJson == null) {
+      throw new SchemaExtractorException(
+          String.format(
+              "Commit metadata for instant %s of table %s carries no writer schema",
+              commit, metaClient.getTableConfig().getTableName()));
+    }
+    boolean withOperationField = false;
+    try {
+      HoodieSchema writerSchema = HoodieSchema.parse(writerSchemaJson);
+      return schemaExtractor.schema(
+          HoodieSchemaUtils.addMetadataFields(writerSchema, withOperationField).toAvroSchema());
+    } catch (Exception e) {
+      throw new SchemaExtractorException(
+          String.format(
+              "Unable to read the writer schema for instant %s of table %s",
+              commit, metaClient.getTableConfig().getTableName()),
+          e);
+    }
   }
 
-  private InternalSchema getCanonicalSchema(
+  private InternalSchema getCanonicalSchemaFromTimeline(
       HoodieTableMetaClient metaClient, HoodieInstant commit) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
     InternalSchema canonicalSchema;

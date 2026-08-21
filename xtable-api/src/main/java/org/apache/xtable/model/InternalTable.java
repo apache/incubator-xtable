@@ -52,6 +52,15 @@ public class InternalTable {
   Instant latestCommitTime;
   // Path to latest metadata
   String latestMetadataPath;
-  // latest operation on the table.
-  String latestTableOperationId;
+  /**
+   * Identifies the source-table operation this state was derived from, or null when the source does
+   * not supply one. Written by the source's table extractor and carried into the target's metadata
+   * by {@link org.apache.xtable.spi.sync.TableFormatSync}, so that a target reading its own
+   * metadata back can tell which source operation it last applied.
+   *
+   * <p>The contents are specific to the source format. The Hudi extractor writes a serialised Hudi
+   * instant, which only Hudi-aware code should parse; every other target must treat this as an
+   * opaque string.
+   */
+  String latestTableOperationIdentifier;
 }
