@@ -312,4 +312,18 @@
     </project>
   </supplement>
 
+
+  <!-- Dual licensed GPL-2.0-with-classpath-exception OR MIT; MIT is the option taken. -->
+  <supplement>
+    <project>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-compat-qual</artifactId>
+      <licenses>
+        <license>
+          <name>MIT License</name>
+          <url>http://opensource.org/licenses/MIT</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
 </supplementalDataModels>
