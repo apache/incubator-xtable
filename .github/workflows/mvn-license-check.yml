@@ -96,7 +96,7 @@ jobs:
       - name: Build Shaded Bundles
         run: >
           ./mvnw -B -DskipTests -Dmaven.build.cache.enabled=false
-          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions,xtable-utilities
+          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions
           -am package
           dependency:tree -DoutputType=text -DoutputFile=target/dependency-tree.txt
 
