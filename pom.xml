@@ -670,6 +670,10 @@
                                             <exclude>META-INF/*.DSA</exclude>
                                             <exclude>META-INF/*.RSA</exclude>
                                             <exclude>**/Log4j2Plugins.dat</exclude>
+                                            <!-- RocksDB natives for platforms we do not run on. -->
+                                            <exclude>librocksdbjni-linux-ppc64le*</exclude>
+                                            <exclude>librocksdbjni-linux-s390x*</exclude>
+                                            <exclude>librocksdbjni-linux32*</exclude>
                                         </excludes>
                                     </filter>
                                 </filters>
