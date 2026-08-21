@@ -72,31 +72,21 @@ public class IcebergRollbackExecutor {
               .get();
       HoodieInstant latestHoodieInstantInIceberg =
           InstantDTO.toInstant(
-              MAPPER.readValue(syncMetadata.getLatestTableOperationId(), InstantDTO.class),
+              MAPPER.readValue(syncMetadata.getLatestTableOperationIdentifier(), InstantDTO.class),
               metaClient.getInstantGenerator());
       if (latestHoodieInstantInIceberg.equals(instantToRollback)) {
-        // The instant to rollback is the one the current snapshot records, so un-publish it by
-        // making its parent current again.
+        // The instant to rollback is committed in iceberg, so rollback to previous snapshot.
         // NOTE: This is equivalent to hudi restore and should be performed by killing all active
         // writers.
-        Long parentSnapshotId = table.currentSnapshot().parentId();
-        if (parentSnapshotId == null) {
-          throw new IllegalStateException(
-              String.format(
-                  "Cannot roll back instant '%s' because the snapshot recording it is the first "
-                      + "snapshot of the table and has no parent to fall back to.",
-                  instantToRollback));
-        }
         target.beginSync(internalTable);
-        target.rollbackToSnapshotId(parentSnapshotId);
+        target.rollbackToSnapshotId(table.currentSnapshot().snapshotId());
       } else if (InstantComparison.compareTimestamps(
           latestHoodieInstantInIceberg.getCompletionTime(),
           InstantComparison.LESSER_THAN,
           instantToRollback.getCompletionTime())) {
-        // In this case, instantToRollback was not committed in iceberg, so we can will be ignoring
-        // it.
+        // instantToRollback was never committed in iceberg, so there is nothing to undo.
         log.info(
-            "Ignoring rollback to instant {}' because it is not committed in Iceberg. Latest committed instant in Iceberg {}'",
+            "Ignoring rollback to instant {} because it is not committed in Iceberg. Latest committed instant in Iceberg is {}",
             instantToRollback,
             latestHoodieInstantInIceberg);
       } else {

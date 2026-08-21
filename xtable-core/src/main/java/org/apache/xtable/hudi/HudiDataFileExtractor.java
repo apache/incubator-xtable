@@ -164,7 +164,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
 
-  public InternalFilesDiff getDiffForCommit(
+  /**
+   * Derives the file diff from the metadata of the commit being written, rather than by comparing
+   * two committed states as {@link #getDiffForCommit(HoodieInstant, InternalTable, HoodieInstant,
+   * HoodieTimeline)} does. Requires the constructor taking a {@link FileSystemViewManager}, since
+   * it reads the live file system view. Log files are skipped, so merge-on-read updates are not
+   * represented.
+   */
+  public InternalFilesDiff getDiffFromCommitMetadata(
       InternalTable table, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
@@ -213,7 +220,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
   }
 
-  public InternalFilesDiff getDiffForReplaceCommit(
+  /**
+   * Replace-commit counterpart of {@link #getDiffFromCommitMetadata}. Files the replace commit
+   * supersedes are reported as removed, files it wrote as added.
+   */
+  public InternalFilesDiff getDiffFromReplaceCommitMetadata(
       InternalTable table,
       HoodieReplaceCommitMetadata replaceCommitMetadata,
       HoodieInstant commit) {
