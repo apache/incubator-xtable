@@ -297,9 +297,7 @@ public class IcebergConversionTarget implements ConversionTarget {
         .cleanExpiredFiles(true)
         .commit();
     transaction.commitTransaction();
-    transaction = null;
-    internalTableState = null;
-    tableSyncMetadata = null;
+    resetTransactionState();
   }
 
   private void safeDelete(String file) {
@@ -348,21 +346,40 @@ public class IcebergConversionTarget implements ConversionTarget {
     return Optional.empty();
   }
 
+  /**
+   * Expires the given snapshots and ends the sync. Requires {@link #beginSync} to have run. Passing
+   * an empty list is a no-op rather than an empty metadata commit, since callers driven by Hudi
+   * archival reach this on every round.
+   *
+   * @param snapshotIds snapshots to expire
+   */
   public void expireSnapshotIds(List<Long> snapshotIds) {
+    if (snapshotIds.isEmpty()) {
+      // Nothing to expire, so end the sync without writing a metadata version that changes nothing.
+      resetTransactionState();
+      return;
+    }
     ExpireSnapshots expireSnapshots = transaction.expireSnapshots().deleteWith(this::safeDelete);
     for (Long snapshotId : snapshotIds) {
       expireSnapshots.expireSnapshotId(snapshotId);
     }
     expireSnapshots.commit();
     transaction.commitTransaction();
-    transaction = null;
-    internalTableState = null;
-    tableSyncMetadata = null;
+    resetTransactionState();
   }
 
+  /**
+   * Makes the given snapshot current and ends the sync. Requires {@link #beginSync} to have run.
+   *
+   * @param snapshotId the snapshot to roll back to, which must be an ancestor of the current one
+   */
   public void rollbackToSnapshotId(long snapshotId) {
     table.manageSnapshots().rollbackTo(snapshotId).commit();
     transaction.commitTransaction();
+    resetTransactionState();
+  }
+
+  private void resetTransactionState() {
     transaction = null;
     internalTableState = null;
     tableSyncMetadata = null;

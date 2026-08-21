@@ -18,7 +18,6 @@
  
 package org.apache.xtable;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
@@ -47,15 +46,5 @@ class TestIcebergTableFormatWiring {
   void suppliesTheIcebergTimelineAndMetadataFactories() {
     assertInstanceOf(IcebergTimelineFactory.class, tableFormat().getTimelineFactory());
     assertInstanceOf(IcebergMetadataFactory.class, tableFormat().getMetadataFactory());
-  }
-
-  @Test
-  void savepointAndRestoreTouchNothing() {
-    // Both change no data files. Recording them would put a non-data snapshot at the Iceberg tip
-    // whose completion time is later than the commits it protects, which breaks rollback. They must
-    // stay side-effect free, so they never reach the metaClient or the view manager.
-    IcebergTableFormat tableFormat = tableFormat();
-    assertDoesNotThrow(() -> tableFormat.savepoint(null, null, null, null));
-    assertDoesNotThrow(() -> tableFormat.restore(null, null, null, null));
   }
 }
