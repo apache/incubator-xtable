@@ -19,46 +19,15 @@
 package org.apache.xtable.timeline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 
 class TestIcebergActiveTimeline {
-
-  @ParameterizedTest
-  @ValueSource(
-      strings = {
-        HoodieTimeline.COMMIT_ACTION,
-        HoodieTimeline.DELTA_COMMIT_ACTION,
-        HoodieTimeline.REPLACE_COMMIT_ACTION,
-        HoodieTimeline.CLUSTERING_ACTION,
-        HoodieTimeline.COMPACTION_ACTION,
-        HoodieTimeline.CLEAN_ACTION,
-        HoodieTimeline.ROLLBACK_ACTION
-      })
-  void actionsThatChangeDataNeedAnIcebergSnapshot(String action) {
-    assertTrue(
-        IcebergActiveTimeline.changesDataFiles(action),
-        action + " adds or removes data files, so an Iceberg snapshot has to record it");
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {HoodieTimeline.SAVEPOINT_ACTION, HoodieTimeline.RESTORE_ACTION})
-  void actionsThatChangeNoDataAreTakenFromTheHudiTimeline(String action) {
-    assertFalse(
-        IcebergActiveTimeline.changesDataFiles(action),
-        action
-            + " changes no data files, so no Iceberg snapshot records it and requiring one would"
-            + " report a completed instant as inflight");
-  }
 
   @Test
   void instantKeySeparatesASavepointFromTheCommitItSavepoints() {

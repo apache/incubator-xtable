@@ -19,9 +19,8 @@
 package org.apache.xtable.timeline;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
@@ -30,6 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 
 import org.apache.iceberg.Snapshot;
@@ -72,30 +72,27 @@ public class IcebergTimelineArchiver {
     if (tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
       Table table =
           tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
-      Set<String> savepointedInstantTimes =
-          metaClient
-              .getActiveTimeline()
-              .getSavePointTimeline()
-              .filterCompletedInstants()
-              .getInstantsAsStream()
-              .map(HoodieInstant::requestedTime)
-              .collect(Collectors.toSet());
       List<Long> expireSnapshots = new ArrayList<>();
-      for (Snapshot snapshot : table.snapshots()) {
+      // Iceberg does not document an ordering for snapshots(), and stopping at the wrong point
+      // would expire a snapshot a savepoint still needs, so order explicitly.
+      List<Snapshot> snapshotsOldestFirst = new ArrayList<>();
+      table.snapshots().forEach(snapshotsOldestFirst::add);
+      // Sequence numbers are all zero on a format-version 1 table, so fall back to commit time.
+      snapshotsOldestFirst.sort(
+          Comparator.comparingLong(Snapshot::sequenceNumber)
+              .thenComparingLong(Snapshot::timestampMillis));
+      for (Snapshot snapshot : snapshotsOldestFirst) {
         TableSyncMetadata syncMetadata =
             TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
                 .get();
         HoodieInstant hoodieInstant =
             InstantDTO.toInstant(
-                MAPPER.readValue(syncMetadata.getLatestTableOperationId(), InstantDTO.class),
+                MAPPER.readValue(
+                    syncMetadata.getLatestTableOperationIdentifier(), InstantDTO.class),
                 metaClient.getInstantGenerator());
-        // A savepoint changes no data, so no snapshot carries the savepoint action itself. The
-        // savepointed commit's snapshot and everything newer has to survive for a restore to it to
-        // remain possible.
-        if (savepointedInstantTimes.contains(hoodieInstant.requestedTime())) {
-          log.warn(
-              "Not expiring the snapshot for {} or any newer snapshot because it is savepointed",
-              hoodieInstant);
+        if (HoodieTimeline.SAVEPOINT_ACTION.equals(hoodieInstant.getAction())) {
+          log.info(
+              "Skipping expiring next set of snapshots because of savepoint {}", hoodieInstant);
           break;
         }
         if (archivedInstants.contains(hoodieInstant)) {
