@@ -215,6 +215,36 @@
   "Apache License (v2.0)", "Apache v2", "Apache-2.0 License",
   "The Apache Software License, version 2.0"
 ])
+#*
+  Spelling variants collapsed to one canonical name per licence family.
+*#
+#set($canonical = {
+  "BSD-3-Clause": "BSD 3-Clause License",
+  "The BSD License": "BSD 3-Clause License",
+  "BSD New license": "BSD 3-Clause License",
+  "New BSD License": "BSD 3-Clause License",
+  "The New BSD License": "BSD 3-Clause License",
+  "3-Clause BSD License": "BSD 3-Clause License",
+  "BSD 3-clause": "BSD 3-Clause License",
+  "Revised BSD": "BSD 3-Clause License",
+  "BSD": "BSD 3-Clause License",
+  "BSD 2-Clause License": "BSD 2-Clause License",
+  "The MIT License": "MIT License",
+  "The MIT License (MIT)": "MIT License",
+  "MIT license": "MIT License",
+  "MIT": "MIT License",
+  "CDDL 1.1": "Common Development and Distribution License 1.1",
+  "CDDL License": "Common Development and Distribution License 1.1",
+  "COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0": "Common Development and Distribution License 1.0",
+  "CDDL/GPLv2+CE": "CDDL + GPLv2 with classpath exception",
+  "GNU General Public License, version 2 (GPL2), with the classpath exception": "GPL 2.0 with Classpath Exception",
+  "GNU General Public License (GPL), version 2, with the Classpath exception": "GPL 2.0 with Classpath Exception",
+  "Eclipse Public License v2.0": "EPL 2.0",
+  "Eclipse Public License 2.0": "EPL 2.0",
+  "Eclipse Public License - Version 1.0": "EPL 1.0",
+  "Eclipse Public License, Version 1.0": "EPL 1.0",
+  "Bouncy Castle Licence": "Bouncy Castle License"
+})
 #set($other = [])
 #set($unmapped = [])
 #foreach( $dep in $projects )
@@ -231,6 +261,9 @@
 #if( $name == "" )
 #set( $ignore = $unmapped.add("${dep.groupId}:${dep.artifactId}:${dep.version}") )
 #else
+#if( $canonical.containsKey($name) )
+#set( $name = $canonical.get($name) )
+#end
 #set( $ignore = $other.add("${dep.groupId}:${dep.artifactId}    ${name}. See META-INF/licenses/LICENSE-${dep.artifactId}.") )
 #end
 #end
