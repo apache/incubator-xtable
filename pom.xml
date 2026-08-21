@@ -448,17 +448,13 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- AWS -->
+            <!-- AWS. The BOM manages every SDK artifact, so modules name only what they use. -->
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bundle</artifactId>
+                <artifactId>bom</artifactId>
                 <version>${aws.version}</version>
-                <scope>runtime</scope>
-            </dependency>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>glue</artifactId>
-                <version>${aws.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- Protobuf -->

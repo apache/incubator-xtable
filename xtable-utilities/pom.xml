@@ -216,9 +216,22 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-aws</artifactId>
         </dependency>
+        <!-- What hadoop-aws S3A needs. The all-services `bundle` artifact was 63% of the shaded jar. -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
-            <artifactId>bundle</artifactId>
+            <artifactId>s3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sts</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3-transfer-manager</artifactId>
         </dependency>
 
         <!-- Azure Dependencies -->
@@ -751,7 +764,10 @@
                             <include>software.amazon.awssdk:auth</include>
                             <include>software.amazon.awssdk:aws-core</include>
                             <include>software.amazon.awssdk:aws-json-protocol</include>
-                            <include>software.amazon.awssdk:bundle</include>
+                            <include>software.amazon.awssdk:s3</include>
+                            <include>software.amazon.awssdk:sts</include>
+                            <include>software.amazon.awssdk:netty-nio-client</include>
+                            <include>software.amazon.awssdk:s3-transfer-manager</include>
                             <include>software.amazon.awssdk:checksums</include>
                             <include>software.amazon.awssdk:checksums-spi</include>
                             <include>software.amazon.awssdk:endpoints-spi</include>
