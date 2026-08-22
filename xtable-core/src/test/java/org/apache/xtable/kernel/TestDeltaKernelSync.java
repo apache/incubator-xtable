@@ -77,6 +77,8 @@ import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.spi.sync.TableFormatSync;
 
 /**
@@ -115,21 +117,13 @@ public class TestDeltaKernelSync {
 
   @Test
   public void testCreateSnapshotControlFlow() throws Exception {
-    InternalSchema schema1 = getInternalSchema();
-    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
-    fields2.add(
-        InternalField.builder()
-            .name("float_field")
-            .schema(
-                InternalSchema.builder()
-                    .name("float")
-                    .dataType(InternalType.FLOAT)
-                    .isNullable(true)
-                    .build())
-            .build());
-    InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
-    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
-    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    // Both snapshots use the same schema: this test is about the file add/remove control flow
+    // across two sequential snapshot syncs to an existing table, not schema evolution (which
+    // DeltaKernelConversionTarget does not support for existing tables; see
+    // testSchemaEvolutionOnExistingTableFailsSync below).
+    InternalSchema schema = getInternalSchema();
+    InternalTable table1 = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
 
     InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
@@ -145,6 +139,54 @@ public class TestDeltaKernelSync {
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)));
+  }
+
+  @Test
+  public void testSchemaEvolutionOnExistingTableFailsSync() throws Exception {
+    // DeltaKernelConversionTarget.commitTransaction() only applies withSchema() on CREATE_TABLE
+    // (Delta Kernel 4.0.0 limitation, see https://github.com/delta-io/delta/issues/4305), so a
+    // second sync that evolves the schema of an already-existing table must fail the sync rather
+    // than silently commit files without registering the new schema in the Delta log.
+    InternalSchema schema1 = getInternalSchema();
+    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
+    fields2.add(
+        InternalField.builder()
+            .name("float_field")
+            .schema(
+                InternalSchema.builder()
+                    .name("float")
+                    .dataType(InternalType.FLOAT)
+                    .isNullable(true)
+                    .build())
+            .build());
+    InternalSchema schema2 = schema1.toBuilder().fields(fields2).build();
+    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
+
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
+    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)));
+
+    Map<String, SyncResult> results =
+        TableFormatSync.getInstance()
+            .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
+    SyncResult.SyncStatus status = results.get(TableFormat.DELTA).getTableFormatSyncStatus();
+    assertEquals(SyncStatusCode.ERROR, status.getStatusCode());
+    assertTrue(
+        status.getErrorDetails().getErrorMessage().contains("delta/issues/4305"),
+        "Expected error message to reference the upstream Kernel limitation, but was: "
+            + status.getErrorDetails().getErrorMessage());
+
+    // The table must be left exactly as the first sync left it: the second sync's files must not
+    // have been committed alongside a stale schema.
+    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)));
   }
 
   @Test
@@ -569,21 +611,13 @@ public class TestDeltaKernelSync {
 
   @Test
   public void testTimestampNtz() throws Exception {
-    InternalSchema schema1 = getInternalSchemaWithTimestampNtz();
-    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
-    fields2.add(
-        InternalField.builder()
-            .name("float_field")
-            .schema(
-                InternalSchema.builder()
-                    .name("float")
-                    .dataType(InternalType.FLOAT)
-                    .isNullable(true)
-                    .build())
-            .build());
-    InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
-    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
-    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    // Both snapshots use the same TIMESTAMP_NTZ-inclusive schema: this test is about that type
+    // being handled correctly across two sequential snapshot syncs to an existing table, not
+    // schema evolution (which DeltaKernelConversionTarget does not support for existing tables;
+    // see testSchemaEvolutionOnExistingTableFailsSync).
+    InternalSchema schema = getInternalSchemaWithTimestampNtz();
+    InternalTable table1 = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
 
     InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
