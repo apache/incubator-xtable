@@ -59,6 +59,7 @@ import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterable;
 
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
@@ -102,8 +103,14 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  *   <li><strong>Commit Tags:</strong> Delta Kernel 4.0.0 does not support commit tags in commitInfo
  *       (e.g., XTABLE_METADATA tags). This affects source-to-target commit identifier mapping.
  *       Tracked in: https://github.com/apache/incubator-xtable/issues/819
- *   <li><strong>Schema Evolution:</strong> Schema changes are handled through Delta Kernel's
- *       transaction API, which may have different semantics compared to Delta Standalone.
+ *   <li><strong>Schema Evolution:</strong> Delta Kernel 4.0.0 only applies a schema via {@code
+ *       TransactionBuilder.withSchema()} on {@code CREATE_TABLE}, not on {@code WRITE} to an
+ *       existing table. {@link #syncSchema(InternalSchema)} detects when a sync's schema differs
+ *       from an existing table's current schema and throws {@link NotSupportedException} rather
+ *       than silently committing a stale schema. Set {@link
+ *       org.apache.xtable.delta.DeltaConversionTargetConfig#USE_KERNEL} to {@code false} to fall
+ *       back to the Delta Standalone target, which does support this. Tracked upstream:
+ *       https://github.com/delta-io/delta/issues/4305
  *   <li><strong>Internal API Usage:</strong> This implementation casts to internal classes
  *       (SnapshotImpl, TableImpl) to access metadata and commit history, as Delta Kernel 4.0.0
  *       lacks public APIs for these operations. These casts are brittle and may break on version
@@ -229,6 +236,29 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
   @Override
   public void syncSchema(InternalSchema schema) {
+    if (transactionState.isTableExists()) {
+      // Compare in Kernel's own StructType, not InternalSchema, to avoid false positives from
+      // any asymmetry in the InternalSchema<->StructType round trip. transactionState's current
+      // latestSchema still holds the schema loaded from the existing snapshot at this point,
+      // since it is only overwritten by the setLatestSchema() call below.
+      StructType existingSchema = transactionState.getLatestSchema();
+      StructType newSchema = schemaExtractor.fromInternalSchema(schema);
+      if (!newSchema.equals(existingSchema)) {
+        // LIMITATION: Delta Kernel 4.0.0's TransactionBuilder.withSchema() only takes effect for
+        // CREATE_TABLE operations (see commitTransaction() below), so there is no supported way
+        // to commit an evolved schema for an existing table today. Committing anyway would write
+        // AddFile actions for files that may contain the new columns/fields while leaving the
+        // table's registered schema stale, silently making the new data unreadable rather than
+        // failing. Fail fast instead. Tracked upstream: https://github.com/delta-io/delta/issues/4305
+        throw new NotSupportedException(
+            "Schema evolution on an existing Delta table is not supported by "
+                + "DeltaKernelConversionTarget (see https://github.com/delta-io/delta/issues/4305). "
+                + "Set "
+                + DeltaConversionTargetConfig.USE_KERNEL
+                + "=false on the target's additional properties to use the Delta Standalone "
+                + "target instead.");
+      }
+    }
     transactionState.setLatestSchema(schema);
   }
 
@@ -378,6 +408,14 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     }
 
     /**
+     * Whether the target table already existed at the start of this sync. Package-private to
+     * allow access from outer class.
+     */
+    boolean isTableExists() {
+      return tableExists;
+    }
+
+    /**
      * Gets the cached snapshot. Returns null if no snapshot was cached (new table). Package-private
      * to allow access from outer class.
      */
@@ -415,11 +453,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
           table.createTransactionBuilder(engine, "XTable Delta Sync", operation);
 
       // LIMITATION: Schema evolution for existing tables is NOT supported in Delta Kernel 4.0.0.
-      // The withSchema() method only works during CREATE_TABLE operations. For existing tables:
-      // - AddFile/RemoveFile actions are created using the old schema from existing snapshot
-      // - If source schema has evolved (columns added/removed/type changed), the Delta table
-      //   will have mismatched metadata and data, causing query failures or incorrect results
-      // This is a known Delta Kernel limitation: https://github.com/delta-io/delta/issues/4305
+      // The withSchema() method only works during CREATE_TABLE operations. syncSchema() already
+      // guards against this by throwing NotSupportedException as soon as an evolved schema is
+      // detected for an existing table, so by the time we get here, an existing table's schema
+      // is guaranteed to be unchanged from the existing snapshot. This is a known Delta Kernel
+      // limitation: https://github.com/delta-io/delta/issues/4305
       if (!tableExists) {
         txnBuilder = txnBuilder.withSchema(engine, latestSchema);
 

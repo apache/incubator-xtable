@@ -28,6 +28,8 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -101,6 +103,7 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.delta.DeltaConversionTargetConfig;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
@@ -108,6 +111,8 @@ import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
 
 public class ITConversionController {
@@ -239,11 +244,7 @@ public class ITConversionController {
   public void testVariousOperations(
       String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     runVariousOperationsTest(
-        sourceTableFormat,
-        syncMode,
-        isPartitioned,
-        getConversionSourceProvider(sourceTableFormat),
-        false);
+        sourceTableFormat, syncMode, isPartitioned, getConversionSourceProvider(sourceTableFormat));
   }
 
   // Runs the same equivalence checks as testVariousOperations above, but forces the Delta Kernel
@@ -260,29 +261,85 @@ public class ITConversionController {
     ConversionSourceProvider<Long> deltaKernelConversionSourceProvider =
         new DeltaKernelConversionSourceProvider();
     deltaKernelConversionSourceProvider.init(jsc.hadoopConfiguration());
-    runVariousOperationsTest(
-        DELTA, syncMode, isPartitioned, deltaKernelConversionSourceProvider, false);
+    runVariousOperationsTest(DELTA, syncMode, isPartitioned, deltaKernelConversionSourceProvider);
   }
 
-  // Runs the same equivalence checks as testVariousOperations, but with the DELTA leg of the
-  // target formats routed through DeltaKernelConversionTarget instead of the default Standalone
-  // target, by setting DeltaConversionTargetConfig.USE_KERNEL on that target's properties. Source
-  // is fixed to HUDI, which is a simple, always-available source unrelated to what's under test
-  // here (the target-side dispatch). Covers the "as a target" half of prerequisite #1 in
+  // Validates the DELTA target routed through DeltaKernelConversionTarget (via
+  // DeltaConversionTargetConfig.USE_KERNEL on that target's properties, using
+  // ConversionTargetFactory's normal dispatch path). Source is fixed to HUDI, a simple,
+  // always-available source unrelated to what's under test here (the target-side dispatch).
+  // Covers the "as a target" half of prerequisite #1 in
   // https://github.com/apache/incubator-xtable/issues/886.
+  //
+  // DeltaKernelConversionTarget does not support schema evolution on an already-existing table
+  // (Delta Kernel 4.0.0 only applies withSchema() at CREATE_TABLE; see
+  // https://github.com/delta-io/delta/issues/4305) and throws NotSupportedException rather than
+  // silently committing a stale schema. ConversionController.sync() catches that per-target
+  // (TableFormatSync#buildResultForError) rather than propagating it, so the exception surfaces
+  // as a SyncStatusCode.ERROR entry in the returned result map, not as a thrown exception from
+  // sync() itself. This test therefore doesn't reuse runVariousOperationsTest: it syncs an
+  // initial snapshot (expected to succeed, verified via the normal equivalence check), then
+  // evolves the schema and syncs again, asserting the DELTA target's sync result is ERROR with
+  // the expected message, and that the target's data was left at its last-good state rather than
+  // partially written.
   @ParameterizedTest
   @MethodSource("generateTestParametersForSyncModesAndPartitioning")
   public void testVariousOperationsDeltaKernelTarget(SyncMode syncMode, boolean isPartitioned) {
-    runVariousOperationsTest(
-        HUDI, syncMode, isPartitioned, getConversionSourceProvider(HUDI), true);
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    String partitionConfig = isPartitioned ? "level:VALUE" : null;
+    List<String> targetTableFormats = Collections.singletonList(DELTA);
+
+    try (GenericTable table =
+        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, HUDI, isPartitioned)) {
+      table.insertRows(100);
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI, syncMode, tableName, table, targetTableFormats, partitionConfig, null, true);
+      Map<String, SyncResult> results =
+          conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS, results.get(DELTA).getTableFormatSyncStatus().getStatusCode());
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
+    }
+
+    try (GenericTable tableWithUpdatedSchema =
+        GenericTable.getInstanceWithAdditionalColumns(
+            tableName, tempDir, sparkSession, jsc, HUDI, isPartitioned)) {
+      tableWithUpdatedSchema.insertRows(100);
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI,
+              syncMode,
+              tableName,
+              tableWithUpdatedSchema,
+              targetTableFormats,
+              partitionConfig,
+              null,
+              true);
+      Map<String, SyncResult> results =
+          conversionController.sync(conversionConfig, conversionSourceProvider);
+      SyncResult.SyncStatus deltaStatus = results.get(DELTA).getTableFormatSyncStatus();
+      assertEquals(SyncStatusCode.ERROR, deltaStatus.getStatusCode());
+      assertTrue(
+          deltaStatus
+              .getErrorDetails()
+              .getErrorMessage()
+              .contains("https://github.com/delta-io/delta/issues/4305"));
+
+      // The target should be left exactly at its last successfully-synced state (100 rows, old
+      // schema), not partially written with some but not all of the new rows/columns.
+      long targetRowCount =
+          sparkSession.read().format("delta").load(tableWithUpdatedSchema.getDataPath()).count();
+      assertEquals(100, targetRowCount);
+    }
   }
 
   private void runVariousOperationsTest(
       String sourceTableFormat,
       SyncMode syncMode,
       boolean isPartitioned,
-      ConversionSourceProvider<?> conversionSourceProvider,
-      boolean useDeltaKernelTarget) {
+      ConversionSourceProvider<?> conversionSourceProvider) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
     if (sourceTableFormat.equals(PAIMON)) {
@@ -308,8 +365,7 @@ public class ITConversionController {
               table,
               targetTableFormats,
               partitionConfig,
-              null,
-              useDeltaKernelTarget);
+              null);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
@@ -341,8 +397,7 @@ public class ITConversionController {
               tableWithUpdatedSchema,
               targetTableFormats,
               partitionConfig,
-              null,
-              useDeltaKernelTarget);
+              null);
       List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
       tableWithUpdatedSchema.reload();
       conversionController.sync(conversionConfig, conversionSourceProvider);
