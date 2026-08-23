@@ -104,6 +104,10 @@ public class ITDeltaDeleteVectorConvert {
             "ALTER TABLE "
                 + tableName
                 + " SET TBLPROPERTIES ('delta.enableDeletionVectors' = true)");
+    // The DeltaTable handle resolved at construction still carries the pre-ALTER protocol, and
+    // as of Delta 3.x a merge planned against it does not see deletion vectors as readable, so
+    // the row_index metadata column the DV write path needs is never exposed.
+    testSparkDeltaTable.reload();
 
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
