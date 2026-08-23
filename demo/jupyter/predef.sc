@@ -50,7 +50,7 @@ def xtableVersion(key: String): String =
     ("org.apache.spark", s"spark-hive_$scalaBinaryVersion", xtableVersion("spark.version")),
     ("org.apache.hudi", s"hudi-spark$sparkVersionPrefix-bundle_$scalaBinaryVersion", xtableVersion("hudi.version")),
     ("org.apache.hudi", "hudi-java-client", xtableVersion("hudi.version")),
-    ("io.delta", s"delta-core_$scalaBinaryVersion", xtableVersion("delta.version")),
+    ("io.delta", s"delta-spark_$scalaBinaryVersion", xtableVersion("delta.version")),
     ("io.delta", "delta-kernel-api", xtableVersion("delta.kernel.version")),
     ("io.delta", "delta-kernel-defaults", xtableVersion("delta.kernel.version")),
     ("org.apache.iceberg", "iceberg-hive-runtime", xtableVersion("iceberg.hive.runtime.version")),

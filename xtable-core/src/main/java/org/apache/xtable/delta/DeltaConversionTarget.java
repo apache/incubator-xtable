@@ -130,7 +130,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, tableDataPath);
     boolean deltaTableExists = deltaLog.tableExists();
     if (!deltaTableExists) {
-      deltaLog.ensureLogDirectoryExist();
+      deltaLog.createLogDirectoriesIfNotExists();
     }
     this.schemaExtractor = schemaExtractor;
     this.partitionExtractor = partitionExtractor;

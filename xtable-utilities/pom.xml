@@ -196,7 +196,7 @@
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <artifactId>delta-spark_${scala.binary.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
@@ -406,7 +406,7 @@
                             <include>commons-pool:commons-pool</include>
                             <include>dnsjava:dnsjava</include>
                             <include>io.airlift:aircompressor</include>
-                            <include>io.delta:delta-core_${scala.binary.version}</include>
+                            <include>io.delta:delta-spark_${scala.binary.version}</include>
                             <include>io.delta:delta-hive_${scala.binary.version}</include>
                             <include>io.delta:delta-kernel-api</include>
                             <include>io.delta:delta-kernel-defaults</include>

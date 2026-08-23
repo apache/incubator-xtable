@@ -65,7 +65,7 @@ pyspark \
 
 ```shell md title="shell"
 pyspark \
-  --packages io.delta:delta-core_2.12:2.1.0 \
+  --packages io.delta:delta-spark_2.12:3.3.3 \
   --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 ```
