@@ -28,7 +28,6 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
@@ -103,7 +102,6 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.delta.DeltaConversionTargetConfig;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;

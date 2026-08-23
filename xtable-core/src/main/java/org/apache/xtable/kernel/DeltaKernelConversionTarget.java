@@ -249,7 +249,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         // to commit an evolved schema for an existing table today. Committing anyway would write
         // AddFile actions for files that may contain the new columns/fields while leaving the
         // table's registered schema stale, silently making the new data unreadable rather than
-        // failing. Fail fast instead. Tracked upstream: https://github.com/delta-io/delta/issues/4305
+        // failing. Fail fast instead. Tracked upstream:
+        // https://github.com/delta-io/delta/issues/4305
         throw new NotSupportedException(
             "Schema evolution on an existing Delta table is not supported by "
                 + "DeltaKernelConversionTarget (see https://github.com/delta-io/delta/issues/4305). "
@@ -408,8 +409,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     }
 
     /**
-     * Whether the target table already existed at the start of this sync. Package-private to
-     * allow access from outer class.
+     * Whether the target table already existed at the start of this sync. Package-private to allow
+     * access from outer class.
      */
     boolean isTableExists() {
       return tableExists;
