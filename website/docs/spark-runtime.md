@@ -91,6 +91,8 @@ $SPARK_HOME/bin/spark-submit \
 The sync reads the table's existing source-format metadata and writes the Iceberg and Delta metadata
 alongside the data files the job already produced; no data is rewritten.
 
+### Run the sync inside the job
+
 If the job already submits its own application jar, add the runtime to that job's classpath with
 `--packages` instead of downloading it:
 
@@ -100,6 +102,65 @@ $SPARK_HOME/bin/spark-submit \
   --class com.example.YourJob \
   your-job.jar
 ```
+
+The job can then call `XTableSyncService` directly after its write, so the table is readable in the
+other formats without a second submit. Build one `TableSyncSpec` per table and pass the session's
+Hadoop configuration:
+
+#### A job that writes Hudi, kept readable as Iceberg and Delta
+
+```java md title="OrdersJob.java"
+import java.util.Arrays;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.xtable.spark.TableSyncSpec;
+import org.apache.xtable.spark.XTableSyncService;
+
+String basePath = "s3://example-warehouse/db/orders";
+
+// the write the job already does
+df.write().format("hudi").options(hudiOptions).mode("append").save(basePath);
+
+// keep Iceberg and Delta metadata in step with it
+Configuration hadoopConf = spark.sparkContext().hadoopConfiguration();
+new XTableSyncService()
+    .sync(
+        TableSyncSpec.builder()
+            .key("orders")
+            .basePath(basePath)
+            .sourceFormat("HUDI")
+            .targets(Arrays.asList("ICEBERG", "DELTA"))
+            .build(),
+        hadoopConf);
+```
+
+#### A job that writes Iceberg, kept readable as Hudi and Delta
+
+An Iceberg table keeps its data files under `<basePath>/data`, and the targets write their metadata
+alongside those files, so set `dataPath` as well:
+
+```java md title="OrdersIcebergJob.java"
+String basePath = "s3://example-warehouse/db/orders";
+
+// the write the job already does
+df.writeTo("catalog.db.orders").append();
+
+Configuration hadoopConf = spark.sparkContext().hadoopConfiguration();
+new XTableSyncService()
+    .sync(
+        TableSyncSpec.builder()
+            .key("orders")
+            .basePath(basePath)
+            .dataPath(basePath + "/data")
+            .sourceFormat("ICEBERG")
+            .targets(Arrays.asList("HUDI", "DELTA"))
+            .build(),
+        hadoopConf);
+```
+
+`sync` runs in `INCREMENTAL` mode and stores its watermark in the target's sync metadata. It falls
+back to a full snapshot when an incremental sync is not safe, such as the first run, so calling it
+after every write is idempotent. On Spark 3.4 add `.useDeltaKernel(true)` to force the Spark-free
+Delta Kernel writer; on Spark 3.5 and newer it is selected automatically.
 
 ## Sync multiple tables
 
