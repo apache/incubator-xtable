@@ -162,6 +162,24 @@ back to a full snapshot when an incremental sync is not safe, such as the first 
 after every write is idempotent. On Spark 3.4 add `.useDeltaKernel(true)` to force the Spark-free
 Delta Kernel writer; on Spark 3.5 and newer it is selected automatically.
 
+### Reading a Hudi target back
+
+XTable records a Hudi target's file listing in the Hudi metadata table rather than as physical file
+slices, so a reader has to enable it. Without this the sync reports success and the read returns
+zero rows:
+
+```scala md title="scala"
+spark.read
+  .option("hoodie.metadata.enable", "true")
+  .option("hoodie.datasource.read.extract.partition.values.from.path", "true")
+  .format("hudi")
+  .load(dataPath)
+```
+
+Iceberg and Delta targets need no extra read options. One exception: Iceberg's vectorized Arrow
+reader mis-casts timestamp columns on a table whose files another engine wrote, so pass
+`vectorization-enabled=false` if you hit that.
+
 ## Sync multiple tables
 
 To sync more than one table in a single submit, pass `--datasetconfig` with a YAML file instead of
@@ -242,3 +260,5 @@ implementation automatically, with no flag needed. To force Kernel on any Spark 
 - See [Installation](/docs/setup) for building the project.
 - See the [Quickstart](/docs/how-to) for an end-to-end interoperability walkthrough.
 - To query a synced table from Spark, see [Apache Spark](/docs/spark).
+- For a runnable end-to-end example of both directions, see
+  [`demo/spark-runtime`](https://github.com/apache/incubator-xtable/tree/main/demo/spark-runtime).
