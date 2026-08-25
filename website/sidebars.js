@@ -19,7 +19,8 @@ module.exports = {
             collapsed: false,
             items: [
                 'how-to',
-                'how-to-catalog-sync'
+                'how-to-catalog-sync',
+                'spark-runtime'
             ],
         },
         {
