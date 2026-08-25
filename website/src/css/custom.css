@@ -132,7 +132,9 @@ html[data-theme='dark'] {
 
 /* Blog list thumbnails differ in aspect ratio. Most are 2:1 and fill the column
    at about 365px tall, so cap every thumbnail there: a near-square image then
-   stands as tall as its neighbours instead of pushing its title far below. */
-.blog-image {
+   stands as tall as its neighbours instead of pushing its title far below.
+   The same image is the hero on the single-post page, where there is no
+   neighbour to line up with, so scope the cap to the list cards. */
+.blogPostCard .blog-image {
   max-height: 365px;
 }
