@@ -799,7 +799,7 @@ public class TestIcebergSync {
         .fileFormat(FileFormat.APACHE_PARQUET)
         .fileSizeBytes(RANDOM.nextInt(10000))
         .physicalPath(physicalPath)
-        .recordCount(RANDOM.nextInt(10000))
+        .recordCount(RANDOM.nextInt(10000) + 1)
         .partitionValues(partitionValues)
         .columnStats(Collections.emptyList())
         .build();
