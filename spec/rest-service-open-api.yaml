@@ -20,7 +20,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.0.1
+  version: 0.0.2
   description: |
     A REST API for initiating metadata conversion using Apache XTable. Note this spec is still under active development and is subject to changes.
 
@@ -122,6 +122,7 @@ components:
         - source-format
         - source-table-name
         - source-table-path
+        - source-data-path
         - target-formats
       properties:
         source-format:
@@ -133,6 +134,11 @@ components:
         source-table-path:
           type: string
           description: Path to the source table's metadata
+        source-data-path:
+          type: string
+          description: >-
+            Path to the source table's data files. Required: the service passes it straight to
+            TargetTable.basePath, whose declaration is @NonNull, so omitting it fails the request.
         target-formats:
           type: array
           items:
@@ -140,7 +146,10 @@ components:
           description: List of desired output table formats (e.g., "ICEBERG", "HUDI", "DELTA")
         configurations:
           type: object
-          description: Additional configuration key/value pairs (e.g., storage credentials or other service configs)
+          description: >-
+            Additional configuration key/value pairs. Only "partition-spec" is read; every other key
+            is ignored. Credentials do not belong here -- the service reads cloud storage with the
+            credentials in its own environment, and a request body is logged, traced and cached.
           additionalProperties:
             type: string
 
@@ -197,11 +206,6 @@ components:
           minimum: 400
           maximum: 600
           description: HTTP response code
-        stack:
-          type: array
-          description: Optional stack trace elements for debugging
-          items:
-            type: string
 
   responses:
     ConvertTableResponse:
