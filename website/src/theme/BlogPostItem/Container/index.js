@@ -1,4 +1,5 @@
 import React from 'react';
+import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import {useLocation} from 'react-router-dom';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
@@ -8,6 +9,7 @@ export default function BlogPostItemContainer({children, className}) {
   const {
     frontMatter,
     assets,
+    isBlogPostPage,
     metadata: {description, permalink},
   } = useBlogPost();
   const location = useLocation();
@@ -17,8 +19,7 @@ export default function BlogPostItemContainer({children, className}) {
 
   return (
     <article
-      className={className}
-      style={{ width: "50%" }}
+      className={clsx(className, !isBlogPostPage && 'blogPostCard')}
       itemProp="blogPost"
       itemScope
       itemType="https://schema.org/BlogPosting">
