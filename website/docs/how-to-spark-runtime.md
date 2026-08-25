@@ -112,9 +112,11 @@ makes it safe to call after every write.
 
 :::note Tables are addressed by path
 The runtime jar identifies tables by path rather than through a catalog, so there is no equivalent
-of the `RunSync` Iceberg catalog config (`-i`) yet. For an Iceberg source, point `basePath` at the
-table root and set `dataPath` to `<basePath>/data`, since that is where Iceberg keeps its data
-files and where each target writes its metadata.
+of the `RunSync` Iceberg catalog config (`-i`) yet. When a table's data files don't sit directly
+under `basePath`, set `dataPath` to wherever they do, because that's the location each target
+writes its metadata to. Iceberg tables often end up at `<basePath>/data`, but nothing in Iceberg
+requires it — `write.data.path` and object-storage layouts can put data files anywhere — so check
+where your table actually writes.
 :::
 
 :::tip Runnable example

@@ -135,8 +135,9 @@ orders.writeTo("xt.db.orders").create()
 println(s"  wrote the Iceberg table at $icebergBase")
 
 // ---- the one call the job adds -----------------------------------------------------------
-// An Iceberg table keeps its data files under <basePath>/data. Each target writes its
-// metadata next to those files, so the demo sets dataPath as well.
+// This demo's Iceberg table lands its data under <basePath>/data, the layout the Hadoop catalog
+// uses here. Each target writes its metadata next to the data files, so dataPath is set to match.
+// Iceberg does not mandate that layout, so check write.data.path for your own tables.
 val icebergResults = new XTableSyncService().sync(
   TableSyncSpec
     .builder()
