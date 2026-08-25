@@ -29,9 +29,7 @@ export default function BlogPostItemContainer({children, className}) {
           {location.pathname.startsWith('/blog') ? (
             <Link itemProp="url" to={permalink}>
               <img
-                src={withBaseUrl(image, {
-                  absolute: true,
-                })}
+                src={withBaseUrl(image)}
                 className="blog-image"
               />
             </Link>

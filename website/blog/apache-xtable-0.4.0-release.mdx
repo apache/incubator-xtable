@@ -3,7 +3,7 @@ title: "Apache XTable™ (Incubating) 0.4.0 Release"
 excerpt: "Apache XTable™ (Incubating) 0.4.0 adds a Spark runtime jar, Apache Paimon and Apache Parquet sources, and Delta Kernel."
 author: Apache XTable Community
 category: blog
-image: /images/blog/XTable/xtable-cover.png
+image: /images/xtable-write-anywhere.png
 tags:
 - apache xtable
 - release
@@ -14,8 +14,8 @@ tags:
 date: 2026-08-25
 ---
 
-The Apache XTable™ (Incubating) community is pleased to announce the release of 0.4.0-incubating,
-which lands 45 commits from 19 contributors.
+We are pleased to announce the release of 0.4.0-incubating, which lands 45 commits from
+19 contributors.
 See the [release notes](/releases/release-0.4.0-incubating) for the complete list of changes.
 
 <!--truncate-->
@@ -26,11 +26,11 @@ Parquet tables as sources.
 
 ## Release Highlights
 
-### Run a sync on Apache Spark
+### Spark runtime
 
-This release introduces `xtable-spark-runtime`, a runtime jar that runs a sync on a Spark cluster
-you already have. Add it to an existing job with `--jars` and call the sync right after your write,
-or submit it on its own with `spark-submit`.
+A new runtime jar, `xtable-spark-runtime`, runs a sync on a Spark cluster you already have. Add it
+to an existing job with `--jars` and call `XTableSyncService` right after your write, or submit
+`XTableSparkSync` on its own with `spark-submit`.
 
 ```shell
 $SPARK_HOME/bin/spark-submit \
@@ -43,16 +43,20 @@ Every engine dependency is `provided`, so the jar reuses the Hudi, Iceberg and D
 already on your cluster. The jar supports Spark 3.4 and 3.5. See
 [Run an XTable sync on Apache Spark](/docs/how-to-spark-runtime) for the full guide.
 
-### New source formats
+### Apache Paimon
 
-* **Apache Paimon source**, with incremental sync and column statistics.
-* **Apache Parquet source**, with schema conversion, column statistics, partition extraction and
-  incremental sync.
+A new conversion source reads Paimon tables, with incremental sync and column statistics.
+
+### Apache Parquet
+
+A new conversion source reads Parquet tables, with schema conversion, column statistics, partition
+extraction and incremental sync.
 
 ### Delta Kernel
 
-This release adds a Delta Kernel conversion source and target. Neither one depends on Spark for
-the conversion itself.
+A new conversion source and target read and write Delta tables through the `delta-kernel-api`
+library, and neither one needs a `SparkSession`. The older Delta source and target call `DeltaLog`
+and `OptimisticTransaction` from `delta-core`, which ties them to Spark.
 
 ## Getting the release
 
