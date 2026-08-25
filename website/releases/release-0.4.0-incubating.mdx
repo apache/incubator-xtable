@@ -1,0 +1,81 @@
+---
+title: "Release 0.4.0-incubating"
+sidebar_position: -4
+---
+
+## [Release 0.4.0-incubating](https://github.com/apache/incubator-xtable/releases/tag/0.4.0-incubating) ([docs](https://xtable.apache.org/docs/how-to))
+
+This is the fourth official Apache release for Apache XTable™ (Incubating), an incubating project under the Apache Software Foundation.
+Apache XTable™ (Incubating) facilitates omni-directional interoperability across data processing systems and query engines by allowing users to convert between open table formats without the need to rewrite any data files.
+Apache XTable™ (Incubating) converts between Apache Hudi, Apache Iceberg and Delta Lake. This release adds Apache Paimon and Apache Parquet as source formats.
+
+## ✨ What's Changed
+
+### 📦 Run a sync on Apache Spark
+
+This release adds `xtable-spark-runtime`, a runtime jar that runs a sync on an Apache Spark cluster
+you already have. Add it to a Spark job with `--jars` and call the sync after the write, or submit
+it on its own with `spark-submit`. Every engine dependency is `provided`, so the jar uses the Hudi,
+Iceberg and Delta libraries your cluster already supplies.
+
+```shell md title="shell"
+$SPARK_HOME/bin/spark-submit \
+  --jars xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  --class com.example.OrdersJob \
+  orders-job.jar
+```
+
+The jar is on Maven Central as `org.apache.xtable:xtable-spark-runtime_2.12:0.4.0-incubating`. It
+supports Spark 3.4 and Spark 3.5. See [Run a sync on Apache Spark](/docs/spark-runtime).
+
+### 🔄 New source formats
+
+* **Apache Paimon source**, with incremental sync and column statistics.
+* **Apache Parquet source**, with schema conversion, column statistics, partition extraction and incremental sync.
+
+### 🆕 Delta Kernel
+
+* Added a **Delta Kernel** conversion target. Delta Kernel needs no Spark, so a Delta sync now runs
+  on Spark 3.5 and newer, where `delta-core` does not.
+
+### 🔧 Conversion improvements
+
+* Delta source: extract statistics for nested fields.
+* Hudi source: support nested partition columns when hive-style partitioning is on.
+* Fall back to Parquet footers when the metadata table has no column statistics.
+* Throw on a bad Delta checkpoint CRC by default.
+* Pass additional properties through to a Hudi target.
+
+### 🐞 Bug fixes
+
+* **Delta**: null partition value for composite generated-column partitions, map-key path handling, a null pointer on binary fields inside maps and arrays, and conversion from a source with column mapping on.
+* **Hudi**: batch `INSERT_OVERWRITE` replace commits that dropped adds, and an empty `EarliestCommitToRetain`.
+* **Iceberg**: nested comments with a qualified name, schema sync, and an empty source table.
+* **Parquet**: snapshot sync over several commits on a partitioned table, and schema conversion.
+
+### 🧰 Build and infrastructure
+
+* Upgraded **Apache Iceberg** to 1.9.2 and **Apache Avro** to 1.12.0.
+* Added a **Maven wrapper** so every build uses the same Maven version.
+* Generate and check the bundled license files as part of the build.
+* Added a **source build check** that builds the source release with no XTable artifact installed.
+* Restored the delombok step, so a release build produces javadoc jars again.
+
+### 🧪 Testing
+
+* Added a first integration test for the XTable REST service.
+* Added an integration test that runs the Spark runtime jar through a real `spark-submit`.
+* Parameterised `TestHudiInstantUtils` and added cases.
+* Removed wildcard imports and enforced the rule with Spotless.
+
+### Known issues
+
+Three license documentation issues stay open. The project targets them for the next release.
+
+* Incomplete license information for the bundled jars ([#700](https://github.com/apache/incubator-xtable/issues/700)).
+* More than one LICENSE file in some jars ([#701](https://github.com/apache/incubator-xtable/issues/701)).
+* Orphaned license files in the bundled jars ([#865](https://github.com/apache/incubator-xtable/issues/865)).
+
+## 📥 Download
+
+See the [Downloads](/releases/downloads) page for the source release, the signature and the checksum.
