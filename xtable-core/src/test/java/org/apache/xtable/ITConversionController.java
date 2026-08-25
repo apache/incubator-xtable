@@ -276,10 +276,13 @@ public class ITConversionController {
   // (TableFormatSync#buildResultForError) rather than propagating it, so the exception surfaces
   // as a SyncStatusCode.ERROR entry in the returned result map, not as a thrown exception from
   // sync() itself. This test therefore doesn't reuse runVariousOperationsTest: it syncs an
-  // initial snapshot (expected to succeed, verified via the normal equivalence check), then
-  // evolves the schema and syncs again, asserting the DELTA target's sync result is ERROR with
-  // the expected message, and that the target's data was left at its last-good state rather than
-  // partially written.
+  // initial snapshot (expected to succeed, verified via the normal equivalence check), resyncs
+  // the same unchanged schema to an existing table (expected to still succeed -- this guards
+  // against a false positive in syncSchema()'s drift check, since it compares in Kernel's
+  // StructType rather than InternalSchema specifically to avoid InternalSchema<->StructType
+  // round-trip asymmetry causing an unchanged schema to look "evolved"), then evolves the schema
+  // and syncs again, asserting the DELTA target's sync result is ERROR with the expected message,
+  // and that the target's data was left at its last-good state rather than partially written.
   @ParameterizedTest
   @MethodSource("generateTestParametersForSyncModesAndPartitioning")
   public void testVariousOperationsDeltaKernelTarget(SyncMode syncMode, boolean isPartitioned) {
@@ -299,6 +302,16 @@ public class ITConversionController {
       assertEquals(
           SyncStatusCode.SUCCESS, results.get(DELTA).getTableFormatSyncStatus().getStatusCode());
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
+
+      // Resync the same table with its unchanged schema. The table now exists, so this exercises
+      // syncSchema()'s drift check on the existing-table path without any real schema evolution.
+      table.insertRows(50);
+      results = conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS,
+          results.get(DELTA).getTableFormatSyncStatus().getStatusCode(),
+          "An unchanged-schema resync of an existing table must not be flagged as schema drift");
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 150);
     }
 
     try (GenericTable tableWithUpdatedSchema =
@@ -325,11 +338,11 @@ public class ITConversionController {
               .getErrorMessage()
               .contains("https://github.com/delta-io/delta/issues/4305"));
 
-      // The target should be left exactly at its last successfully-synced state (100 rows, old
+      // The target should be left exactly at its last successfully-synced state (150 rows, old
       // schema), not partially written with some but not all of the new rows/columns.
       long targetRowCount =
           sparkSession.read().format("delta").load(tableWithUpdatedSchema.getDataPath()).count();
-      assertEquals(100, targetRowCount);
+      assertEquals(150, targetRowCount);
     }
   }
 
