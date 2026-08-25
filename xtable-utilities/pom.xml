@@ -286,6 +286,7 @@
                             <resource>META-INF/NOTICE</resource>
                             <file>target/classes/META-INF/NOTICE-bundled</file>
                         </transformer>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                             <mainClass>org.apache.xtable.utilities.RunSync</mainClass>
                         </transformer>
