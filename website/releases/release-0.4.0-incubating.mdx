@@ -5,18 +5,18 @@ sidebar_position: -4
 
 ## [Release 0.4.0-incubating](https://github.com/apache/incubator-xtable/releases/tag/0.4.0-incubating) ([docs](https://xtable.apache.org/docs/how-to))
 
-This is the fourth official Apache release for Apache XTable™ (Incubating), an incubating project under the Apache Software Foundation.
+This is the fourth official Apache release for Apache XTable (Incubating), an incubating project under the Apache Software Foundation.
 Apache XTable™ (Incubating) facilitates omni-directional interoperability across data processing systems and query engines by allowing users to convert between open table formats without the need to rewrite any data files.
-Apache XTable™ (Incubating) converts between Apache Hudi, Apache Iceberg and Delta Lake. This release adds Apache Paimon and Apache Parquet as source formats.
+Apache XTable™ (Incubating) converts between Apache Hudi, Apache Iceberg and Delta Lake, and with this release it can also read Apache Paimon and Apache Parquet tables as sources.
 
 ## ✨ What's Changed
 
-### 📦 Run a sync on Apache Spark
+### 📦 Run an XTable sync on Apache Spark
 
-This release adds `xtable-spark-runtime`, a runtime jar that runs a sync on an Apache Spark cluster
-you already have. Add it to a Spark job with `--jars` and call the sync after the write, or submit
-it on its own with `spark-submit`. Every engine dependency is `provided`, so the jar uses the Hudi,
-Iceberg and Delta libraries your cluster already supplies.
+This release introduces `xtable-spark-runtime`, a runtime jar that runs a sync on a Spark cluster
+you already have. Add it to an existing job with `--jars` and call the sync right after your write,
+or submit it on its own with `spark-submit`. Every engine dependency is `provided`, so the jar
+reuses the Hudi, Iceberg and Delta libraries already on your cluster.
 
 ```shell md title="shell"
 $SPARK_HOME/bin/spark-submit \
@@ -25,8 +25,8 @@ $SPARK_HOME/bin/spark-submit \
   orders-job.jar
 ```
 
-The jar is on Maven Central as `org.apache.xtable:xtable-spark-runtime_2.12:0.4.0-incubating`. It
-supports Spark 3.4 and Spark 3.5. See [Run a sync on Apache Spark](/docs/spark-runtime).
+It is published to Maven Central as `org.apache.xtable:xtable-spark-runtime_2.12:0.4.0-incubating`
+and supports Spark 3.4 and 3.5. See [Run an XTable sync on Apache Spark](/docs/how-to-spark-runtime).
 
 ### 🔄 New source formats
 
@@ -35,42 +35,40 @@ supports Spark 3.4 and Spark 3.5. See [Run a sync on Apache Spark](/docs/spark-r
 
 ### 🆕 Delta Kernel
 
-* Added a **Delta Kernel** conversion target. Delta Kernel needs no Spark, so a Delta sync now runs
-  on Spark 3.5 and newer, where `delta-core` does not.
+* Added a **Delta Kernel** conversion source and target, which no longer depend on Spark for the conversion itself.
 
 ### 🔧 Conversion improvements
 
 * Delta source: extract statistics for nested fields.
-* Hudi source: support nested partition columns when hive-style partitioning is on.
+* Hudi source: support nested partition columns when hive-style partitioning is enabled.
 * Fall back to Parquet footers when the metadata table has no column statistics.
-* Throw on a bad Delta checkpoint CRC by default.
-* Pass additional properties through to a Hudi target.
+* Fail fast on a corrupt Delta checkpoint CRC, instead of continuing with bad statistics.
 
 ### 🐞 Bug fixes
 
-* **Delta**: null partition value for composite generated-column partitions, map-key path handling, a null pointer on binary fields inside maps and arrays, and conversion from a source with column mapping on.
+* **Delta**: null partition value for composite generated-column partitions, map-key path handling, a null pointer on binary fields inside maps and arrays, and conversion from a source with column mapping enabled.
 * **Hudi**: batch `INSERT_OVERWRITE` replace commits that dropped adds, and an empty `EarliestCommitToRetain`.
 * **Iceberg**: nested comments with a qualified name, schema sync, and an empty source table.
-* **Parquet**: snapshot sync over several commits on a partitioned table, and schema conversion.
+* **Parquet**: snapshot sync across several commits on a partitioned table, and schema conversion.
 
 ### 🧰 Build and infrastructure
 
 * Upgraded **Apache Iceberg** to 1.9.2 and **Apache Avro** to 1.12.0.
 * Added a **Maven wrapper** so every build uses the same Maven version.
-* Generate and check the bundled license files as part of the build.
+* Bundled license files are now generated and verified as part of the build.
 * Added a **source build check** that builds the source release with no XTable artifact installed.
-* Restored the delombok step, so a release build produces javadoc jars again.
+* Restored the delombok step, so release builds produce javadoc jars again.
 
 ### 🧪 Testing
 
 * Added a first integration test for the XTable REST service.
 * Added an integration test that runs the Spark runtime jar through a real `spark-submit`.
-* Parameterised `TestHudiInstantUtils` and added cases.
+* Parameterised `TestHudiInstantUtils` and added more cases.
 * Removed wildcard imports and enforced the rule with Spotless.
 
 ### Known issues
 
-Three license documentation issues stay open. The project targets them for the next release.
+Three license documentation issues remain open and are targeted for the next release:
 
 * Incomplete license information for the bundled jars ([#700](https://github.com/apache/incubator-xtable/issues/700)).
 * More than one LICENSE file in some jars ([#701](https://github.com/apache/incubator-xtable/issues/701)).
@@ -78,4 +76,4 @@ Three license documentation issues stay open. The project targets them for the n
 
 ## 📥 Download
 
-See the [Downloads](/releases/downloads) page for the source release, the signature and the checksum.
+See the [Downloads](/releases/downloads) page for the source release, its signature and its checksum.

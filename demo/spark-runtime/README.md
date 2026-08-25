@@ -18,26 +18,26 @@
 
 # In-job sync demo for `xtable-spark-runtime`
 
-This demo shows the case the `xtable-spark-runtime` jar exists for. A Spark job already writes a
-table. The job adds the jar with `--jars` and calls `XTableSyncService` after the write. The table
-then reads in the other formats, and no data is rewritten.
+This demo shows what the `xtable-spark-runtime` jar is for: a Spark job that already writes a table
+adds the jar with `--jars` and calls `XTableSyncService` right after its write, making the table
+interoperable without rewriting any data.
 
-The demo runs both directions and checks the row counts, so it also works as a smoke test of a
-release.
+It runs the sync in both directions and verifies the row counts, so it also serves as a smoke test
+for a release.
 
 | Direction | The job writes | XTable adds |
 | --- | --- | --- |
 | 1 | `HUDI` | `ICEBERG`, `DELTA` |
 | 2 | `ICEBERG` | `HUDI`, `DELTA` |
 
-The demo needs no Docker and no Scala compiler. `spark-shell` compiles the script. This is separate
-from the notebook demo in the parent directory.
+No Docker and no Scala compiler are needed — `spark-shell` compiles the script for you. This is
+separate from the notebook demo in the parent directory.
 
 ## Prerequisites
 
 - A Spark **3.4.x** distribution. Hudi 0.14.0 publishes no Spark 3.5 bundle, so the Hudi Spark
   datasource that direction 1 writes with needs a 3.4 runtime. The runtime jar itself supports both
-  Spark 3.4 and Spark 3.5.
+  Spark 3.4 and 3.5.
 - JDK 11.
 - Maven, to resolve the engine jars in step 2.
 
@@ -121,7 +121,7 @@ runtime, the Hudi write in direction 1 fails with
 
 ```
 ==============================================================================
-  DIRECTION 1: the job writes HUDI -> readable as ICEBERG and DELTA
+  DIRECTION 1: the job writes HUDI -> interoperable with ICEBERG and DELTA
 ==============================================================================
   wrote the Hudi table at /tmp/xtable-spark-demo/out/hudi_orders
   XTableSyncService returned [ICEBERG, DELTA]
@@ -129,7 +129,7 @@ runtime, the Hudi write in direction 1 fails with
   [PASS] hudi -> delta          1000 rows
 
 ==============================================================================
-  DIRECTION 2: the job writes ICEBERG -> readable as HUDI and DELTA
+  DIRECTION 2: the job writes ICEBERG -> interoperable with HUDI and DELTA
 ==============================================================================
   wrote the Iceberg table at /tmp/xtable-spark-demo/out/iceberg_warehouse/db/orders
   XTableSyncService returned [HUDI, DELTA]
@@ -146,12 +146,10 @@ Set `XT_DEMO_ROWS` to change the row count. The default is 1000.
 
 ## Notes
 
-- **Read a Hudi target with `hoodie.metadata.enable=true`.** XTable records the file listing of a
-  Hudi target in the Hudi metadata table. Without the option, the sync reports success and the read
-  returns zero rows.
-- **Do not add the engines with `--packages`.** `--packages` and `--jars` load classes in a child
-  class loader. A second copy of Avro or Parquet there breaks casts across the class loader
-  boundary. Use `extraClassPath` for engine jars, as this demo does.
+- **A Hudi target needs `hoodie.metadata.enable=true` on read.** XTable records a Hudi target's
+  file listing in the Hudi metadata table, so without this option the sync reports success and the
+  read comes back empty. See [Apache Spark](https://xtable.apache.org/docs/spark) for the read
+  options each format needs.
 - For paths on S3, add S3A and credentials:
 
   ```shell
@@ -159,4 +157,4 @@ Set `XT_DEMO_ROWS` to change the row count. The default is 1000.
   --conf spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.EnvironmentVariableCredentialsProvider
   ```
 
-See [Run a sync on Apache Spark](https://xtable.apache.org/docs/spark-runtime) for the full guide.
+See [Run an XTable sync on Apache Spark](https://xtable.apache.org/docs/how-to-spark-runtime) for the full guide.

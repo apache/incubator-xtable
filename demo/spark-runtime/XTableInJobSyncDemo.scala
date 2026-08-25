@@ -17,7 +17,7 @@
  */
 
 /*
- * Keeps a table readable in the other formats from inside the Spark job that writes it.
+ * Keeps a table interoperable from inside the Spark job that writes it.
  * The job adds the xtable-spark-runtime jar with --jars and calls XTableSyncService after
  * the write. No data is rewritten.
  *
@@ -26,7 +26,7 @@
  *   2. the job writes ICEBERG -> XTable adds HUDI and DELTA
  *
  * See demo/spark-runtime/README.md for how to run it, and
- * https://xtable.apache.org/docs/spark-runtime for the guide.
+ * https://xtable.apache.org/docs/how-to-spark-runtime for the guide.
  *
  * Environment:
  *   XT_DEMO_DIR   output directory (default /tmp/xtable-demo)
@@ -94,7 +94,7 @@ val orders: DataFrame = spark
   .withColumn("ts", lit(System.currentTimeMillis()))
 println(s"  $rows rows, ${orders.schema.fields.length} columns")
 
-banner("DIRECTION 1: the job writes HUDI -> readable as ICEBERG and DELTA")
+banner("DIRECTION 1: the job writes HUDI -> interoperable with ICEBERG and DELTA")
 val hudiPath = s"$outPrefix/hudi_orders"
 
 // ---- the write the job already does ------------------------------------------------------
@@ -125,7 +125,7 @@ println(s"  XTableSyncService returned ${hudiResults.keySet()}")
 check("hudi -> iceberg", rows, "iceberg", hudiPath)
 check("hudi -> delta", rows, "delta", hudiPath)
 
-banner("DIRECTION 2: the job writes ICEBERG -> readable as HUDI and DELTA")
+banner("DIRECTION 2: the job writes ICEBERG -> interoperable with HUDI and DELTA")
 val icebergBase = s"$outPrefix/iceberg_warehouse/db/orders"
 
 // ---- the write the job already does ------------------------------------------------------

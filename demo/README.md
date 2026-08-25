@@ -27,7 +27,7 @@ When you are done, use `./stop_demo.sh` to stop and remove the containers. Pass 
 - `work/demo.ipynb` — the main demo: two existing datasets (Hudi and Delta) are synced across Hudi, Delta and Iceberg, updated from Trino, joined, and validated from Trino.
 
 ## Standalone Spark demo
-- `spark-runtime/` — a Spark job that keeps a table readable in the other formats from inside the job that writes it, using the `xtable-spark-runtime` jar on `--jars`. It runs Hudi to Iceberg/Delta and Iceberg to Hudi/Delta, and checks the row counts. It needs no Docker; see `spark-runtime/README.md`.
+- `spark-runtime/` — keeps a table interoperable by adding the `xtable-spark-runtime` jar with `--jars`. No Docker required; see `spark-runtime/README.md`.
 
 ## Accessing Services
 ### Jupyter Notebook
