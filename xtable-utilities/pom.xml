@@ -759,12 +759,9 @@
                             <include>software.amazon.awssdk:netty-nio-client</include>
                             <include>software.amazon.awssdk:profiles</include>
                             <include>software.amazon.awssdk:protocol-core</include>
-                            <include>software.amazon.awssdk:regions</include>
                             <include>software.amazon.awssdk:retries</include>
                             <include>software.amazon.awssdk:retries-spi</include>
-                            <include>software.amazon.awssdk:sdk-core</include>
                             <include>software.amazon.awssdk:third-party-jackson-core</include>
-                            <include>software.amazon.awssdk:utils</include>
                             <include>software.amazon.eventstream:eventstream</include>
                             <include>stax:stax-api</include>
                             <include>tomcat:jasper-compiler</include>
