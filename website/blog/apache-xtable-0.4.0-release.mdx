@@ -1,0 +1,83 @@
+---
+title: "Apache XTable™ (Incubating) 0.4.0 Release"
+description: "Apache XTable™ (Incubating) 0.4.0 adds a Spark runtime jar, Apache Paimon and Apache Parquet sources, and Delta Kernel."
+author: Apache XTable Community
+category: blog
+image: /images/xtable-write-anywhere.png
+tags:
+- apache xtable
+- release
+- spark
+- paimon
+- parquet
+- delta kernel
+date: 2026-08-25
+---
+
+We are pleased to announce the release of 0.4.0-incubating, which lands 45 commits from
+19 contributors.
+See the [release notes](/releases/release-0.4.0-incubating) for the complete list of changes.
+
+<!--truncate-->
+
+Apache XTable™ (Incubating) converts metadata between Apache Hudi, Apache Iceberg and Delta Lake
+without rewriting any data files. With this release it also supports Apache Paimon and Apache
+Parquet tables as sources.
+
+## Release Highlights
+
+### Spark runtime
+
+A new runtime jar, `xtable-spark-runtime`, runs a sync on a Spark cluster you already have. Add it
+to an existing job with `--jars` and call `XTableSyncService` right after your write, or submit
+`XTableSparkSync` on its own with `spark-submit`.
+
+```shell
+$SPARK_HOME/bin/spark-submit \
+  --jars xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  --class com.example.OrdersJob \
+  orders-job.jar
+```
+
+Every engine dependency is `provided`, so the jar reuses the Hudi, Iceberg and Delta libraries
+already on your cluster. The jar supports Spark 3.4 and 3.5. See
+[Run an XTable sync on Apache Spark](/docs/how-to-spark-runtime) for the full guide.
+
+### Apache Paimon
+
+A new conversion source reads Paimon tables, with incremental sync and column statistics.
+
+### Apache Parquet
+
+A new conversion source reads Parquet tables, with schema conversion, column statistics, partition
+extraction and incremental sync.
+
+### Delta Kernel
+
+A new conversion source and target read and write Delta tables through the `delta-kernel-api`
+library, and neither one needs a `SparkSession`. The older Delta source and target call `DeltaLog`
+and `OptimisticTransaction` from `delta-core`, which ties them to Spark.
+
+## Getting the release
+
+Download the source release, its signature and its checksum from the
+[Downloads](/releases/downloads) page. Always verify the signature before you use the release.
+
+The binary artifacts are on Maven Central under the `org.apache.xtable` group. For example, add the
+Spark runtime jar as `org.apache.xtable:xtable-spark-runtime_2.12:0.4.0-incubating`.
+
+## Getting involved
+
+Apache XTable™ (Incubating) grows through its contributors. We track work in
+[GitHub issues](https://github.com/apache/incubator-xtable/issues) and we discuss it on the
+[dev mailing list](mailto:dev@xtable.apache.org).
+
+The easiest way to start is to:
+
+1. Try 0.4.0-incubating on your own tables and tell us how it goes.
+2. Join the [community sync](/community/sync) and the dev mailing list.
+3. Pick up a [good first issue](https://github.com/apache/incubator-xtable/contribute).
+
+For more information, visit the [documentation](/docs/setup) or the
+[GitHub repository](https://github.com/apache/incubator-xtable). If you want to grow into a
+committer role, read [Becoming a committer](/community/becoming-a-committer).
