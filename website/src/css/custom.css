@@ -37,11 +37,6 @@
   --ifm-spacing-horizontal: 1.5rem;
   --ifm-navbar-padding-horizontal: 0.75rem;
 
-  /* Infima defaults to 1140px, which leaves a wide monitor mostly empty on the
-     blog and release pages. */
-  --ifm-container-width: 1600px;
-  --ifm-container-width-xl: 1600px;
-
   --ifm-font-family-base: 'Inter', system-ui, -apple-system, Segoe UI, Roboto,
     Ubuntu, Cantarell, Noto Sans, sans-serif, BlinkMacSystemFont, 'Segoe UI',
     Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
@@ -114,6 +109,17 @@ html[data-theme='dark'] {
 .blogThumbnail {
     padding-left: 0;
     padding-right: 48px;
+}
+
+/* BlogLayout wraps the blog list and the single-post page in Infima's
+   .container, which caps at --ifm-container-width. That defaults to 1140px and
+   leaves a wide monitor mostly empty. Infima reads the variable on the element,
+   so setting it here widens only the blog pages and leaves the docs, the
+   release notes and the home page at the default line length. See
+   src/theme/BlogLayout/index.js. */
+.blogLayoutContainer {
+  --ifm-container-width: 1600px;
+  --ifm-container-width-xl: 1600px;
 }
 
 /* Blog list cards: two per row on wide screens, one per row on narrow ones.
