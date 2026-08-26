@@ -738,30 +738,19 @@
                             <include>org.xerial.snappy:snappy-java</include>
                             <include>org.yaml:snakeyaml</include>
                             <include>oro:oro</include>
-                            <include>software.amazon.awssdk:annotations</include>
-                            <include>software.amazon.awssdk:apache-client</include>
-                            <include>software.amazon.awssdk:auth</include>
-                            <include>software.amazon.awssdk:aws-core</include>
-                            <include>software.amazon.awssdk:aws-json-protocol</include>
+                            <!-- Only bundle; it already contains internally-consistent
+                                 copies of every individual software.amazon.awssdk:* module
+                                 (annotations/auth/aws-core/glue/profiles/etc). Including any
+                                 of those separately alongside bundle makes the shade plugin
+                                 merge two different builds of the same classes, pairing
+                                 (e.g.) bundle's auth/sts classes with an IoUtils/AttributeMap
+                                 from the standalone jar that's missing a method they call,
+                                 causing a NoSuchMethodError at JVM shutdown when closing S3A's
+                                 credentials provider. Compile-time resolution of the individual
+                                 modules is untouched (controlled by <dependencies>, not this
+                                 list); this only changes which copy's bytes end up in the
+                                 final jar. -->
                             <include>software.amazon.awssdk:bundle</include>
-                            <include>software.amazon.awssdk:checksums</include>
-                            <include>software.amazon.awssdk:checksums-spi</include>
-                            <include>software.amazon.awssdk:endpoints-spi</include>
-                            <include>software.amazon.awssdk:glue</include>
-                            <include>software.amazon.awssdk:http-auth</include>
-                            <include>software.amazon.awssdk:http-auth-aws</include>
-                            <include>software.amazon.awssdk:http-auth-aws-eventstream</include>
-                            <include>software.amazon.awssdk:http-auth-spi</include>
-                            <include>software.amazon.awssdk:http-client-spi</include>
-                            <include>software.amazon.awssdk:identity-spi</include>
-                            <include>software.amazon.awssdk:json-utils</include>
-                            <include>software.amazon.awssdk:metrics-spi</include>
-                            <include>software.amazon.awssdk:netty-nio-client</include>
-                            <include>software.amazon.awssdk:profiles</include>
-                            <include>software.amazon.awssdk:protocol-core</include>
-                            <include>software.amazon.awssdk:retries</include>
-                            <include>software.amazon.awssdk:retries-spi</include>
-                            <include>software.amazon.awssdk:third-party-jackson-core</include>
                             <include>software.amazon.eventstream:eventstream</include>
                             <include>stax:stax-api</include>
                             <include>tomcat:jasper-compiler</include>
