@@ -178,6 +178,21 @@
             <artifactId>hudi-hadoop-common</artifactId>
             <version>${hudi.version}</version>
         </dependency>
+        <!--
+          Same story as hudi-hadoop-common above: xtable-aws declares this
+          provided (a real cluster supplies it), which doesn't propagate to
+          this standalone jar. Needed for org.apache.hudi.hive.MultiPartKeysValueExtractor,
+          referenced by Jackson when deserializing GlueCatalogConfig's
+          partition value extractor field. Without it, RunCatalogSync's Glue
+          catalog sync fails with NoClassDefFoundError at runtime despite
+          compiling fine (the reference is a string class name resolved via
+          reflection, so javac never catches the missing dependency).
+        -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hive-sync</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
@@ -605,6 +620,7 @@
                             <include>org.apache.hudi:hudi-client-common</include>
                             <include>org.apache.hudi:hudi-common</include>
                             <include>org.apache.hudi:hudi-hadoop-common</include>
+                            <include>org.apache.hudi:hudi-hive-sync</include>
                             <include>org.apache.hudi:hudi-io</include>
                             <include>org.apache.hudi:hudi-java-client</include>
                             <include>org.apache.hudi:hudi-timeline-service</include>
