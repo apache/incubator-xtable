@@ -270,6 +270,17 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <configuration>
                     <transformers>
+                        <!-- Several bundled Spark data sources (delta-spark, hudi-spark,
+                             parquet, avro, etc) each ship their own
+                             META-INF/services/org.apache.spark.sql.sources.DataSourceRegister
+                             file at the same path. Without merging them, shade keeps only one
+                             and silently drops the rest, including delta-spark's "delta"
+                             shortname registration, so Spark's ServiceLoader lookup for
+                             format("delta")/DeltaTable.forPath() finds nothing and falls back
+                             to guessing the legacy class name "delta.DefaultSource", which
+                             doesn't exist: ClassNotFoundException. This transformer merges
+                             same-path service files instead of overwriting. -->
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"> </transformer>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"> </transformer>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                             <resources>
