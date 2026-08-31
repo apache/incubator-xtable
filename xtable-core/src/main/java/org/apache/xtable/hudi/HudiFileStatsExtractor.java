@@ -54,9 +54,9 @@ import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.metadata.MetadataPartitionType;
-import org.apache.hudi.stats.HoodieColumnRangeMetadata;
-import org.apache.hudi.stats.ValueMetadata;
-import org.apache.hudi.stats.XTableValueMetadata;
+import org.apache.hudi.metadata.stats.HoodieColumnRangeMetadata;
+import org.apache.hudi.metadata.stats.ValueMetadata;
+import org.apache.hudi.metadata.stats.XTableValueMetadata;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.collectors.CustomCollectors;

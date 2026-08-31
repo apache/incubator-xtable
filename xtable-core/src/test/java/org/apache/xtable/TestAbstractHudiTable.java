@@ -142,6 +142,11 @@ public abstract class TestAbstractHudiTable
   protected KeyGenerator keyGenerator;
   protected Schema schema;
   protected List<String> partitionFieldNames;
+  // Hudi table format version used when creating the test table. Defaults to version 6 (legacy 0.x
+  // timeline layout / column-stats index V1) to match the historical behaviour; tests covering the
+  // Hudi 1.x layout (column-stats index V2) can opt into version 9. See
+  // https://github.com/apache/incubator-xtable/issues/834.
+  protected HoodieTableVersion tableVersion = HoodieTableVersion.SIX;
 
   TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
     try {
@@ -441,10 +446,6 @@ public abstract class TestAbstractHudiTable
         HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
-    // Hudi 1.x MDT col-stats generation fails for array and map types, so only enable column
-    // stats when the schema does not contain those types.
-    // https://github.com/apache/incubator-xtable/issues/773
-    // boolean columnStatsSupported = !schemaContainsArrayOrMap(schema);
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
@@ -457,10 +458,9 @@ public abstract class TestAbstractHudiTable
         LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
     return HoodieWriteConfig.newBuilder()
-        // Pin writes to table version 6 and disable auto-upgrade so the write client does not
-        // upgrade the test table to version 9. Table version 9 support will be added in a
-        // follow-up PR.
-        .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+        // Write at the configured table version (default 6) and disable auto-upgrade so the write
+        // client does not migrate the test table to a different version.
+        .withWriteTableVersion(tableVersion.versionCode())
         .withAutoUpgradeVersion(false)
         .withProperties(keyGenProperties)
         .withPath(this.basePath)
@@ -629,9 +629,9 @@ public abstract class TestAbstractHudiTable
         .set(keyGenPropsMap)
         .setTableName(tableName)
         .setTableType(hoodieTableType)
-        // Pin test tables to table version 6 to match the conversion target. Table version 9
-        // support will be added in a follow-up PR.
-        .setTableVersion(HoodieTableVersion.SIX)
+        // Use the configured table version (default 6) so tests can exercise both the legacy and
+        // Hudi 1.x layouts.
+        .setTableVersion(tableVersion)
         .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
         .setPartitionFields(String.join(",", partitionFieldNames))
         .setRecordKeyFields(RECORD_KEY_FIELD_NAME)
