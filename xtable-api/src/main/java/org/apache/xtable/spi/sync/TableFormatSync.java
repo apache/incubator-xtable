@@ -168,7 +168,8 @@ public class TableFormatSync {
             tableState.getLatestCommitTime(),
             pendingCommits,
             tableState.getTableFormat(),
-            sourceIdentifier);
+            sourceIdentifier,
+            tableState.getLatestTableOperationIdentifier());
     conversionTarget.syncMetadata(latestState);
     // sync schema updates
     conversionTarget.syncSchema(tableState.getReadSchema());
