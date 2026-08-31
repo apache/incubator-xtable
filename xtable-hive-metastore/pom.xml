@@ -28,6 +28,9 @@
     <artifactId>xtable-hive-metastore</artifactId>
     <name>XTable HMS</name>
     <properties>
+        <!-- Mirrors the shade includes below; feeds the bundled LICENSE render. -->
+        <xtable.bundled.resources.skip>false</xtable.bundled.resources.skip>
+        <xtable.bundled.artifactIds>HikariCP,ST4,activation,aircompressor,ant,ant-launcher,antlr-runtime,aopalliance,asm,asm-commons,asm-tree,avro,bonecp,checker-qual,commons-daemon,commons-dbcp,commons-el,commons-httpclient,commons-lang,commons-pool,curator-framework,datanucleus-api-jdo,datanucleus-core,datanucleus-rdbms,derby,dropwizard-metrics-hadoop-metrics2-reporter,eigenbase-properties,error_prone_annotations,failureaccess,fastutil,findbugs-annotations,geronimo-annotation_1.0_spec,geronimo-jaspic_1.0_spec,geronimo-jta_1.1_spec,groovy-all,guava,guice,guice-assistedinject,guice-servlet,hadoop-client,hadoop-hdfs,hadoop-mapreduce-client-app,hadoop-mapreduce-client-common,hadoop-mapreduce-client-core,hadoop-mapreduce-client-jobclient,hadoop-mapreduce-client-shuffle,hadoop-yarn-api,hadoop-yarn-common,hadoop-yarn-registry,hadoop-yarn-server-applicationhistoryservice,hadoop-yarn-server-common,hadoop-yarn-server-resourcemanager,hadoop-yarn-server-web-proxy,hbase-annotations,hbase-client,hbase-common,hbase-protocol,hive-common,hive-exec,hive-jdbc,hive-llap-client,hive-llap-common,hive-llap-server,hive-llap-tez,hive-metastore,hive-serde,hive-service,hive-service-rpc,hive-shims,hive-shims-0.23,hive-shims-common,hive-shims-scheduler,hive-storage-api,hive-vector-code-gen,htrace-core,httpcore,ivy,j2objc-annotations,jackson-annotations,jackson-core,jackson-core-asl,jackson-databind,jackson-datatype-jsr310,jackson-jaxrs,jackson-mapper-asl,jackson-module-scala_${scala.binary.version},jackson-xc,jamon-runtime,jasper-compiler,jasper-runtime,javax.annotation-api,javax.inject,javax.jdo,javax.servlet,javolution,jcodings,jdo-api,jersey-client,jersey-guice,jersey-json,jetty,jetty-all,jetty-util,jline,joda-time,joni,jpam,json,jsp-api,jta,leveldbjni-all,libfb303,libthrift,listenablefuture,log4j-1.2-api,log4j-api,mail,metrics-json,metrics-jvm,netty,netty-all,netty-codec-dns,netty-codec-haproxy,netty-codec-http,netty-codec-http2,netty-codec-memcache,netty-codec-mqtt,netty-codec-redis,netty-codec-smtp,netty-codec-socks,netty-codec-stomp,netty-codec-xml,netty-handler-proxy,netty-handler-ssl-ocsp,netty-resolver-dns,netty-resolver-dns-classes-macos,netty-resolver-dns-native-macos,netty-transport-classes-kqueue,netty-transport-native-epoll,netty-transport-native-kqueue,netty-transport-rxtx,netty-transport-sctp,netty-transport-udt,opencsv,orc-core,oro,paranamer,parquet-avro,parquet-column,parquet-common,parquet-encoding,parquet-format-structures,parquet-hadoop,parquet-jackson,protobuf-java,scala-library,servlet-api,slice,slider-core,stax-api,tephra-api,tephra-core,tephra-hbase-compat-1.0,transaction-api,twill-api,twill-common,twill-core,twill-discovery-api,twill-discovery-core,twill-zookeeper,velocity,xercesImpl,xml-apis,xmlenc,xtable-api,xtable-core_${scala.binary.version},xtable-hudi-support-utils,zookeeper,zstd-jni</xtable.bundled.artifactIds>
         <!--
           This module produces a large bundled jar (~125 MB). Keep it out of the
           maven-build-cache entirely: the property disables both restore and save
@@ -213,21 +216,24 @@
                         </goals>
                         <configuration>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"> </transformer>
+                                <!-- Must run before DontIncludeResourceTransformer, or there are no NOTICEs left to merge. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <projectName>Apache XTable (incubating)</projectName>
+                                    <inceptionYear>2024</inceptionYear>
+                                </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                                     <resources>
                                         <resource>LICENSE</resource>
+                                        <resource>LICENSE.txt</resource>
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
+                                        <resource>META-INF/LICENSE.txt</resource>
                                     </resources>
                                 </transformer>
+                                <!-- ALv2 plus a pointer to each bundled non-ALv2 licence text. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE-bundled</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                    <file>target/bundled-archive-resources/META-INF/LICENSE</file>
                                 </transformer>
                             </transformers>
                             <artifactSet>
@@ -311,7 +317,6 @@
                                     <include>javolution:javolution</include>
                                     <include>jline:jline</include>
                                     <include>joda-time:joda-time</include>
-                                    <include>junit:junit</include>
                                     <include>net.hydromatic:eigenbase-properties</include>
                                     <include>net.sf.jpam:jpam</include>
                                     <include>net.sf.opencsv:opencsv</include>
@@ -400,7 +405,6 @@
                                     <include>org.eclipse.jetty.aggregate:jetty-all</include>
                                     <include>org.eclipse.jetty.orbit:javax.servlet</include>
                                     <include>org.fusesource.leveldbjni:leveldbjni-all</include>
-                                    <include>org.hamcrest:hamcrest-core</include>
                                     <include>org.jamon:jamon-runtime</include>
                                     <include>org.jruby.jcodings:jcodings</include>
                                     <include>org.jruby.joni:joni</include>

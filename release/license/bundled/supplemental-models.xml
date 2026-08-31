@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
+<supplementalDataModels xmlns="http://maven.apache.org/supplemental-model/1.0.0"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://maven.apache.org/supplemental-model/1.0.0 https://maven.apache.org/xsd/supplemental-model-1.0.0.xsd">
+
+  <!--
+    Normalises license metadata for bundled dependencies whose own POM declares it
+    incompletely or under a non-canonical name.
+
+    The <name> values here must match one of the $apacheAliases or $knownTexts
+    entries in META-INF/LICENSE.vm character for character, or the generated
+    LICENSE carries an UNMAPPED-LICENSE line and the build fails.
+
+    Every entry must be justified against the artifact itself - its POM's
+    <licenses> block and the license file inside its jar - not against what a
+    search engine says. Two known traps:
+      - junit 4.12 is EPL 1.0, not CPL 1.0, and ships its text under the
+        non-standard name LICENSE-junit.txt. junit 4.11 ships Hamcrest's BSD text.
+      - javolution 5.5.1 declares "BSD License" in its POM with a dead URL, ships
+        no license file, and the text previously committed for it was MIT with a
+        2017 copyright for a 2010 artifact. Do not guess it.
+  -->
+
+  <!--
+    paranamer's own POM declares no license at all; paranamer-parent-2.8 declares
+    <name>BSD</name> with <url>LICENSE.txt</url>, a relative path that resolves to
+    nothing, and the jar carries no license file. The project's LICENSE.txt at tag
+    paranamer-parent-2.8 is BSD 3-Clause: three numbered conditions including the
+    "Neither the name of the copyright holders" no-endorsement clause. Its header
+    notes the license changed from Public Domain to BSD when a piece of ASM was
+    included.
+  -->
+  <supplement>
+    <project>
+      <groupId>com.thoughtworks.paranamer</groupId>
+      <artifactId>paranamer</artifactId>
+      <licenses>
+        <license>
+          <name>BSD 3-Clause License</name>
+          <url>https://github.com/paul-hammant/paranamer/blob/master/LICENSE.txt</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    Declares "The MIT License"; the jar's own META-INF/LICENSE.txt is the MIT text.
+    Renamed only so it groups with the other MIT components.
+  -->
+  <supplement>
+    <project>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <licenses>
+        <license>
+          <name>MIT License</name>
+          <url>http://opensource.org/licenses/MIT</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    No <licenses> block at all, but the jar carries the Apache-2.0 text as
+    LICENSE.txt. It is an ASF project.
+  -->
+  <supplement>
+    <project>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <licenses>
+        <license>
+          <name>Apache License, Version 2.0</name>
+          <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    Two <license> entries carrying only a <url> and no <name>, one pointing at
+    ASM's license page and one at the Apache-2.0 text. The jar's own
+    META-INF/LICENSE is the Apache-2.0 text, and the shaded ASM inside it is
+    redistributed under that.
+  -->
+  <supplement>
+    <project>
+      <groupId>org.apache.xbean</groupId>
+      <artifactId>xbean-asm9-shaded</artifactId>
+      <licenses>
+        <license>
+          <name>Apache License, Version 2.0</name>
+          <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    No <licenses> block. Both jars carry the same 16782-byte
+    META-INF/LICENSE.txt, which is the CDDL 1.0 text. Note it is latin-1, not
+    UTF-8.
+  -->
+  <supplement>
+    <project>
+      <groupId>javax.transaction</groupId>
+      <artifactId>jta</artifactId>
+      <licenses>
+        <license>
+          <name>Common Development and Distribution License 1.0</name>
+          <url>https://oss.oracle.com/licenses/CDDL</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+  <supplement>
+    <project>
+      <groupId>javax.transaction</groupId>
+      <artifactId>transaction-api</artifactId>
+      <licenses>
+        <license>
+          <name>Common Development and Distribution License 1.0</name>
+          <url>https://oss.oracle.com/licenses/CDDL</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    No <licenses> block. The jar's META-INF/LICENSE is the Apache Software
+    License 1.1 - the older license, not 2.0 - carrying a 2000-2002 ASF
+    copyright. Jakarta ORO was retired before the 2.0 relicensing.
+  -->
+  <supplement>
+    <project>
+      <groupId>oro</groupId>
+      <artifactId>oro</artifactId>
+      <licenses>
+        <license>
+          <name>Apache Software License 1.1</name>
+          <url>https://www.apache.org/licenses/LICENSE-1.1</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    The POM declares "BSD License" with url http://javolution.org/LICENSE.txt,
+    dead for well over a decade, and the jar carries no license file - which is
+    why this was previously unresolvable and why the text once committed for it
+    here was the wrong license entirely.
+
+    The evidence is in javolution-5.5.1-sources.jar, published on Maven Central
+    alongside the binary: 267 of its 290 source files carry the same permissive
+    grant in their header, and it is not BSD. The remaining 23 are public-domain
+    SAX classes which the binary jar does not contain.
+
+    5.5.1 is the last release under this groupId - the project moved to
+    org.javolution with a different package - and Apache Hive still depends on it
+    in 4.0.0 and 4.0.1, so there is nothing to upgrade to.
+  -->
+  <supplement>
+    <project>
+      <groupId>javolution</groupId>
+      <artifactId>javolution</artifactId>
+      <licenses>
+        <license>
+          <name>Javolution License</name>
+          <url>https://repo1.maven.org/maven2/javolution/javolution/5.5.1/javolution-5.5.1-sources.jar</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    The POM is a four-line stub with no <licenses> block and the jar carries no
+    license file. jsp-api-2.1-sources.jar, published on Central alongside it,
+    carries the CDDL 1.0 header in its source files: "The contents of this file
+    are subject to the terms of the Common Development and Distribution License".
+  -->
+  <supplement>
+    <project>
+      <groupId>javax.servlet.jsp</groupId>
+      <artifactId>jsp-api</artifactId>
+      <licenses>
+        <license>
+          <name>Common Development and Distribution License 1.0</name>
+          <url>https://repo1.maven.org/maven2/javax/servlet/jsp/jsp-api/2.1/jsp-api-2.1-sources.jar</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    Jersey 2.36 needs pinning because the "any one of these" reading of a
+    multi-<license> POM does not hold for it.
+
+    jersey-common and jersey-server declare EPL 2.0, GPL2 w/ CPE, Apache-2.0 and
+    others. Those trailing entries are the licenses of third-party components the
+    Jersey distribution carries, not alternatives under which Jersey itself may be
+    used, so resolving them to Apache-2.0 was wrong. Each jar's own
+    META-INF/LICENSE.md is EPL 2.0 with the GPL2 w/ CPE alternative, and that is
+    what these record. The sibling artifacts declare no license at all and inherit
+    the same text.
+
+    Found by auditing every bundled coordinate's asserted license against the
+    license file inside its own jar.
+  -->
+  <supplement>
+    <project>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-common</artifactId>
+      <licenses>
+        <license>
+          <name>Eclipse Public License 2.0</name>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+  <supplement>
+    <project>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-server</artifactId>
+      <licenses>
+        <license>
+          <name>Eclipse Public License 2.0</name>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+  <supplement>
+    <project>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-client</artifactId>
+      <licenses>
+        <license>
+          <name>Eclipse Public License 2.0</name>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+  <supplement>
+    <project>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-servlet</artifactId>
+      <licenses>
+        <license>
+          <name>Eclipse Public License 2.0</name>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+  <supplement>
+    <project>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-servlet-core</artifactId>
+      <licenses>
+        <license>
+          <name>Eclipse Public License 2.0</name>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+  <supplement>
+    <project>
+      <groupId>org.glassfish.jersey.inject</groupId>
+      <artifactId>jersey-hk2</artifactId>
+      <licenses>
+        <license>
+          <name>Eclipse Public License 2.0</name>
+          <url>https://www.eclipse.org/legal/epl-2.0</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+  <!--
+    Declares "CDDL/GPLv2+CE" with no version, which reads as CDDL 1.0. The jar's
+    own META-INF/LICENSE.txt is CDDL 1.1 with the GPL2 w/ CPE alternative.
+  -->
+  <supplement>
+    <project>
+      <groupId>javax.activation</groupId>
+      <artifactId>javax.activation-api</artifactId>
+      <licenses>
+        <license>
+          <name>Common Development and Distribution License 1.1</name>
+          <url>https://oss.oracle.com/licenses/CDDL-1.1</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+
+
+  <!-- Dual licensed GPL-2.0-with-classpath-exception OR MIT; MIT is the option taken. -->
+  <supplement>
+    <project>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-compat-qual</artifactId>
+      <licenses>
+        <license>
+          <name>MIT License</name>
+          <url>http://opensource.org/licenses/MIT</url>
+        </license>
+      </licenses>
+    </project>
+  </supplement>
+</supplementalDataModels>
