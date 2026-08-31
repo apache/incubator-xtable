@@ -655,6 +655,25 @@
     <build>
         <pluginManagement>
             <plugins>
+                <!--
+                  LICENSE-bundled and NOTICE-bundled are inputs to the shade
+                  transformers below, which read them from target/classes and write
+                  them out as META-INF/LICENSE and META-INF/NOTICE. Packaging them as
+                  well left every jar carrying two byte-identical copies, and left the
+                  thin jars carrying bundle metadata that does not describe them (#701).
+                  Excluding them here keeps them in target/classes for the transformers
+                  and out of both artifacts.
+                -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>META-INF/LICENSE-bundled</exclude>
+                            <exclude>META-INF/NOTICE-bundled</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
