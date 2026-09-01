@@ -96,8 +96,11 @@ public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
     return StorageDescriptor.builder()
         .columns(columns)
         .location(TEST_BASE_PATH)
+        .inputFormat("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat")
+        .outputFormat("org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat")
         .serdeInfo(
             SerDeInfo.builder()
+                .serializationLibrary("org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe")
                 .parameters(
                     deltaGlueCatalogTableBuilder.getSerDeParameters(TEST_DELTA_INTERNAL_TABLE))
                 .build())

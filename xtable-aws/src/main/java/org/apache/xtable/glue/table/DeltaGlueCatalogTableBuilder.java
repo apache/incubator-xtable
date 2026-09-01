@@ -27,6 +27,7 @@ import static org.apache.xtable.catalog.Constants.PROP_SPARK_SQL_SOURCES_PROVIDE
 import static org.apache.xtable.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -48,6 +49,20 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 /** Delta specific table operations for Glue catalog sync */
 public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableInput, Table> {
 
+  // Standard Hive-compatible Parquet classes (Delta's on-disk file format).
+  // A generic Hive-Metastore-compatible reader (e.g. a UC Glue Federation
+  // foreign catalog) validates every table's StorageDescriptor when listing a
+  // database and throws InvalidObjectException for the whole database on the
+  // first table with a null SerDe/format -- these must be set even though
+  // Athena's own Delta reader (which keys off the table_type/
+  // spark.sql.sources.provider parameters instead) tolerates them being null.
+  private static final String PARQUET_INPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
+  private static final String PARQUET_OUTPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat";
+  private static final String PARQUET_SERDE_CLASS =
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
+
   private final GlueSchemaExtractor schemaExtractor;
   private static final String tableFormat = TableFormat.DELTA;
 
@@ -68,11 +83,7 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
         .tableType(GLUE_EXTERNAL_TABLE_TYPE)
         .parameters(getTableParameters())
         .storageDescriptor(
-            StorageDescriptor.builder()
-                .columns(schemaExtractor.getNonPartitionColumns(table, columnsMap))
-                .location(table.getBasePath())
-                .serdeInfo(SerDeInfo.builder().parameters(getSerDeParameters(table)).build())
-                .build())
+            getStorageDescriptor(table, schemaExtractor.getNonPartitionColumns(table, columnsMap)))
         .partitionKeys(schemaExtractor.getPartitionColumns(table, columnsMap))
         .build();
   }
@@ -90,10 +101,22 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
         .tableType(GLUE_EXTERNAL_TABLE_TYPE)
         .parameters(parameters)
         .storageDescriptor(
-            catalogTable.storageDescriptor().toBuilder()
-                .columns(schemaExtractor.getNonPartitionColumns(table, columnsMap))
-                .build())
+            getStorageDescriptor(table, schemaExtractor.getNonPartitionColumns(table, columnsMap)))
         .partitionKeys(schemaExtractor.getPartitionColumns(table, columnsMap))
+        .build();
+  }
+
+  private StorageDescriptor getStorageDescriptor(InternalTable table, List<Column> columns) {
+    return StorageDescriptor.builder()
+        .columns(columns)
+        .location(table.getBasePath())
+        .inputFormat(PARQUET_INPUT_FORMAT)
+        .outputFormat(PARQUET_OUTPUT_FORMAT)
+        .serdeInfo(
+            SerDeInfo.builder()
+                .serializationLibrary(PARQUET_SERDE_CLASS)
+                .parameters(getSerDeParameters(table))
+                .build())
         .build();
   }
 
