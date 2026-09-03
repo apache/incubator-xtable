@@ -269,7 +269,6 @@
                 <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-sync-common</artifactId>
                 <version>${hudi.version}</version>
-                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
