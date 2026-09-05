@@ -86,11 +86,11 @@ class ITIcebergMergeOnReadDeletionVectors {
     properties.put(
         HoodieTableConfig.VERSION.key(), String.valueOf(HoodieTableVersion.EIGHT.versionCode()));
     properties.put(HoodieMetadataConfig.ENABLE.key(), "false");
-    // The deletion-vector model: updates decompose into positional deletes plus inserts, all
-    // inserts go to base files (no log routing), and the simple index supplies record positions.
+    // The deletion-vector model: updates decompose into positional deletes plus inserts and the
+    // simple index supplies record positions; the writer itself keeps small-file routing out of
+    // the way so inserts land in base files of new file groups.
     properties.put("hoodie.write.updates.as.deletes.and.inserts", "true");
     properties.put("hoodie.index.type", "SIMPLE");
-    properties.put("hoodie.parquet.small.file.limit", "0");
     // Deletion vectors require an Iceberg format-version 3 table.
     properties.put("xtable.iceberg.format-version", "3");
     return properties;
