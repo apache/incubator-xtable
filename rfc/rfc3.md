@@ -14,18 +14,17 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-# RFC-2: Module Structure
+# RFC-3: Module Structure
 
 ## Proposers
 
 - @the-other-tim-brown
 
 ## Approvers
-- @<approver1 github username>
-- @<approver2 github username>
+- @vinishjail97
 
 ## Status
-
+Proposed
 GH Feature Request: https://github.com/apache/incubator-xtable/issues/611
 
 > Please keep the status updated in `rfc/README.md`.
@@ -39,13 +38,13 @@ Currently, XTable users have two options for running the conversion code.
 They can create their own jar with the XTable dependencies specified in their build file or they can generate the xtable-utilities bundled jar and run that on its own.
 There are difficulties when using either approach currently.
 
-When running the prebuilt utilities bundle jar, the user will bring in all the required dependencies which currently include three table formats, spark, and hadoop. 
+When running the prebuilt utilities bundle jar, the user will bring in all the required dependencies which currently include six table formats, spark, and hadoop. 
 This results in a very large jar containing more than the user really needs.
 
 When building your own jar, you can run into issues with conflicts in versions for the specific table formats you want to use since the user will often already have an implementation of at least one format on their classpath. 
 These conflicts may only surface as runtime errors when there is difference in method signature for example. 
 This can make the experience brittle for the end user by requiring them to closely follow any upgrades within the XTable repo as well.
-In this scenario the user will also have dependencies on all 3 table formats by default.
+In this scenario the user will also have dependencies on all 6 table formats by default.
 
 ## Implementation
 In order to allow users to include only the dependencies that they need for their use case, the repo will need to have modules per table format and per catalog client in the future.
@@ -70,4 +69,6 @@ None needed, just need to update documentation.
 
 ## Test Plan
 
-Describe in few sentences how the RFC will be tested. How will we know that the implementation works as expected? How will we know nothing breaks?
+1. Create a suite of integration tests that run the bundled jars and validate that the conversion is working as expected. These will be added as their own module before any of the other refactoring to reduce risk of regression as we migrate each of the table formats into their own modules.
+2. As each module is created, we will use the integration tests to validate that the conversion is still working as expected. We will also run manual tests to simulate a user's workflow to make sure the conversion is still working as expected, especially in the presence of a conflicting version of the table format on the classpath.
+3. After each module is created, we will verify that only the required dependencies are included in the shaded jar for that module and validate the size of the jar is reasonable.
