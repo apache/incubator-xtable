@@ -54,7 +54,7 @@ In addition to this, the jars will still be published to allow users to compose 
 
 We can also create these modules with a suffix indicating which version of the format is supported to allow for different implementations or versions of dependencies for the same format. For example, have an xtable-iceberg-v2 and xtable-iceberg-v3 module. 
 
-![img.png](assets/images/xtable_dependencies.jpg)
+![img.png](xtable_dependencies.jpg)
 
 ## Rollout/Adoption Plan
 
