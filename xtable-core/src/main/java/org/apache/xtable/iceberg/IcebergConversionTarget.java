@@ -20,8 +20,12 @@ package org.apache.xtable.iceberg;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -38,13 +42,18 @@ import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
+import org.apache.iceberg.mapping.MappedField;
+import org.apache.iceberg.mapping.MappedFields;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
+import org.apache.iceberg.mapping.NameMappingParser;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
@@ -66,6 +75,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
+  private TableSyncMetadata tableSyncMetadata;
 
   public IcebergConversionTarget() {}
 
@@ -159,10 +169,70 @@ public class IcebergConversionTarget implements ConversionTarget {
     }
   }
 
+  /**
+   * Create a name mapping from the given schema, add storage names in {@link
+   * IcebergSchemaExtractor#getIdToStorageName()}, if any exist, to the name mapping, and apply the
+   * updated mapping to the table.
+   *
+   * <p>This method should only be called when the name mapping is not set, or when field IDs are
+   * provided in the source schema
+   *
+   * @param schema the {@link Schema} from which to create the name mapping
+   */
+  private void createAndSetNameMapping(Schema schema) {
+    NameMapping mapping = MappingUtil.create(schema);
+    MappedFields updatedMappedFields =
+        updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName());
+    transaction
+        .updateProperties()
+        .set(
+            TableProperties.DEFAULT_NAME_MAPPING,
+            NameMappingParser.toJson(NameMapping.of(updatedMappedFields)))
+        .commit();
+  }
+
+  private MappedFields updateNameMapping(
+      MappedFields mapping, Map<Integer, String> idToStorageName) {
+    if (mapping == null) {
+      return null;
+    }
+    List<MappedField> fieldResults = new ArrayList<>();
+    for (MappedField field : mapping.fields()) {
+      Set<String> fieldNames = new HashSet<>(field.names());
+      if (idToStorageName.containsKey(field.id())) {
+        fieldNames.add(idToStorageName.get(field.id()));
+      }
+      MappedFields nestedMapping = updateNameMapping(field.nestedMapping(), idToStorageName);
+      fieldResults.add(MappedField.of(field.id(), fieldNames, nestedMapping));
+    }
+    return MappedFields.of(fieldResults);
+  }
+
   @Override
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
-    schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
+    if (!transaction.table().properties().containsKey(TableProperties.DEFAULT_NAME_MAPPING)) {
+      createAndSetNameMapping(latestSchema);
+    }
+    if (!transaction.table().schema().sameSchema(latestSchema)) {
+      boolean hasFieldIds =
+          schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
+      if (hasFieldIds) {
+        // If field IDs are provided in the source schema, manually update the name mapping to
+        // ensure the IDs match the correct fields.
+        createAndSetNameMapping(latestSchema);
+        // There is no clean way to sync the schema with the provided field IDs using the
+        // transaction API so we commit the current transaction and interact directly with
+        // the operations API.
+        transaction.commitTransaction();
+        schemaSync.syncWithProvidedIds(latestSchema, table);
+        // Start a new transaction for remaining operations
+        table.refresh();
+        transaction = table.newTransaction();
+      } else {
+        schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
+      }
+    }
   }
 
   @Override
@@ -174,6 +244,8 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void syncMetadata(TableSyncMetadata metadata) {
+    tableSyncMetadata = metadata;
+
     UpdateProperties updateProperties = transaction.updateProperties();
     updateProperties.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     if (!table.properties().containsKey(TableProperties.WRITE_DATA_LOCATION)) {
@@ -200,13 +272,18 @@ public class IcebergConversionTarget implements ConversionTarget {
         transaction,
         partitionedDataFiles,
         transaction.table().schema(),
-        transaction.table().spec());
+        transaction.table().spec(),
+        tableSyncMetadata);
   }
 
   @Override
-  public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
+  public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
     dataFileUpdatesExtractor.applyDiff(
-        transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
+        transaction,
+        internalFilesDiff,
+        transaction.table().schema(),
+        transaction.table().spec(),
+        tableSyncMetadata);
   }
 
   @Override
@@ -221,6 +298,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction.commitTransaction();
     transaction = null;
     internalTableState = null;
+    tableSyncMetadata = null;
   }
 
   private void safeDelete(String file) {
@@ -240,6 +318,33 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public String getTableFormat() {
     return TableFormat.ICEBERG;
+  }
+
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    for (Snapshot snapshot : table.snapshots()) {
+      Map<String, String> summary = snapshot.summary();
+      String sourceMetadataJson = summary.get(TableSyncMetadata.XTABLE_METADATA);
+      if (sourceMetadataJson == null) {
+        continue;
+      }
+
+      try {
+        Optional<TableSyncMetadata> optionalMetadata =
+            TableSyncMetadata.fromJson(sourceMetadataJson);
+        if (!optionalMetadata.isPresent()) {
+          continue;
+        }
+
+        TableSyncMetadata metadata = optionalMetadata.get();
+        if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
+          return Optional.of(String.valueOf(snapshot.snapshotId()));
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse parse snapshot metadata for {}", snapshot.snapshotId(), e);
+      }
+    }
+    return Optional.empty();
   }
 
   private void rollbackCorruptCommits() {

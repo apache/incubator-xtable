@@ -25,16 +25,22 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           java-version: '11'
           distribution: 'temurin'
       - name: Parse Version Number
         run: echo "VERSION=$(echo ${{ github.event.release.tag_name }} | sed -e s/v//)" >> $GITHUB_ENV
       - name: Set Version
-        run: mvn versions:set -DnewVersion="$VERSION"
+        run: ./mvnw versions:set -DnewVersion="$VERSION"
       - name: Publish package
-        run: mvn -ntp --batch-mode deploy -DskipTests
+        # Never build a release from cached module output. `versions:set` above has
+        # just rewritten the version, while cache restoration is version-agnostic —
+        # it stamps the current project version onto whatever it restores. This
+        # runner keeps no build-cache directory today, so the flag is a guard
+        # against that changing, and it also saves checksumming every module for a
+        # cache that can never hit. Same reasoning as source-build-check.yml.
+        run: ./mvnw -ntp --batch-mode deploy -DskipTests -Dmaven.build.cache.enabled=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

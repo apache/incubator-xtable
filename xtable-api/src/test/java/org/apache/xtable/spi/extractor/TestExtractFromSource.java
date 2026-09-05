@@ -41,8 +41,8 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 public class TestExtractFromSource {
@@ -53,7 +53,11 @@ public class TestExtractFromSource {
     InternalTable table = InternalTable.builder().latestCommitTime(Instant.now()).build();
     List<PartitionFileGroup> dataFiles = Collections.emptyList();
     InternalSnapshot internalSnapshot =
-        InternalSnapshot.builder().table(table).partitionedDataFiles(dataFiles).build();
+        InternalSnapshot.builder()
+            .table(table)
+            .partitionedDataFiles(dataFiles)
+            .sourceIdentifier("0")
+            .build();
     when(mockConversionSource.getCurrentSnapshot()).thenReturn(internalSnapshot);
     assertEquals(internalSnapshot, ExtractFromSource.of(mockConversionSource).extractSnapshot());
   }
@@ -85,7 +89,8 @@ public class TestExtractFromSource {
         TableChange.builder()
             .tableAsOfChange(tableAtFirstInstant)
             .filesDiff(
-                DataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+                InternalFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+            .sourceIdentifier("0")
             .build();
     when(mockConversionSource.getTableChangeForCommit(firstCommitToSync))
         .thenReturn(tableChangeToReturnAtFirstInstant);
@@ -93,7 +98,8 @@ public class TestExtractFromSource {
         TableChange.builder()
             .tableAsOfChange(tableAtFirstInstant)
             .filesDiff(
-                DataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+                InternalFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+            .sourceIdentifier("0")
             .build();
 
     // add 2 new files, remove 2 files
@@ -106,10 +112,11 @@ public class TestExtractFromSource {
         TableChange.builder()
             .tableAsOfChange(tableAtSecondInstant)
             .filesDiff(
-                DataFilesDiff.builder()
+                InternalFilesDiff.builder()
                     .filesAdded(Arrays.asList(newFile2, newFile3))
                     .filesRemoved(Arrays.asList(initialFile3, newFile1))
                     .build())
+            .sourceIdentifier("1")
             .build();
     when(mockConversionSource.getTableChangeForCommit(secondCommitToSync))
         .thenReturn(tableChangeToReturnAtSecondInstant);
@@ -117,10 +124,11 @@ public class TestExtractFromSource {
         TableChange.builder()
             .tableAsOfChange(tableAtSecondInstant)
             .filesDiff(
-                DataFilesDiff.builder()
+                InternalFilesDiff.builder()
                     .filesAdded(Arrays.asList(newFile2, newFile3))
                     .filesRemoved(Arrays.asList(initialFile3, newFile1))
                     .build())
+            .sourceIdentifier("1")
             .build();
 
     IncrementalTableChanges actual =

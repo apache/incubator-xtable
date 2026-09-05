@@ -18,6 +18,7 @@
  
 package org.apache.xtable.iceberg;
 
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,9 +30,12 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.types.Type;
@@ -177,7 +181,7 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).deleteColumn("array_field.element.element_string");
     verify(mockUpdateSchema)
-        .addColumn("array_field.element", "element_double", Types.DoubleType.get(), null);
+        .addColumn("array_field.element", "element_double", Types.DoubleType.get(), (String) null);
     verify(mockUpdateSchema).commit();
   }
 
@@ -190,7 +194,8 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).deleteColumn("map_field.value.value_string");
     verify(mockUpdateSchema)
-        .addRequiredColumn("map_field.value", "value_double", Types.DoubleType.get(), null);
+        .addRequiredColumn(
+            "map_field.value", "value_double", Types.DoubleType.get(), (String) null);
     verify(mockUpdateSchema).commit();
   }
 
@@ -286,7 +291,7 @@ public class TestIcebergSchemaSync {
 
     schemaSync.sync(SCHEMA, latest, mockTransaction);
 
-    verify(mockUpdateSchema).updateColumnDoc("int_field", "doc");
+    verify(mockUpdateSchema).updateColumnDoc("record.int_field", "doc");
     verify(mockUpdateSchema).commit();
   }
 
@@ -307,7 +312,7 @@ public class TestIcebergSchemaSync {
 
     schemaSync.sync(SCHEMA, latest, mockTransaction);
 
-    verify(mockUpdateSchema).updateColumnDoc("element_string", "doc");
+    verify(mockUpdateSchema).updateColumnDoc("array_field.element.element_string", "doc");
     verify(mockUpdateSchema).commit();
   }
 
@@ -331,8 +336,27 @@ public class TestIcebergSchemaSync {
 
     schemaSync.sync(SCHEMA, latest, mockTransaction);
 
-    verify(mockUpdateSchema).updateColumnDoc("value_string", "doc");
+    verify(mockUpdateSchema).updateColumnDoc("map_field.value.value_string", "doc");
     verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void testSyncWithProvidedIds() {
+    BaseTable mockBaseTable = Mockito.mock(BaseTable.class, RETURNS_DEEP_STUBS);
+    TableMetadata mockCurrent = Mockito.mock(TableMetadata.class);
+    when(mockBaseTable.operations().current()).thenReturn(mockCurrent);
+    try (MockedStatic<TableMetadata> tableMetadataMockedStatic =
+        Mockito.mockStatic(TableMetadata.class)) {
+      TableMetadata.Builder mockBuilder = Mockito.mock(TableMetadata.Builder.class);
+      tableMetadataMockedStatic
+          .when(() -> TableMetadata.buildFrom(mockCurrent))
+          .thenReturn(mockBuilder);
+      when(mockBuilder.setCurrentSchema(SCHEMA, SCHEMA.highestFieldId())).thenReturn(mockBuilder);
+      TableMetadata mockUpdated = Mockito.mock(TableMetadata.class);
+      when(mockBuilder.build()).thenReturn(mockUpdated);
+      schemaSync.syncWithProvidedIds(SCHEMA, mockBaseTable);
+      verify(mockBaseTable.operations()).commit(mockCurrent, mockUpdated);
+    }
   }
 
   private Schema addColumnToDefault(Schema schema, Types.NestedField field, Integer parentId) {

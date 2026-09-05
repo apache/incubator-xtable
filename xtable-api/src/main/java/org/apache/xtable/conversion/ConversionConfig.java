@@ -18,7 +18,9 @@
  
 package org.apache.xtable.conversion;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -29,22 +31,30 @@ import com.google.common.base.Preconditions;
 import org.apache.xtable.model.sync.SyncMode;
 
 @Value
+@Builder
 public class ConversionConfig {
   // The source of the sync
   @NonNull SourceTable sourceTable;
   // One or more targets to sync the table metadata to
   List<TargetTable> targetTables;
+  // Each target table can be synced to multiple target catalogs, this is map from
+  // targetTable to target catalogs.
+  Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs;
   // The mode, incremental or snapshot
   SyncMode syncMode;
 
   @Builder
   ConversionConfig(
-      @NonNull SourceTable sourceTable, List<TargetTable> targetTables, SyncMode syncMode) {
+      @NonNull SourceTable sourceTable,
+      List<TargetTable> targetTables,
+      Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs,
+      SyncMode syncMode) {
     this.sourceTable = sourceTable;
     this.targetTables = targetTables;
     Preconditions.checkArgument(
         targetTables != null && !targetTables.isEmpty(),
         "Please provide at-least one format to sync");
+    this.targetCatalogs = targetCatalogs == null ? Collections.emptyMap() : targetCatalogs;
     this.syncMode = syncMode == null ? SyncMode.INCREMENTAL : syncMode;
   }
 }

@@ -45,7 +45,8 @@ public class SchemaFieldFinder {
    * @return the field if it exists, otherwise returns null
    */
   public InternalField findFieldByPath(InternalSchema schema, String path) {
-    return findFieldByPath(schema, path.split("\\."), 0);
+    int startIndex = 0;
+    return findFieldByPath(schema, path.split("\\."), startIndex);
   }
 
   private InternalField findFieldByPath(InternalSchema schema, String[] pathParts, int startIndex) {

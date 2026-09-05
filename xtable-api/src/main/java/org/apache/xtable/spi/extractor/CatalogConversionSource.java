@@ -18,6 +18,10 @@
  
 package org.apache.xtable.spi.extractor;
 
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.xtable.annotations.Evolving;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
@@ -26,7 +30,14 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
  * catalog to SourceTable object {@link SourceTable}, can be used by downstream consumers for
  * syncing it to multiple {@link org.apache.xtable.conversion.TargetTable}
  */
+@Evolving
 public interface CatalogConversionSource {
   /** Returns the source table object present in the catalog. */
   SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
+
+  /** Returns the {@link org.apache.xtable.model.storage.CatalogType} for the catalog conversion */
+  String getCatalogType();
+
+  /** Initializes the ConversionSource with provided configuration */
+  void init(ExternalCatalogConfig catalogConfig, Configuration configuration);
 }

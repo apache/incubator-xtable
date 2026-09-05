@@ -26,6 +26,7 @@ hs_err_pid*
 # Ignore java-version and idea files.
 .java-version
 .idea
+.vscode
 
 # Ignore Gradle project-specific cache directory
 .gradle
@@ -42,3 +43,13 @@ target/
 demo/jars/*
 demo/notebook/.ipynb_checkpoints/*
 my_config.yaml
+my_config_catalog.yaml
+
+# REST generated models
+spec/generated
+
+# SDKMan
+.sdkmanrc
+demo/notebook/spark-warehouse/
+demo/notebook/metastore_db/
+demo/notebook/derby.log

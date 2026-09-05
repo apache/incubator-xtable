@@ -35,12 +35,14 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -58,9 +60,9 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
@@ -106,7 +108,9 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   @Override
   public InternalTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
-    Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
+    Schema iceSchema =
+        (snapshot != null) ? iceTable.schemas().get(snapshot.schemaId()) : iceTable.schema();
+    TableOperations iceOps = ((BaseTable) iceTable).operations();
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
 
@@ -120,14 +124,22 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         irPartitionFields.size() > 0
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
+
+    Instant latestCommitTime =
+        (snapshot != null)
+            ? Instant.ofEpochMilli(snapshot.timestampMillis())
+            : Instant.ofEpochMilli(
+                ((BaseTable) iceTable).operations().current().lastUpdatedMillis());
+
     return InternalTable.builder()
         .tableFormat(TableFormat.ICEBERG)
         .basePath(iceTable.location())
         .name(iceTable.name())
         .partitioningFields(irPartitionFields)
-        .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
+        .latestCommitTime(latestCommitTime)
         .readSchema(irSchema)
         .layoutStrategy(dataLayoutStrategy)
+        .latestMetadataPath(iceOps.current().metadataFileLocation())
         .build();
   }
 
@@ -143,9 +155,22 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
+
+    if (currentSnapshot == null) {
+      // Handle empty table case - return snapshot with schema but no data files
+      InternalTable irTable = getTable(null);
+      return InternalSnapshot.builder()
+          .version("0")
+          .table(irTable)
+          .partitionedDataFiles(Collections.emptyList())
+          .sourceIdentifier("0")
+          .build();
+    }
+
     InternalTable irTable = getTable(currentSnapshot);
 
-    TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
+    TableScan scan =
+        iceTable.newScan().useSnapshot(currentSnapshot.snapshotId()).includeColumnStats();
     PartitionSpec partitionSpec = iceTable.spec();
     List<PartitionFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
@@ -164,6 +189,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .partitionedDataFiles(partitionedDataFiles)
+        .sourceIdentifier(getCommitIdentifier(currentSnapshot))
         .build();
   }
 
@@ -191,11 +217,18 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
             .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
-    DataFilesDiff filesDiff =
-        DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
+    InternalFilesDiff filesDiff =
+        InternalFilesDiff.builder()
+            .filesAdded(dataFilesAdded)
+            .filesRemoved(dataFilesRemoved)
+            .build();
 
     InternalTable table = getTable(snapshot);
-    return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(table)
+        .filesDiff(filesDiff)
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .build();
   }
 
   @Override
@@ -237,31 +270,29 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     long timeInMillis = instant.toEpochMilli();
     Table iceTable = getSourceTable();
-    boolean doesInstantOfAgeExists = false;
-    Long targetSnapshotId = null;
-    for (Snapshot snapshot : iceTable.snapshots()) {
-      if (snapshot.timestampMillis() <= timeInMillis) {
-        doesInstantOfAgeExists = true;
-        targetSnapshotId = snapshot.snapshotId();
-      } else {
-        break;
-      }
-    }
-    if (!doesInstantOfAgeExists) {
-      return false;
-    }
-    // Go from latest snapshot until targetSnapshotId through parent reference.
-    // nothing has to be null in this chain to guarantee safety of incremental sync.
-    Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
-    while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
-      Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
-      if (currentSnapshot == null) {
-        // The snapshot is expired.
+    Snapshot currentSnapshot = iceTable.currentSnapshot();
+
+    while (currentSnapshot != null && currentSnapshot.timestampMillis() > timeInMillis) {
+      Long parentSnapshotId = currentSnapshot.parentId();
+      if (parentSnapshotId == null) {
+        // no more snapshots in the chain and did not find targetSnapshot
         return false;
       }
-      currentSnapshotId = currentSnapshot.parentId();
+
+      Snapshot parentSnapshot = iceTable.snapshot(parentSnapshotId);
+      if (parentSnapshot == null) {
+        // chain is broken due to expired snapshot
+        log.info("Expired snapshot id: {}", parentSnapshotId);
+        return false;
+      }
+      currentSnapshot = parentSnapshot;
     }
-    return true;
+    return currentSnapshot != null;
+  }
+
+  @Override
+  public String getCommitIdentifier(Snapshot commit) {
+    return String.valueOf(commit.snapshotId());
   }
 
   @Override

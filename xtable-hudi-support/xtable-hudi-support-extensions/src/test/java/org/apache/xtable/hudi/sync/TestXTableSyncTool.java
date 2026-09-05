@@ -39,7 +39,6 @@ import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.encoders.RowEncoder;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,6 +48,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.DataSourceWriteOptions;
+import org.apache.hudi.SparkAdapterSupport$;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.sync.common.HoodieSyncConfig;
 
@@ -61,6 +61,18 @@ public class TestXTableSyncTool {
         Arguments.of(""), // unpartitioned
         Arguments.of("partition_string"), // identity transform for partition
         Arguments.of("time_millis:TIMESTAMP") // timestamp transform
+        );
+  }
+
+  /**
+   * Cases supported by the Delta Kernel writer. The timestamp-transform partition is excluded
+   * because XTable models it as a Delta generated column, and Delta Kernel 4.0.0 cannot write
+   * tables that use the "generatedColumns" writer feature.
+   */
+  private static Stream<Arguments> kernelTestCases() {
+    return Stream.of(
+        Arguments.of(""), // unpartitioned
+        Arguments.of("partition_string") // identity transform for partition
         );
   }
 
@@ -83,7 +95,7 @@ public class TestXTableSyncTool {
     String tableName = "table-" + UUID.randomUUID();
     String path = tempDir.toUri() + "/" + tableName;
     Map<String, String> options = new HashMap<>();
-    options.put(DataSourceWriteOptions.PRECOMBINE_FIELD().key(), "key");
+    options.put(DataSourceWriteOptions.ORDERING_FIELDS().key(), "key");
     options.put(DataSourceWriteOptions.RECORDKEY_FIELD().key(), "key");
     options.put(DataSourceWriteOptions.PARTITIONPATH_FIELD().key(), partitionPath);
     options.put("hoodie.table.name", tableName);
@@ -110,6 +122,33 @@ public class TestXTableSyncTool {
     assertTrue(Files.exists(Paths.get(URI.create(path + "/metadata"))));
   }
 
+  @ParameterizedTest
+  @MethodSource(value = "kernelTestCases")
+  public void testSyncWithDeltaKernel(String partitionPath) {
+    String tableName = "table-" + UUID.randomUUID();
+    String path = tempDir.toUri() + "/" + tableName;
+    Map<String, String> options = new HashMap<>();
+    options.put(DataSourceWriteOptions.PRECOMBINE_FIELD().key(), "key");
+    options.put(DataSourceWriteOptions.RECORDKEY_FIELD().key(), "key");
+    options.put(DataSourceWriteOptions.PARTITIONPATH_FIELD().key(), partitionPath);
+    options.put("hoodie.table.name", tableName);
+    writeBasicHudiTable(path, options);
+
+    Properties properties = new Properties();
+    properties.put(XTableSyncConfig.XTABLE_FORMATS.key(), "iceberg,DELTA");
+    // Route the Delta target through the Delta Kernel writer instead of Delta Standalone.
+    properties.put(XTableSyncConfig.XTABLE_DELTA_USE_KERNEL.key(), "true");
+    properties.put(KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME.key(), partitionPath);
+    properties.put(HoodieSyncConfig.META_SYNC_BASE_PATH.key(), path);
+    properties.putAll(options);
+
+    new XTableSyncTool(properties, new Configuration()).syncHoodieTable();
+    // lightweight check to make sure metadata dirs are made - assumes that InternalTable sync is
+    // correct if it succeeds
+    assertTrue(Files.exists(Paths.get(URI.create(path + "/_delta_log"))));
+    assertTrue(Files.exists(Paths.get(URI.create(path + "/metadata"))));
+  }
+
   protected void writeBasicHudiTable(String path, Map<String, String> options) {
     StructType schema =
         DataTypes.createStructType(
@@ -124,7 +163,12 @@ public class TestXTableSyncTool {
     Row row2 = RowFactory.create("key2", partition, timestamp, "value2");
     Row row3 = RowFactory.create("key3", partition, timestamp, "value3");
     spark
-        .createDataset(Arrays.asList(row1, row2, row3), RowEncoder.apply(schema))
+        .createDataset(
+            Arrays.asList(row1, row2, row3),
+            SparkAdapterSupport$.MODULE$
+                .sparkAdapter()
+                .getCatalystExpressionUtils()
+                .getEncoder(schema))
         .write()
         .format("hudi")
         .options(options)

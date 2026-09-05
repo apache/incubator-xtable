@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.xtable.model.storage.PartitionFileGroup;
@@ -47,4 +48,6 @@ public class InternalSnapshot {
   List<PartitionFileGroup> partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+  // commit identifier in source table
+  @NonNull String sourceIdentifier;
 }

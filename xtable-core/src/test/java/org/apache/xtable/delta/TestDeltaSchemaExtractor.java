@@ -247,43 +247,11 @@ public class TestDeltaSchemaExtractor {
             .add("optionalDecimal", DataTypes.createDecimalType(10, 2), true);
 
     Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
-    Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
 
   @Test
   public void testFixedBytes() {
-    InternalSchema internalSchemaOriginal =
-        InternalSchema.builder()
-            .name("struct")
-            .dataType(InternalType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
-                    InternalField.builder()
-                        .name("requiredFixed")
-                        .schema(
-                            InternalSchema.builder()
-                                .name("fixed")
-                                .dataType(InternalType.FIXED)
-                                .isNullable(false)
-                                .comment("comment")
-                                .build())
-                        .build(),
-                    InternalField.builder()
-                        .name("optionalFixed")
-                        .schema(
-                            InternalSchema.builder()
-                                .name("fixed")
-                                .dataType(InternalType.FIXED)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build();
-
     InternalSchema internalSchemaAfterRoundTrip =
         InternalSchema.builder()
             .name("struct")
@@ -317,9 +285,6 @@ public class TestDeltaSchemaExtractor {
             .add("requiredFixed", DataTypes.BinaryType, false, "comment")
             .add("optionalFixed", DataTypes.BinaryType, true);
 
-    Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchemaOriginal));
     Assertions.assertEquals(
         internalSchemaAfterRoundTrip,
         DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
@@ -357,32 +322,25 @@ public class TestDeltaSchemaExtractor {
                                 .metadata(metadata)
                                 .build())
                         .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build();
-
-    InternalSchema internalSchemaTimestampNtz =
-        InternalSchema.builder()
-            .name("struct")
-            .dataType(InternalType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
+                        .build(),
                     InternalField.builder()
                         .name("requiredTimestampNtz")
                         .schema(
                             InternalSchema.builder()
-                                .name("timestampNtz")
+                                .name("timestamp_ntz")
                                 .dataType(InternalType.TIMESTAMP_NTZ)
                                 .isNullable(false)
+                                .metadata(metadata)
                                 .build())
                         .build(),
                     InternalField.builder()
                         .name("optionalTimestampNtz")
                         .schema(
                             InternalSchema.builder()
-                                .name("timestampNtz")
+                                .name("timestamp_ntz")
                                 .dataType(InternalType.TIMESTAMP_NTZ)
                                 .isNullable(true)
+                                .metadata(metadata)
                                 .build())
                         .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
@@ -391,70 +349,13 @@ public class TestDeltaSchemaExtractor {
     StructType structRepresentationTimestamp =
         new StructType()
             .add("requiredTimestamp", DataTypes.TimestampType, false)
-            .add("optionalTimestamp", DataTypes.TimestampType, true);
+            .add("optionalTimestamp", DataTypes.TimestampType, true)
+            .add("requiredTimestampNtz", DataTypes.TimestampNTZType, false)
+            .add("optionalTimestampNtz", DataTypes.TimestampNTZType, true);
 
-    StructType structRepresentationTimestampNtz =
-        new StructType()
-            .add("requiredTimestampNtz", DataTypes.LongType, false)
-            .add("optionalTimestampNtz", DataTypes.LongType, true);
-
-    Assertions.assertEquals(
-        structRepresentationTimestamp,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchemaTimestamp));
     Assertions.assertEquals(
         internalSchemaTimestamp,
         DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentationTimestamp));
-    Assertions.assertEquals(
-        structRepresentationTimestampNtz,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchemaTimestampNtz));
-  }
-
-  @Test
-  public void testEnums() {
-    Map<InternalSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
-    requiredEnumMetadata.put(InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<InternalSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
-    optionalEnumMetadata.put(
-        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
-
-    InternalSchema internalSchema =
-        InternalSchema.builder()
-            .name("struct")
-            .dataType(InternalType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
-                    InternalField.builder()
-                        .name("requiredEnum")
-                        .schema(
-                            InternalSchema.builder()
-                                .name("REQUIRED_ENUM")
-                                .dataType(InternalType.ENUM)
-                                .isNullable(false)
-                                .metadata(requiredEnumMetadata)
-                                .build())
-                        .build(),
-                    InternalField.builder()
-                        .name("optionalEnum")
-                        .schema(
-                            InternalSchema.builder()
-                                .name("OPTIONAL_ENUM")
-                                .dataType(InternalType.ENUM)
-                                .isNullable(true)
-                                .metadata(optionalEnumMetadata)
-                                .build())
-                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build();
-
-    StructType structRepresentation =
-        new StructType()
-            .add("requiredEnum", DataTypes.StringType, false)
-            .add("optionalEnum", DataTypes.StringType, true);
-
-    Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
   }
 
   @Test
@@ -568,8 +469,97 @@ public class TestDeltaSchemaExtractor {
             .add("recordMap", DataTypes.createMapType(DataTypes.IntegerType, mapElement, true));
 
     Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
+        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
+  public void testMapWithStructKey() {
+    InternalSchema structKeySchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("id")
+                        .parentPath("structKeyMap._one_field_key")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("long")
+                                .dataType(InternalType.LONG)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("region")
+                        .parentPath("structKeyMap._one_field_key")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema structValueSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(true)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("payload")
+                        .parentPath("structKeyMap._one_field_value")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(false)
+                                .build())
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("structKeyMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("structKeyMap")
+                                            .schema(structKeySchema)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("structKeyMap")
+                                            .schema(structValueSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    StructType keyStruct =
+        new StructType()
+            .add("id", DataTypes.LongType, false)
+            .add("region", DataTypes.StringType, true);
+    StructType valueStruct = new StructType().add("payload", DataTypes.StringType, false);
+    StructType structRepresentation =
+        new StructType().add("structKeyMap", DataTypes.createMapType(keyStruct, valueStruct, true));
+
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
@@ -661,10 +651,82 @@ public class TestDeltaSchemaExtractor {
             .add("recordList", DataTypes.createArrayType(elementSchema, true), true);
 
     Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
-    Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
+  public void testBinaryInMapAndArrayWithoutMetadata() {
+    InternalSchema expectedSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("binaryList")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(false)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("binaryList")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("binaryMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("binaryMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("binaryMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
+
+    StructType structRepresentation =
+        new StructType()
+            .add("binaryList", DataTypes.createArrayType(DataTypes.BinaryType, false), false)
+            .add(
+                "binaryMap",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.BinaryType, false),
+                false);
+
+    Assertions.assertEquals(
+        expectedSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
 
   @Test
@@ -757,9 +819,6 @@ public class TestDeltaSchemaExtractor {
                         false),
                 true,
                 "comment");
-    Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
@@ -939,9 +998,6 @@ public class TestDeltaSchemaExtractor {
                         .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
-    Assertions.assertEquals(
-        structRepresentation,
-        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }

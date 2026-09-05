@@ -160,11 +160,15 @@ public class AvroSchemaConverter {
           metadata.put(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
         } else if (logicalType instanceof LogicalTypes.LocalTimestampMillis) {
-          newDataType = InternalType.TIMESTAMP_NTZ;
+          // TODO: https://github.com/apache/incubator-xtable/issues/672
+          // Hudi 0.x writes INT64 in parquet, TimestampNTZType support added in 1.x
+          newDataType = InternalType.LONG;
           metadata.put(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
         } else if (logicalType instanceof LogicalTypes.LocalTimestampMicros) {
-          newDataType = InternalType.TIMESTAMP_NTZ;
+          // TODO: https://github.com/apache/incubator-xtable/issues/672
+          // Hudi 0.x writes INT64 in parquet, TimestampNTZType support added in 1.x
+          newDataType = InternalType.LONG;
           metadata.put(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
         } else {
@@ -350,6 +354,22 @@ public class AvroSchemaConverter {
       case INT:
         return finalizeSchema(Schema.create(Schema.Type.INT), internalSchema);
       case LONG:
+        if (internalSchema.getMetadata() != null
+            && internalSchema
+                .getMetadata()
+                .containsKey(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)) {
+          if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+              == InternalSchema.MetadataValue.MILLIS) {
+            return finalizeSchema(
+                LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
+                internalSchema);
+          }
+          {
+            return finalizeSchema(
+                LogicalTypes.localTimestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+                internalSchema);
+          }
+        }
         return finalizeSchema(Schema.create(Schema.Type.LONG), internalSchema);
       case STRING:
         return finalizeSchema(Schema.create(Schema.Type.STRING), internalSchema);
@@ -371,8 +391,9 @@ public class AvroSchemaConverter {
         return finalizeSchema(
             LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), internalSchema);
       case TIMESTAMP:
-        if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
-            == InternalSchema.MetadataValue.MICROS) {
+        if (internalSchema.getMetadata() != null
+            && internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                == InternalSchema.MetadataValue.MICROS) {
           return finalizeSchema(
               LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
               internalSchema);
@@ -382,8 +403,9 @@ public class AvroSchemaConverter {
               internalSchema);
         }
       case TIMESTAMP_NTZ:
-        if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
-            == InternalSchema.MetadataValue.MICROS) {
+        if (internalSchema.getMetadata() != null
+            && internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                == InternalSchema.MetadataValue.MICROS) {
           return finalizeSchema(
               LogicalTypes.localTimestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
               internalSchema);

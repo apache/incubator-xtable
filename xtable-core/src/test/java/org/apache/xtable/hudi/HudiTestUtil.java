@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 
 import java.nio.file.Path;
@@ -38,48 +39,59 @@ import org.apache.spark.serializer.KryoSerializer;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
 
   @SneakyThrows
-  static HoodieTableMetaClient initTableAndGetMetaClient(
+  public static HoodieTableMetaClient initTableAndGetMetaClient(
       String tableBasePath, String partitionFields) {
-    return HoodieTableMetaClient.withPropertyBuilder()
+    return HoodieTableMetaClient.newTableBuilder()
         .setCommitTimezone(HoodieTimelineTimeZone.UTC)
         .setTableType(HoodieTableType.COPY_ON_WRITE)
+        // Pin test tables to table version 6 to match the conversion target. Table version 9
+        // support will be added in a follow-up PR.
+        .setTableVersion(HoodieTableVersion.SIX)
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
         .setPartitionFields(partitionFields)
-        .initTable(new Configuration(), tableBasePath);
+        .initTable(getStorageConf(new Configuration()), tableBasePath);
   }
 
   public static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {
     return getHoodieWriteConfig(metaClient, null);
   }
 
-  static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient, Schema schema) {
+  public static HoodieWriteConfig getHoodieWriteConfig(
+      HoodieTableMetaClient metaClient, Schema schema) {
     Properties properties = new Properties();
     properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
     return HoodieWriteConfig.newBuilder()
+        // Pin writes to table version 6 and disable auto-upgrade so the write client does not
+        // upgrade the test table to version 9. Table version 9 support will be added in a
+        // follow-up PR.
+        .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+        .withAutoUpgradeVersion(false)
         .withSchema(schema == null ? "" : schema.toString())
         .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
-        .withPath(metaClient.getBasePathV2().toString())
+        .withPath(metaClient.getBasePath().toString())
         .withEmbeddedTimelineServerEnabled(false)
         .withMetadataConfig(
             HoodieMetadataConfig.newBuilder()
                 .withMaxNumDeltaCommitsBeforeCompaction(2)
                 .enable(true)
-                .withMetadataIndexColumnStats(true)
+                // Mirror HudiConversionTarget: col-stats index only for un-partitioned tables.
+                .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
                 .withProperties(properties)
                 .build())
         .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(1, 2).build())
@@ -87,7 +99,7 @@ public class HudiTestUtil {
         .build();
   }
 
-  static WriteStatus createWriteStatus(
+  public static WriteStatus createWriteStatus(
       String fileName,
       String partitionPath,
       String commitTime,
@@ -105,6 +117,7 @@ public class HudiTestUtil {
             partitionPath.isEmpty() ? fileName : String.format("%s/%s", partitionPath, fileName),
             commitTime));
     writeStat.setNumWrites(recordCount);
+    writeStat.setNumInserts(recordCount);
     writeStat.setFileSizeInBytes(fileSize);
     writeStat.setTotalWriteBytes(fileSize);
     writeStat.putRecordsStats(recordStats);

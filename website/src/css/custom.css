@@ -85,6 +85,27 @@ html[data-theme='dark'] {
   --docusaurus-highlighted-code-line-bg: rgba(105, 105, 105, 0.3);
 }
 
+/* Footer: match the home page (homepage/index.html) footer — the same blue
+   gradient background and translucent-white links, in both light and dark mode. */
+.footer {
+  background-image: linear-gradient(130deg, #04548c, #043c74);
+  --ifm-footer-background-color: #043c74;
+  --ifm-footer-color: rgba(255, 255, 255, 0.75);
+  --ifm-footer-link-color: rgba(255, 255, 255, 0.75);
+  --ifm-footer-title-color: #ffffff;
+}
+
+.footer .footer__link-item:hover {
+  color: #ffffff;
+}
+
+/* XTable logo shown as the first footer column, before the "XTable" links. */
+.footer__xtable-logo {
+  max-width: 100%;
+  height: auto;
+  margin-top: 4px;
+}
+
 .blogThumbnail {
     padding-left: 0;
     padding-right: 48px;

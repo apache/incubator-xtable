@@ -26,6 +26,8 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import com.google.common.collect.ImmutableMap;
+
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -174,7 +176,16 @@ public class ColumnStatMapUtil {
   private static final InternalField DECIMAL_FIELD =
       InternalField.builder()
           .name("decimal_field")
-          .schema(InternalSchema.builder().name("decimal").dataType(InternalType.DECIMAL).build())
+          .schema(
+              InternalSchema.builder()
+                  .name("decimal")
+                  .dataType(InternalType.DECIMAL)
+                  .metadata(
+                      ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                          .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                          .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 5)
+                          .build())
+                  .build())
           .build();
 
   private static final InternalField FLOAT_FIELD =
@@ -187,6 +198,24 @@ public class ColumnStatMapUtil {
       InternalField.builder()
           .name("double_field")
           .schema(InternalSchema.builder().name("double").dataType(InternalType.DOUBLE).build())
+          .build();
+
+  private static final InternalField NESTED_STRING_FIELD =
+      InternalField.builder()
+          .name("nested_string_field")
+          .parentPath("nested_struct_field_primitive")
+          .schema(InternalSchema.builder().name("a_string").dataType(InternalType.STRING).build())
+          .build();
+
+  private static final InternalField NESTED_STRUCT_FIELD_PRIMITIVE =
+      InternalField.builder()
+          .name("nested_struct_field_primitive")
+          .schema(
+              InternalSchema.builder()
+                  .name("nested_struct_field_primitive")
+                  .dataType(InternalType.RECORD)
+                  .fields(Arrays.asList(NESTED_STRING_FIELD))
+                  .build())
           .build();
 
   public static InternalSchema getSchema() {
@@ -205,6 +234,7 @@ public class ColumnStatMapUtil {
                 ARRAY_LONG_FIELD,
                 MAP_STRING_LONG_FIELD,
                 NESTED_STRUCT_FIELD,
+                NESTED_STRUCT_FIELD_PRIMITIVE,
                 DECIMAL_FIELD,
                 FLOAT_FIELD,
                 DOUBLE_FIELD))
@@ -312,7 +342,7 @@ public class ColumnStatMapUtil {
         ColumnStat.builder()
             .field(DECIMAL_FIELD)
             .numNulls(1)
-            .range(Range.vector(new BigDecimal("1.0"), new BigDecimal("2.0")))
+            .range(Range.vector(new BigDecimal("1.00"), new BigDecimal("2.00")))
             .numValues(50)
             .totalSize(123)
             .build();
@@ -332,7 +362,21 @@ public class ColumnStatMapUtil {
             .numValues(50)
             .totalSize(123)
             .build();
+    ColumnStat nestedStringColumnStats =
+        ColumnStat.builder()
+            .field(NESTED_STRING_FIELD)
+            .numNulls(1)
+            .range(Range.vector("alice", "zion"))
+            .numValues(50)
+            .totalSize(500)
+            .build();
 
+    ColumnStat ignoredColumnStatsNestedStructFieldPrimitive =
+        ColumnStat.builder()
+            .field(NESTED_STRUCT_FIELD_PRIMITIVE)
+            .numNulls(0)
+            .range(Range.scalar("IGNORED"))
+            .build();
     ColumnStat ignoredColumnStatsArrayLongField =
         ColumnStat.builder()
             .field(ARRAY_LONG_FIELD)
@@ -374,6 +418,8 @@ public class ColumnStatMapUtil {
         decimalColumnStats,
         floatColumnStats,
         doubleColumnStats,
+        nestedStringColumnStats,
+        ignoredColumnStatsNestedStructFieldPrimitive,
         ignoredColumnStatsArrayLongField,
         ignoredColumnStatsMapStringField,
         ignoredColumnStatsNestedStructField,

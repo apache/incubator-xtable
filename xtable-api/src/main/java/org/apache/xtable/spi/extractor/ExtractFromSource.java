@@ -23,6 +23,7 @@ import java.util.Iterator;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import org.apache.xtable.annotations.Stable;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -31,6 +32,7 @@ import org.apache.xtable.model.TableChange;
 
 @AllArgsConstructor(staticName = "of")
 @Getter
+@Stable
 public class ExtractFromSource<COMMIT> {
   private final ConversionSource<COMMIT> conversionSource;
 

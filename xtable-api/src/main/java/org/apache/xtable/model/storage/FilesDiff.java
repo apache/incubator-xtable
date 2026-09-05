@@ -18,7 +18,11 @@
  
 package org.apache.xtable.model.storage;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -92,12 +96,12 @@ public class FilesDiff<L, P> {
    * @param <P> the type of the previous files
    * @return the set of files that are added
    */
-  public static <P> FilesDiff<InternalDataFile, P> findNewAndRemovedFiles(
+  public static <P> FilesDiff<InternalFile, P> findNewAndRemovedFiles(
       List<PartitionFileGroup> latestFileGroups, Map<String, P> previousFiles) {
-    Map<String, InternalDataFile> latestFiles =
+    Map<String, InternalFile> latestFiles =
         latestFileGroups.stream()
             .flatMap(group -> group.getFiles().stream())
-            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
+            .collect(Collectors.toMap(InternalFile::getPhysicalPath, Function.identity()));
     return findNewAndRemovedFiles(latestFiles, previousFiles);
   }
 }

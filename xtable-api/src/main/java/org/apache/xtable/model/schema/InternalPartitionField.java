@@ -20,6 +20,7 @@ package org.apache.xtable.model.schema;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import lombok.Builder;
 import lombok.Value;
@@ -32,6 +33,7 @@ import lombok.Value;
 @Value
 @Builder
 public class InternalPartitionField {
+  public static final String NUM_BUCKETS = "NUM_BUCKETS";
   // Source field the partition is based on
   InternalField sourceField;
   /*
@@ -47,4 +49,6 @@ public class InternalPartitionField {
   @Builder.Default List<String> partitionFieldNames = Collections.emptyList();
   // An enum describing how the source data was transformed into the partition value
   PartitionTransformType transformType;
+  // Transform options such as number of buckets in the BUCKET transform type
+  @Builder.Default Map<String, Object> transformOptions = Collections.emptyMap();
 }

@@ -44,6 +44,7 @@ class TestTableSyncMetadata {
 
   private static Stream<Arguments> provideMetadataAndJson() {
     return Stream.of(
+        // Old version of metadata and JSON
         Arguments.of(
             TableSyncMetadata.of(
                 Instant.parse("2020-07-04T10:15:30.00Z"),
@@ -56,7 +57,24 @@ class TestTableSyncMetadata {
             "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"instantsToConsiderForNextSync\":[],\"version\":0}"),
         Arguments.of(
             TableSyncMetadata.of(Instant.parse("2020-07-04T10:15:30.00Z"), null),
-            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"version\":0}"));
+            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"version\":0}"),
+        // New version of metadata and JSON with `sourceTableFormat` and `sourceIdentifier` fields
+        Arguments.of(
+            TableSyncMetadata.of(
+                Instant.parse("2020-07-04T10:15:30.00Z"),
+                Arrays.asList(
+                    Instant.parse("2020-08-21T11:15:30.00Z"),
+                    Instant.parse("2024-01-21T12:15:30.00Z")),
+                "TEST",
+                "0"),
+            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"instantsToConsiderForNextSync\":[\"2020-08-21T11:15:30Z\",\"2024-01-21T12:15:30Z\"],\"version\":0,\"sourceTableFormat\":\"TEST\",\"sourceIdentifier\":\"0\"}"),
+        Arguments.of(
+            TableSyncMetadata.of(
+                Instant.parse("2020-07-04T10:15:30.00Z"), Collections.emptyList(), "TEST", "0"),
+            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"instantsToConsiderForNextSync\":[],\"version\":0,\"sourceTableFormat\":\"TEST\",\"sourceIdentifier\":\"0\"}"),
+        Arguments.of(
+            TableSyncMetadata.of(Instant.parse("2020-07-04T10:15:30.00Z"), null, "TEST", "0"),
+            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"version\":0,\"sourceTableFormat\":\"TEST\",\"sourceIdentifier\":\"0\"}"));
   }
 
   @Test

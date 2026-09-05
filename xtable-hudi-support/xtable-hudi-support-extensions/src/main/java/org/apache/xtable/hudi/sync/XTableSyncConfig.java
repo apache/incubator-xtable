@@ -36,6 +36,13 @@ public class XTableSyncConfig extends HoodieSyncConfig implements Serializable {
           .defaultValue(24 * 7)
           .withDocumentation("Retention in hours for metadata in target table.");
 
+  public static final ConfigProperty<Boolean> XTABLE_DELTA_USE_KERNEL =
+      ConfigProperty.key("hoodie.xtable.delta.target.use_kernel")
+          .defaultValue(false)
+          .withDocumentation(
+              "When true, the Delta target is synced using the Delta Kernel implementation "
+                  + "instead of the default Delta Standalone implementation.");
+
   public XTableSyncConfig(Properties props) {
     super(props);
   }

@@ -34,8 +34,10 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.sync.ErrorDetails;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /** Provides the functionality to sync metadata from InternalTable to multiple target catalogs */
 @Log4j2
@@ -56,16 +58,19 @@ public class CatalogSync {
           try {
             results.add(syncCatalog(catalogSyncClient, tableIdentifier, table));
             log.info(
-                "Catalog sync is successful for table {} with format {} using catalogSync {}",
+                "Catalog sync is successful for table {} with base path {} and format {} using catalogSync {}",
+                tableIdentifier.getId(),
                 table.getBasePath(),
                 table.getTableFormat(),
                 catalogSyncClient.getClass().getName());
           } catch (Exception e) {
             log.error(
-                "Catalog sync failed for table {} with format {} using catalogSync {}",
+                "Catalog sync failed for table {} with base path {} and format {} using catalogSync {}",
+                tableIdentifier.getId(),
                 table.getBasePath(),
                 table.getTableFormat(),
-                catalogSyncClient.getClass().getName());
+                catalogSyncClient.getClass().getName(),
+                e);
             results.add(
                 getCatalogSyncFailureStatus(
                     catalogSyncClient.getCatalogId(), catalogSyncClient.getClass().getName(), e));
@@ -83,6 +88,12 @@ public class CatalogSync {
       CatalogSyncClient<TABLE> catalogSyncClient,
       CatalogTableIdentifier tableIdentifier,
       InternalTable table) {
+    log.info(
+        "Running catalog sync for table {} with base path {} and format {} using catalogSync {}",
+        tableIdentifier.getId(),
+        table.getBasePath(),
+        table.getTableFormat(),
+        catalogSyncClient.getClass().getName());
     if (!catalogSyncClient.hasDatabase(tableIdentifier)) {
       catalogSyncClient.createDatabase(tableIdentifier);
     }
@@ -110,7 +121,7 @@ public class CatalogSync {
     }
     return CatalogSyncStatus.builder()
         .catalogId(catalogSyncClient.getCatalogId())
-        .statusCode(SyncResult.SyncStatusCode.SUCCESS)
+        .statusCode(SyncStatusCode.SUCCESS)
         .build();
   }
 
@@ -118,9 +129,9 @@ public class CatalogSync {
       String catalogId, String catalogImpl, Exception e) {
     return CatalogSyncStatus.builder()
         .catalogId(catalogId)
-        .statusCode(SyncResult.SyncStatusCode.ERROR)
+        .statusCode(SyncStatusCode.ERROR)
         .errorDetails(
-            SyncResult.ErrorDetails.builder()
+            ErrorDetails.builder()
                 .errorMessage(e.getMessage())
                 .errorDescription("catalogSync failed for " + catalogImpl)
                 .build())

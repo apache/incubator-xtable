@@ -8,6 +8,8 @@ import TabItem from '@theme/TabItem';
 
 # Features and Limitations
 ## Features
+
+### Synchronizing table format metadata (TableFormatSync)
 Apache XTable™ (Incubating) provides users with the ability to translate metadata from one table format to another.  
 
 Apache XTable™ (Incubating) provides two sync modes, "incremental" and "full." The incremental mode is more lightweight and has better performance, especially on large tables. If there is anything that prevents the incremental mode from working properly, the tool will fall back to the full sync mode.
@@ -19,6 +21,12 @@ This sync provides users with the following:
    * For Hudi, unreferenced files will be marked as [cleaned](https://hudi.apache.org/docs/hoodie_cleaner/) to control the size of the metadata table.
    * For Iceberg, snapshots will be [expired](https://iceberg.apache.org/docs/latest/maintenance/#expire-snapshots) after a configured amount of time.
    * For Delta, the transaction log will be [retained](https://docs.databricks.com/en/sql/language-manual/delta-vacuum.html) for a configured amount of time.
+
+### Synchronizing table format metadata in external catalogs (CatalogSync)
+In addition to synchronizing table format metadata, Apache XTable™ (Incubating) now allows users to synchronize metadata for tables across multiple external catalogs continuously and incrementally.
+This reduces friction by eliminating the manual step of registering tables in multiple catalogs and enhances flexibility by avoiding catalog lock-in.
+HMS and AWS Glue are the two catalogs supported right now, support for other catalogs (Unity, Apache Polaris, Apache Gravitino, DataHub) coming soon. 
+
 
 ## Limitations and Compatibility Notes
 ### General

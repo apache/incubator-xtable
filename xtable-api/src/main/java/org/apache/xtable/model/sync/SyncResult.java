@@ -20,10 +20,13 @@ package org.apache.xtable.model.sync;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 
 import lombok.Builder;
 import lombok.Value;
+
+import org.apache.xtable.annotations.Evolving;
 
 /**
  * Result of a sync operation
@@ -32,6 +35,7 @@ import lombok.Value;
  */
 @Value
 @Builder(toBuilder = true)
+@Evolving
 public class SyncResult {
   // Mode used for the sync
   SyncMode mode;
@@ -44,13 +48,7 @@ public class SyncResult {
   // The Sync Mode recommended for the next sync (Usually filled on an error)
   SyncMode recommendedSyncMode;
   // The sync status for each catalog.
-  List<CatalogSyncStatus> catalogSyncStatusList;
-
-  public enum SyncStatusCode {
-    SUCCESS,
-    ABORTED,
-    ERROR
-  }
+  @Builder.Default List<CatalogSyncStatus> catalogSyncStatusList = Collections.emptyList();
 
   /** Represents the status of a Sync operation. */
   @Value
@@ -74,16 +72,5 @@ public class SyncResult {
     SyncStatusCode statusCode;
     // errorDetails if any
     ErrorDetails errorDetails;
-  }
-
-  @Value
-  @Builder
-  public static class ErrorDetails {
-    // error Message if any
-    String errorMessage;
-    // Readable description of the error
-    String errorDescription;
-    // Can the client retry for this type of error (Transient error=true, persistent error=false)
-    boolean canRetryOnFailure;
   }
 }

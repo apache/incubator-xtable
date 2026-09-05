@@ -54,10 +54,30 @@ public class TableSyncMetadata {
   Instant lastInstantSynced;
   List<Instant> instantsToConsiderForNextSync;
   int version;
+  String sourceTableFormat;
+  String sourceIdentifier;
 
+  /**
+   * @deprecated Use {@link #of(Instant, List, String, String)} instead. This method exists for
+   *     backward compatibility and will be removed in a future version.
+   */
+  @Deprecated
   public static TableSyncMetadata of(
       Instant lastInstantSynced, List<Instant> instantsToConsiderForNextSync) {
-    return new TableSyncMetadata(lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION);
+    return TableSyncMetadata.of(lastInstantSynced, instantsToConsiderForNextSync, null, null);
+  }
+
+  public static TableSyncMetadata of(
+      Instant lastInstantSynced,
+      List<Instant> instantsToConsiderForNextSync,
+      String sourceTableFormat,
+      String sourceIdentifier) {
+    return new TableSyncMetadata(
+        lastInstantSynced,
+        instantsToConsiderForNextSync,
+        CURRENT_VERSION,
+        sourceTableFormat,
+        sourceIdentifier);
   }
 
   public String toJson() {

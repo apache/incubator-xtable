@@ -18,6 +18,10 @@
  
 package org.apache.xtable.spi.sync;
 
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.xtable.annotations.Evolving;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
@@ -27,12 +31,16 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
  *
  * @param <TABLE>
  */
+@Evolving
 public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   /**
    * Returns the user-defined unique identifier for the catalog, allows user to sync table to
    * multiple catalogs of the same name/type eg: HMS catalog with url1, HMS catalog with url2.
    */
   String getCatalogId();
+
+  /** Returns the {@link org.apache.xtable.model.storage.CatalogType} the client syncs to */
+  String getCatalogType();
 
   /** Returns the storage location of the table synced to the catalog. */
   String getStorageLocation(TABLE table);
@@ -68,4 +76,7 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
 
   /** Drops a table from the catalog. */
   void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier);
+
+  /** Initializes the client with provided configuration */
+  void init(ExternalCatalogConfig catalogConfig, String tableFormat, Configuration configuration);
 }

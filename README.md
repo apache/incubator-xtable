@@ -33,23 +33,25 @@ future.
 
 # Building the project and running tests.
 1. Use Java 11 for building the project. If you are using another Java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple Java versions locally.
-2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
-3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
-   by something like `mvn test -Dtest=TestDeltaSync -pl xtable-core`.
-4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
+2. Build the project using `./mvnw clean package`. Use `./mvnw clean package -DskipTests` to skip tests while building.
+3. Use `./mvnw clean test` or `./mvnw test` to run all unit tests. If you need to run only a specific test you can do this
+   by something like `./mvnw test -Dtest=TestDeltaSync -pl xtable-core`.
+4. Similarly, use `./mvnw clean verify` or `./mvnw verify` to run integration tests.
+
+Automation and coding agents should also follow the repository-specific workflow in [AGENTS.md](./AGENTS.md), especially for dependency updates, shaded modules, and targeted validation.
 
 **Note:** When using Maven version 3.9 or above, Maven automatically caches the build. To ignore build caching, you can 
-add the `-Dmaven.build.cache.enabled=false` parameter. For example, `mvn clean package -DskipTests -Dmaven.build.cache.enabled=false`
+add the `-Dmaven.build.cache.enabled=false` parameter. For example, `./mvnw clean package -DskipTests -Dmaven.build.cache.enabled=false`
 
 
 # Style guide
 1. We use [Maven Spotless plugin](https://github.com/diffplug/spotless/tree/main/plugin-maven) and 
    [Google java format](https://github.com/google/google-java-format) for code style.
-2. Use `mvn spotless:check` to find out code style violations and `mvn spotless:apply` to fix them. 
+2. Use `./mvnw spotless:check` to find out code style violations and `./mvnw spotless:apply` to fix them. 
    Code style check is tied to compile phase by default, so code style violations will lead to build failures.
 
 # Running the bundled jar
-1. Get a pre-built bundled jar or create the jar with `mvn install -DskipTests`
+1. Get a pre-built bundled jar or create the jar with `./mvnw install -DskipTests`
 2. Create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI
@@ -114,7 +116,7 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-5. Run with `java -jar xtable-utilities/target/xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
+5. Run with `java -jar xtable-utilities/target/xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
 can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/xtable-utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
 The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
@@ -140,10 +142,10 @@ docker run \
 For setting up the repo on IntelliJ, open the project and change the Java version to Java 11 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
-You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
+Found a bug or have a cool idea to contribute? Open a GitHub [issue](https://github.com/apache/incubator-xtable/issues) to get started. For more contribution guidelines and ways to stay involved, visit our [community](https://xtable.apache.org/community/sync) page.
 
 ## Adding a new target format
-Adding a new target format requires a developer implement [ConversionTarget](./api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [ConversionController](./core/src/main/java/org/apache/xtable/conversion/ConversionController.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
+Adding a new target format requires a developer implement [ConversionTarget](./xtable-api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [ConversionController](./xtable-core/src/main/java/org/apache/xtable/conversion/ConversionController.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
 
 ## Overview of the sync process
 ![img.png](assets/images/sync_flow.jpg)

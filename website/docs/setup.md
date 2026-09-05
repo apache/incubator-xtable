@@ -11,12 +11,12 @@ This page covers the essential steps to setup Apache XTable™ (incubating) in y
 Once the project is successfully cloned in your environment, you can build the jars from the source using the below command.
 
 ```shell md title=="shell"
-mvn clean package
+./mvnw clean package
 ```
 For skipping the tests while building, add `-DskipTests`.
 
 ```shell md title=="shell"
-mvn clean package -DskipTests
+./mvnw clean package -DskipTests
 ```
 
 For more information on the steps, follow the project's GitHub [README.md](https://github.com/apache/incubator-xtable/blob/main/README.md) 

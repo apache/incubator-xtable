@@ -7,6 +7,7 @@ image: /images/blog/XTable/xtable-cover.png
 tags:
 - apache xtable
 - community
+date: 2024-03-08
 ---
 
 # OneTable is now “Apache XTable™ (Incubating)”

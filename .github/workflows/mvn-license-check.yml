@@ -29,18 +29,118 @@ on:
     branches:
       - "main"
 
+# Kept in step with mvn-ci-build.yml: this job writes the cache that job reads,
+# and the JDK is part of the key on both sides.
+env:
+  JDK_VERSION: '11'
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v4
+      - name: Set up JDK ${{ env.JDK_VERSION }}
+        uses: actions/setup-java@v5
         with:
-          java-version: '11'
+          java-version: ${{ env.JDK_VERSION }}
           distribution: 'temurin'
-          cache: maven
+
+      # ~/.m2/repository is cached here rather than via setup-java's
+      # `cache: maven`, which restores on an exact key match only - it sets no
+      # restore-keys by design (actions/setup-java#269), so any pom change made
+      # every job re-download the whole dependency tree from Central. The prefix
+      # fallback below warms from the previous entry and downloads just the delta.
+      #
+      # This job is the writer for that cache, and deliberately the only one:
+      # it is the short job, so making it the writer costs the least, and it
+      # stops at `package`, so this project's own artifacts never enter the
+      # entry. Maven CI Build restores the same key read-only.
+      #
+      # Being the only writer means this job has to resolve what the readers
+      # need, which the license steps below do not do on their own - they build
+      # the shaded modules and their `-am` closure, which excludes the two
+      # leaves, xtable-utilities and xtable-service. The explicit resolve step
+      # after them covers the rest of the reactor.
+      #
+      # Restore and save are split so that only `main` writes. The entry is
+      # ~1 GB against a repository-wide 10 GB budget, so letting every branch
+      # write one would crowd out the entry they all restore from. Pull requests
+      # warm from `main` via the prefix and re-download only their own delta.
+      - name: Restore Maven repository cache
+        id: m2-repository
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/repository
+          key: m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          restore-keys: |
+            m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
+
+      # Replaces the separate wrapper cache that setup-java's `cache: maven`
+      # used to provide. Keyed only on the wrapper properties, which change
+      # rarely, so it survives the pom changes that rotate the key above. Left
+      # unsplit unlike the repository cache: at ~9 MB it is not worth gating.
+      - name: Cache Maven wrapper
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/wrapper/dists
+          key: m2-wrapper-${{ runner.os }}-${{ hashFiles('**/.mvn/wrapper/maven-wrapper.properties') }}
 
       - name: Apache License Check
-        run: mvn apache-rat:check -B
+        run: ./mvnw apache-rat:check -B
+
+      - name: Validate Shaded Dependency License Metadata
+        run: release/scripts/validate_shaded_license_coverage.sh
+
+      # The bundled jars are what a release reviewer inspects, so the license
+      # texts are checked against the built artifact rather than the poms. The
+      # dependency tree must not be scope-filtered; -Dscope=runtime drops
+      # protobuf-java, which is bundled.
+      - name: Build Shaded Bundles
+        run: >
+          ./mvnw -B -DskipTests -Dmaven.build.cache.enabled=false
+          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions
+          -am package
+          dependency:tree -DoutputType=text -DoutputFile=target/dependency-tree.txt
+
+      - name: Validate Bundled License Texts
+        run: python3 release/scripts/validate_bundled_license_texts.py
+
+      # Nothing above this line resolves xtable-utilities or xtable-service:
+      # `apache-rat:check` requires no dependency resolution, `dependency:tree`
+      # collects poms rather than jars, and the shaded-bundle build reaches only
+      # the `-am` closure of the three modules it names, which excludes both
+      # leaves. Without this step the entry never gains the Quarkus stack or
+      # xtable-utilities' bundled dependencies, and Maven CI Build - which
+      # cannot write the cache - would re-download them from Central on every
+      # run, permanently. This job exists to warm the cache for that one, so it
+      # has to cover the whole reactor even where a license check does not.
+      #
+      # Failure here must not fail a license check, hence `|| true`: an
+      # incomplete cache entry costs download time on the next run and nothing
+      # else. `go-offline` does not catch plugin dependencies resolved at
+      # execution time, so expect a small delta regardless.
+      - name: Resolve the rest of the reactor for the cache
+        if: success() && github.ref == 'refs/heads/main'
+        run: ./mvnw -B -ntp -q dependency:go-offline -Dmaven.build.cache.enabled=false || true
+
+      # This job writes the repository cache, so the invariant that the entry
+      # holds third-party dependencies only is enforced here. The steps above
+      # stop at `package`, so this is a no-op today; it exists so that adding
+      # an `install` later cannot silently add ~1.2 GB of bundled jars to the
+      # entry. Must stay ahead of the save below.
+      - name: Drop this project's own artifacts from the Maven repository
+        if: always()
+        run: rm -rf ~/.m2/repository/org/apache/xtable
+
+      # Only when the exact key missed - entries are immutable, so saving over
+      # an existing key just fails. This is what actions/cache does internally
+      # when restore and save are not split.
+      - name: Save Maven repository cache
+        if: >
+          success() && github.ref == 'refs/heads/main'
+          && steps.m2-repository.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.m2/repository
+          key: m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}

@@ -19,6 +19,7 @@
 package org.apache.xtable.delta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -51,6 +53,7 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +84,7 @@ import io.delta.standalone.types.StringType;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -91,6 +95,7 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
@@ -159,8 +164,8 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
     InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
@@ -214,7 +219,7 @@ public class TestDeltaSync {
     EqualTo equalToExpr =
         new EqualTo(new Column("string_field", new StringType()), Literal.of("warning"));
 
-    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
@@ -294,7 +299,7 @@ public class TestDeltaSync {
     EqualTo equalToExpr2 = new EqualTo(new Column("int_field", new IntegerType()), Literal.of(20));
     And CombinedExpr = new And(equalToExpr1, equalToExpr2);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2)), CombinedExpr);
@@ -337,7 +342,7 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1, basePath);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2, basePath);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
@@ -365,6 +370,100 @@ public class TestDeltaSync {
             .get(0)
             .toString()
             .contains(String.format("xtable_partition_col_%s_timestamp_field", transformType)));
+  }
+
+  @Test
+  public void testSourceTargetIdMapping() throws Exception {
+    InternalSchema baseSchema = getInternalSchema();
+    InternalTable sourceTable =
+        getInternalTable("source_table", basePath, baseSchema, null, LAST_COMMIT_TIME);
+
+    InternalDataFile sourceDataFile1 = getDataFile(101, Collections.emptyList(), basePath);
+    InternalDataFile sourceDataFile2 = getDataFile(102, Collections.emptyList(), basePath);
+    InternalDataFile sourceDataFile3 = getDataFile(103, Collections.emptyList(), basePath);
+
+    InternalSnapshot sourceSnapshot1 =
+        buildSnapshot(sourceTable, "0", sourceDataFile1, sourceDataFile2);
+    InternalSnapshot sourceSnapshot2 =
+        buildSnapshot(sourceTable, "1", sourceDataFile2, sourceDataFile3);
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot1);
+    Optional<String> mappedTargetId1 =
+        conversionTarget.getTargetCommitIdentifier(sourceSnapshot1.getSourceIdentifier());
+    validateDeltaTable(
+        basePath, new HashSet<>(Arrays.asList(sourceDataFile1, sourceDataFile2)), null);
+    assertTrue(mappedTargetId1.isPresent());
+    assertEquals("0", mappedTargetId1.get());
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot2);
+    Optional<String> mappedTargetId2 =
+        conversionTarget.getTargetCommitIdentifier(sourceSnapshot2.getSourceIdentifier());
+    validateDeltaTable(
+        basePath, new HashSet<>(Arrays.asList(sourceDataFile2, sourceDataFile3)), null);
+    assertTrue(mappedTargetId2.isPresent());
+    assertEquals("1", mappedTargetId2.get());
+
+    Optional<String> unmappedTargetId = conversionTarget.getTargetCommitIdentifier("s3");
+    assertFalse(unmappedTargetId.isPresent());
+  }
+
+  @Test
+  public void testGetTargetCommitIdentifierWithNullSourceIdentifier() throws Exception {
+    InternalSchema baseSchema = getInternalSchema();
+    InternalTable internalTable =
+        getInternalTable("source_table", basePath, baseSchema, null, LAST_COMMIT_TIME);
+    InternalDataFile sourceDataFile = getDataFile(101, Collections.emptyList(), basePath);
+    InternalSnapshot snapshot = buildSnapshot(internalTable, "0", sourceDataFile);
+
+    // Mock the snapshot sync process like getSyncResult()
+    conversionTarget.beginSync(internalTable);
+    TableSyncMetadata tableSyncMetadata =
+        TableSyncMetadata.of(internalTable.getLatestCommitTime(), snapshot.getPendingCommits());
+    conversionTarget.syncMetadata(tableSyncMetadata);
+    conversionTarget.syncSchema(internalTable.getReadSchema());
+    conversionTarget.syncPartitionSpec(internalTable.getPartitioningFields());
+    conversionTarget.syncFilesForSnapshot(snapshot.getPartitionedDataFiles());
+    conversionTarget.completeSync();
+
+    // No crash should happen during the process
+    Optional<String> unmappedTargetId = conversionTarget.getTargetCommitIdentifier("0");
+    // The targetIdentifier is expected to not be found
+    assertFalse(unmappedTargetId.isPresent());
+  }
+
+  @Test
+  public void testTimestampNtz() {
+    InternalSchema schema1 = getInternalSchemaWithTimestampNtz();
+    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
+    fields2.add(
+        InternalField.builder()
+            .name("float_field")
+            .schema(
+                InternalSchema.builder()
+                    .name("float")
+                    .dataType(InternalType.FLOAT)
+                    .isNullable(true)
+                    .build())
+            .build());
+    InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
+    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
+
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
+    validateDeltaTableUsingSpark(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)));
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
+    validateDeltaTableUsingSpark(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)));
   }
 
   private static Stream<Arguments> timestampPartitionTestingArgs() {
@@ -408,10 +507,19 @@ public class TestDeltaSync {
         internalDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
   }
 
-  private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
+  private void validateDeltaTableUsingSpark(
+      Path basePath, Set<InternalDataFile> internalDataFiles) {
+    Dataset<Row> dataset = sparkSession.read().format("delta").load(basePath.toString());
+    long countFromFiles = internalDataFiles.stream().mapToLong(InternalFile::getRecordCount).sum();
+    Assertions.assertEquals(countFromFiles, dataset.count());
+  }
+
+  private InternalSnapshot buildSnapshot(
+      InternalTable table, String sourceIdentifier, InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
+        .sourceIdentifier(sourceIdentifier)
         .build();
   }
 
@@ -495,6 +603,25 @@ public class TestDeltaSync {
                     .build()))
         .isNullable(false)
         .build();
+  }
+
+  private InternalSchema getInternalSchemaWithTimestampNtz() {
+    Map<InternalSchema.MetadataKey, Object> timestampMetadata = new HashMap<>();
+    timestampMetadata.put(
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+    List<InternalField> fields = new ArrayList<>(getInternalSchema().getFields());
+    fields.add(
+        InternalField.builder()
+            .name("timestamp_ntz_field")
+            .schema(
+                InternalSchema.builder()
+                    .name("time_ntz")
+                    .dataType(InternalType.TIMESTAMP_NTZ)
+                    .isNullable(true)
+                    .metadata(timestampMetadata)
+                    .build())
+            .build());
+    return getInternalSchema().toBuilder().fields(fields).build();
   }
 
   private static SparkSession buildSparkSession() {

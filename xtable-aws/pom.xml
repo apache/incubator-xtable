@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.apache.xtable</groupId>
+        <artifactId>xtable</artifactId>
+        <version>0.5.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>xtable-aws</artifactId>
+    <name>XTable AWS</name>
+    <properties>
+        <!--
+          This module produces a large bundled jar (~42 MB). Keep it out of the
+          maven-build-cache entirely: the property disables both restore and save
+          for this project, so the artifact never enters the cache directory that
+          CI persists between runs. Shading is cheap relative to the test suites
+          the cache is there to skip, so there is nothing worth caching here.
+          See .mvn/maven-build-cache-config.xml.
+        -->
+        <maven.build.cache.enabled>false</maven.build.cache.enabled>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Hudi dependencies -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hive-sync</artifactId>
+            <version>${hudi.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Hadoop dependencies -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Iceberg dependencies -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- AWS Glue dependencies -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>glue</artifactId>
+        </dependency>
+
+        <!-- Junit -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Mockito -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+            <classifier>tests</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"> </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
+                                    <resources>
+                                        <resource>LICENSE</resource>
+                                        <resource>NOTICE</resource>
+                                        <resource>NOTICE.txt</resource>
+                                    </resources>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/LICENSE</resource>
+                                    <file>target/classes/META-INF/LICENSE-bundled</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/NOTICE</resource>
+                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                </transformer>
+                            </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.fasterxml.jackson.core:jackson-annotations</include>
+                                    <include>com.fasterxml.jackson.core:jackson-core</include>
+                                    <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
+                                    <include>com.github.luben:zstd-jni</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>com.thoughtworks.paranamer:paranamer</include>
+                                    <include>commons-pool:commons-pool</include>
+                                    <include>io.netty:netty-codec-http</include>
+                                    <include>io.netty:netty-codec-http2</include>
+                                    <include>javax.annotation:javax.annotation-api</include>
+                                    <include>org.apache.avro:avro</include>
+                                    <include>org.apache.logging.log4j:log4j-1.2-api</include>
+                                    <include>org.apache.logging.log4j:log4j-api</include>
+                                    <include>org.apache.parquet:parquet-avro</include>
+                                    <include>org.apache.parquet:parquet-column</include>
+                                    <include>org.apache.parquet:parquet-common</include>
+                                    <include>org.apache.parquet:parquet-encoding</include>
+                                    <include>org.apache.parquet:parquet-format-structures</include>
+                                    <include>org.apache.parquet:parquet-hadoop</include>
+                                    <include>org.apache.parquet:parquet-jackson</include>
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
+                                    <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>org.reactivestreams:reactive-streams</include>
+                                    <include>org.scala-lang:scala-library</include>
+                                    <include>software.amazon.awssdk:annotations</include>
+                                    <include>software.amazon.awssdk:apache-client</include>
+                                    <include>software.amazon.awssdk:auth</include>
+                                    <include>software.amazon.awssdk:aws-core</include>
+                                    <include>software.amazon.awssdk:aws-json-protocol</include>
+                                    <include>software.amazon.awssdk:checksums</include>
+                                    <include>software.amazon.awssdk:checksums-spi</include>
+                                    <include>software.amazon.awssdk:endpoints-spi</include>
+                                    <include>software.amazon.awssdk:glue</include>
+                                    <include>software.amazon.awssdk:http-auth</include>
+                                    <include>software.amazon.awssdk:http-auth-aws</include>
+                                    <include>software.amazon.awssdk:http-auth-aws-eventstream</include>
+                                    <include>software.amazon.awssdk:http-auth-spi</include>
+                                    <include>software.amazon.awssdk:http-client-spi</include>
+                                    <include>software.amazon.awssdk:identity-spi</include>
+                                    <include>software.amazon.awssdk:json-utils</include>
+                                    <include>software.amazon.awssdk:metrics-spi</include>
+                                    <include>software.amazon.awssdk:netty-nio-client</include>
+                                    <include>software.amazon.awssdk:profiles</include>
+                                    <include>software.amazon.awssdk:protocol-core</include>
+                                    <include>software.amazon.awssdk:regions</include>
+                                    <include>software.amazon.awssdk:retries</include>
+                                    <include>software.amazon.awssdk:retries-spi</include>
+                                    <include>software.amazon.awssdk:sdk-core</include>
+                                    <include>software.amazon.awssdk:third-party-jackson-core</include>
+                                    <include>software.amazon.awssdk:utils</include>
+                                    <include>software.amazon.eventstream:eventstream</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

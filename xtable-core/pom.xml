@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache.xtable</groupId>
         <artifactId>xtable</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.5.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>xtable-core_${scala.binary.version}</artifactId>
@@ -56,7 +56,7 @@
             <artifactId>guava</artifactId>
         </dependency>
 
-        <!-- Avro -->
+
         <dependency>
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
@@ -77,30 +77,64 @@
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-common</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-sync-common</artifactId>
+            <version>${hudi.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Iceberg dependencies -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-api</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Delta dependencies -->
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-standalone_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-defaults</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Paimon dependencies -->
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-bundle</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-spark-${spark.version.prefix}</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -109,6 +143,10 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
         </dependency>
 
         <!-- Logging API -->
@@ -144,6 +182,10 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+        </dependency>
 
         <!-- Junit -->
         <dependency>
@@ -174,4 +216,24 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <phase>test-compile</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <skip>false</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

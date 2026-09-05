@@ -33,13 +33,16 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.xtable.annotations.Stable;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
+import org.apache.xtable.model.sync.ErrorDetails;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /** Provides the functionality to sync from the InternalTable format to the target format. */
 @Log4j2
@@ -58,6 +61,7 @@ public class TableFormatSync {
    * @param snapshot the snapshot to sync
    * @return the result of the sync process
    */
+  @Stable
   public Map<String, SyncResult> syncSnapshot(
       Collection<ConversionTarget> conversionTargets, InternalSnapshot snapshot) {
     Instant startTime = Instant.now();
@@ -73,7 +77,8 @@ public class TableFormatSync {
                 internalTable,
                 target -> target.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
                 startTime,
-                snapshot.getPendingCommits()));
+                snapshot.getPendingCommits(),
+                snapshot.getSourceIdentifier()));
       } catch (Exception e) {
         log.error("Failed to sync snapshot", e);
         results.put(
@@ -90,6 +95,7 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
+  @Stable
   public Map<String, List<SyncResult>> syncChanges(
       Map<ConversionTarget, TableSyncMetadata> conversionTargetWithMetadata,
       IncrementalTableChanges changes) {
@@ -121,7 +127,8 @@ public class TableFormatSync {
                   change.getTableAsOfChange(),
                   target -> target.syncFilesForDiff(change.getFilesDiff()),
                   startTime,
-                  changes.getPendingCommits()));
+                  changes.getPendingCommits(),
+                  change.getSourceIdentifier()));
         } catch (Exception e) {
           log.error("Failed to sync table changes", e);
           resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
@@ -149,19 +156,26 @@ public class TableFormatSync {
       InternalTable tableState,
       SyncFiles fileSyncMethod,
       Instant startTime,
-      List<Instant> pendingCommits) {
+      List<Instant> pendingCommits,
+      String sourceIdentifier) {
     // initialize the sync
     conversionTarget.beginSync(tableState);
+    // Persist the latest commit time in table properties for incremental syncs
+    // Syncing metadata must precede the following steps to ensure that the metadata is available
+    // before committing
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(
+            tableState.getLatestCommitTime(),
+            pendingCommits,
+            tableState.getTableFormat(),
+            sourceIdentifier);
+    conversionTarget.syncMetadata(latestState);
     // sync schema updates
     conversionTarget.syncSchema(tableState.getReadSchema());
     // sync partition updates
     conversionTarget.syncPartitionSpec(tableState.getPartitioningFields());
     // Update the files in the target table
     fileSyncMethod.sync(conversionTarget);
-    // Persist the latest commit time in table properties for incremental syncs.
-    TableSyncMetadata latestState =
-        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
-    conversionTarget.syncMetadata(latestState);
     conversionTarget.completeSync();
 
     return SyncResult.builder()
@@ -183,9 +197,9 @@ public class TableFormatSync {
         .mode(mode)
         .tableFormatSyncStatus(
             SyncResult.SyncStatus.builder()
-                .statusCode(SyncResult.SyncStatusCode.ERROR)
+                .statusCode(SyncStatusCode.ERROR)
                 .errorDetails(
-                    SyncResult.ErrorDetails.builder()
+                    ErrorDetails.builder()
                         .errorMessage(e.getMessage())
                         .errorDescription("Failed to sync " + mode.name())
                         .canRetryOnFailure(true)

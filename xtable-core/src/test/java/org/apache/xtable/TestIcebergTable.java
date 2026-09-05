@@ -19,7 +19,7 @@
 package org.apache.xtable;
 
 import static org.apache.iceberg.SnapshotSummary.TOTAL_RECORDS_PROP;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,6 +40,7 @@ import lombok.SneakyThrows;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.OverwriteFiles;
@@ -49,6 +50,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
@@ -249,6 +251,12 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return removeSlash(basePath) + "/" + tableName;
   }
 
+  @Override
+  public String getMetadataPath() {
+    TableOperations iceOps = ((BaseTable) icebergTable).operations();
+    return iceOps.current().metadataFileLocation();
+  }
+
   public String getDataPath() {
     return getBasePath() + "/data";
   }
@@ -307,7 +315,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return String.format("%s > 'aaa'", icebergDataHelper.getRecordKeyField());
   }
 
-  public Long getLastCommitTimestamp() {
+  public long getLastCommitTimestamp() {
     return getLatestSnapshot().timestampMillis();
   }
 
@@ -352,7 +360,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     Path baseDataPath = Paths.get(icebergTable.location(), "data");
     String filePath;
     if (icebergDataHelper.getPartitionSpec().isPartitioned()) {
-      String partitionPath = getPartitionPath(partitionKey.get(0, String.class));
+      String partitionPath = ((PartitionKey) partitionKey).toPath();
       filePath =
           baseDataPath.resolve(partitionPath).resolve(UUID.randomUUID() + ".parquet").toString();
     } else {
@@ -363,7 +371,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     DataWriter<Record> dataWriter =
         Parquet.writeData(file)
             .schema(icebergTable.schema())
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .overwrite()
             .withSpec(icebergTable.spec())
             .withPartition(partitionKey)
@@ -433,15 +441,5 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return recordsByPartition.entrySet().stream()
         .map(entry -> writeAndGetDataFile(entry.getValue(), entry.getKey()))
         .collect(Collectors.toList());
-  }
-
-  private String getPartitionPath(Object partitionValue) {
-    Preconditions.checkArgument(
-        icebergDataHelper.getPartitionFieldNames().size() == 1,
-        "Only single partition field is supported for grouping records by partition");
-    Preconditions.checkArgument(
-        icebergDataHelper.getPartitionFieldNames().get(0).equals("level"),
-        "Only level partition field is supported for grouping records by partition");
-    return "level=" + partitionValue;
   }
 }

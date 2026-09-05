@@ -59,6 +59,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -106,6 +108,7 @@ import org.apache.xtable.spi.sync.TableFormatSync;
  * Validates that the metadata for the table is properly created/updated. {@link
  * ITConversionController} validates that the table and its data can be properly read.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestIcebergSync {
   private static final Random RANDOM = new Random();
   private static final Instant LAST_COMMIT_TIME = Instant.ofEpochSecond(1000);
@@ -170,9 +173,9 @@ public class TestIcebergSync {
           .build();
   private final Schema icebergSchema =
       new Schema(
-          Types.NestedField.required(1, "timestamp_field", Types.TimestampType.withoutZone()),
+          Types.NestedField.required(3, "timestamp_field", Types.TimestampType.withoutZone()),
           Types.NestedField.required(2, "date_field", Types.DateType.get()),
-          Types.NestedField.required(3, "group_id", Types.IntegerType.get()),
+          Types.NestedField.required(1, "group_id", Types.IntegerType.get()),
           Types.NestedField.required(
               4,
               "record",
@@ -227,8 +230,8 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList());
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList());
     InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList());
-    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
@@ -244,11 +247,13 @@ public class TestIcebergSync {
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
-    validateIcebergTable(tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null);
+    validateIcebergTable(
+        tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null, icebergSchema);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
-    validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null);
+    validateIcebergTable(
+        tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null, icebergSchema);
 
     ArgumentCaptor<Transaction> transactionArgumentCaptor =
         ArgumentCaptor.forClass(Transaction.class);
@@ -256,7 +261,7 @@ public class TestIcebergSync {
     ArgumentCaptor<PartitionSpec> partitionSpecArgumentCaptor =
         ArgumentCaptor.forClass(PartitionSpec.class);
 
-    verify(mockSchemaSync, times(2))
+    verify(mockSchemaSync, times(1))
         .sync(
             schemaArgumentCaptor.capture(),
             schemaArgumentCaptor.capture(),
@@ -274,13 +279,9 @@ public class TestIcebergSync {
     assertTrue(
         partitionSpecSchemaArgumentCaptor.getAllValues().stream()
             .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema)));
-    // schema sync args for first iteration
-    assertTrue(
-        schemaArgumentCaptor.getAllValues().subList(0, 2).stream()
-            .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema)));
     // second snapshot sync will evolve the schema
-    assertTrue(schemaArgumentCaptor.getAllValues().get(2).sameSchema(icebergSchema));
-    assertTrue(schemaArgumentCaptor.getAllValues().get(3).sameSchema(icebergSchema2));
+    assertTrue(schemaArgumentCaptor.getAllValues().get(0).sameSchema(icebergSchema));
+    assertTrue(schemaArgumentCaptor.getAllValues().get(1).sameSchema(icebergSchema2));
     // check that the correct partition spec is used in calls to the mocks
     assertTrue(
         partitionSpecArgumentCaptor.getAllValues().stream()
@@ -292,9 +293,6 @@ public class TestIcebergSync {
     assertSame(
         transactionArgumentCaptor.getAllValues().get(0),
         transactionArgumentCaptor.getAllValues().get(2));
-    assertSame(
-        transactionArgumentCaptor.getAllValues().get(1),
-        transactionArgumentCaptor.getAllValues().get(3));
     // validate that transactions are different between runs
     assertNotSame(
         transactionArgumentCaptor.getAllValues().get(1),
@@ -322,9 +320,9 @@ public class TestIcebergSync {
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList());
     InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList());
     InternalDataFile dataFile4 = getDataFile(4, Collections.emptyList());
-    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
-    InternalSnapshot snapshot3 = buildSnapshot(table2, dataFile3, dataFile4);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
+    InternalSnapshot snapshot3 = buildSnapshot(table2, "2", dataFile3, dataFile4);
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
@@ -358,7 +356,8 @@ public class TestIcebergSync {
     // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot3);
-    validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null);
+    validateIcebergTable(
+        tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null, icebergSchema);
     // Validate Iceberg table state
     Table table = getTable(basePath);
     assertEquals(4, table.history().size());
@@ -398,7 +397,7 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema))
         .thenReturn(icebergSchema)
@@ -425,7 +424,8 @@ public class TestIcebergSync {
         Expressions.and(
             Expressions.greaterThanOrEqual(
                 partitionField.getSourceField().getName(), "2022-10-01T00:00"),
-            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02T00:00")));
+            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02T00:00")),
+        icebergSchema);
   }
 
   @Test
@@ -461,7 +461,7 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -485,7 +485,8 @@ public class TestIcebergSync {
         Sets.newHashSet(dataFile1, dataFile2),
         Expressions.and(
             Expressions.greaterThanOrEqual(partitionField.getSourceField().getName(), "2022-10-01"),
-            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02")));
+            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02")),
+        icebergSchema);
   }
 
   @Test
@@ -515,7 +516,7 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -539,7 +540,8 @@ public class TestIcebergSync {
         Sets.newHashSet(dataFile1, dataFile2),
         Expressions.and(
             Expressions.greaterThanOrEqual(partitionField.getSourceField().getName(), 1),
-            Expressions.lessThan(partitionField.getSourceField().getName(), 2)));
+            Expressions.lessThan(partitionField.getSourceField().getName(), 2)),
+        icebergSchema);
   }
 
   @Test
@@ -590,7 +592,7 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(2, partitionValues2);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues3);
-    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -619,7 +621,8 @@ public class TestIcebergSync {
                 Expressions.greaterThanOrEqual(
                     partitionField2.getSourceField().getName(), "2022-10-01T00:00"),
                 Expressions.lessThan(
-                    partitionField2.getSourceField().getName(), "2022-10-02T00:00"))));
+                    partitionField2.getSourceField().getName(), "2022-10-02T00:00"))),
+        icebergSchema);
   }
 
   @Test
@@ -656,7 +659,7 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -678,13 +681,115 @@ public class TestIcebergSync {
         tableName,
         table,
         Sets.newHashSet(dataFile1, dataFile2),
-        Expressions.equal(partitionField.getSourceField().getPath(), "value1"));
+        Expressions.equal(partitionField.getSourceField().getPath(), "value1"),
+        icebergSchema);
   }
 
-  private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
+  @Test
+  public void testSourceTargetMapping() throws Exception {
+    // Prepare schemas
+    List<InternalField> fields2 = new ArrayList<>(internalSchema.getFields());
+    fields2.add(
+        InternalField.builder()
+            .name("long_field")
+            .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
+            .build());
+    InternalSchema schema2 = internalSchema.toBuilder().fields(fields2).build();
+    List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
+    fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
+    Schema icebergSchema2 = new Schema(fields);
+
+    InternalTable table1 =
+        getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+
+    // Create data files and snapshots
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList());
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList());
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList());
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
+
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
+    when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
+    when(mockPartitionSpecExtractor.toIceberg(eq(null), any()))
+        .thenReturn(PartitionSpec.unpartitioned());
+
+    mockColStatsForFile(dataFile1, 2);
+    mockColStatsForFile(dataFile2, 2);
+    mockColStatsForFile(dataFile3, 1);
+
+    // Sync first snapshot
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
+    Optional<String> targetIdentifier1 =
+        conversionTarget.getTargetCommitIdentifier(snapshot1.getSourceIdentifier());
+    assertTrue(targetIdentifier1.isPresent());
+    assertEquals(
+        targetIdentifier1.get(), String.valueOf(getTable(basePath).currentSnapshot().snapshotId()));
+
+    // Sync second snapshot
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
+    Optional<String> targetIdentifier2 =
+        conversionTarget.getTargetCommitIdentifier(snapshot2.getSourceIdentifier());
+    assertTrue(targetIdentifier2.isPresent());
+    assertEquals(
+        targetIdentifier2.get(), String.valueOf(getTable(basePath).currentSnapshot().snapshotId()));
+
+    // Validate that an unknown source ID returns empty
+    Optional<String> emptyTargetIdentifier = conversionTarget.getTargetCommitIdentifier("999");
+    assertFalse(emptyTargetIdentifier.isPresent());
+  }
+
+  @Test
+  public void testGetTargetCommitIdentifierWithNullSourceIdentifier() {
+    // Prepare schemas
+    List<InternalField> fields2 = new ArrayList<>(internalSchema.getFields());
+    fields2.add(
+        InternalField.builder()
+            .name("long_field")
+            .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
+            .build());
+    InternalSchema schema2 = internalSchema.toBuilder().fields(fields2).build();
+    List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
+    fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
+    Schema icebergSchema2 = new Schema(fields);
+
+    InternalTable internalTable =
+        getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+
+    // Create data files and snapshots
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList());
+    InternalSnapshot snapshot = buildSnapshot(internalTable, "0", dataFile1);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
+    when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
+    when(mockPartitionSpecExtractor.toIceberg(eq(null), any()))
+        .thenReturn(PartitionSpec.unpartitioned());
+    mockColStatsForFile(dataFile1, 2);
+
+    // Mock the snapshot sync process like getSyncResult()
+    conversionTarget.beginSync(internalTable);
+    TableSyncMetadata tableSyncMetadata =
+        TableSyncMetadata.of(internalTable.getLatestCommitTime(), snapshot.getPendingCommits());
+    conversionTarget.syncMetadata(tableSyncMetadata);
+    conversionTarget.syncSchema(internalTable.getReadSchema());
+    conversionTarget.syncPartitionSpec(internalTable.getPartitioningFields());
+    conversionTarget.syncFilesForSnapshot(snapshot.getPartitionedDataFiles());
+    conversionTarget.completeSync();
+
+    // No crash should happen during the process
+    Optional<String> targetIdentifier = conversionTarget.getTargetCommitIdentifier("0");
+    // The targetIdentifier is expected to not be found
+    assertFalse(targetIdentifier.isPresent());
+  }
+
+  private InternalSnapshot buildSnapshot(
+      InternalTable table, String sourceIdentifier, InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
+        .sourceIdentifier(sourceIdentifier)
         .build();
   }
 
@@ -721,13 +826,16 @@ public class TestIcebergSync {
       String tableName,
       InternalTable table,
       Set<InternalDataFile> expectedFiles,
-      Expression filterExpression)
+      Expression filterExpression,
+      Schema expectedSchema)
       throws IOException {
     Path warehouseLocation = Paths.get(table.getBasePath()).getParent();
     try (HadoopCatalog catalog = new HadoopCatalog(CONFIGURATION, warehouseLocation.toString())) {
       TableIdentifier tableId = TableIdentifier.of(Namespace.empty(), tableName);
       assertTrue(catalog.tableExists(tableId));
-      TableScan scan = catalog.loadTable(tableId).newScan();
+      Table icebergTable = catalog.loadTable(tableId);
+      assertTrue(expectedSchema.sameSchema(icebergTable.schema()));
+      TableScan scan = icebergTable.newScan();
       if (filterExpression != null) {
         scan = scan.filter(filterExpression);
       }

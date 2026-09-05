@@ -19,7 +19,8 @@
 package org.apache.xtable.delta;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.text.DateFormat;
@@ -63,7 +64,7 @@ public class DeltaValueConverter {
       return null;
     }
     if (noConversionForSchema(fieldSchema)) {
-      return castObjectToInternalType(value, fieldSchema.getDataType());
+      return castObjectToInternalType(value, fieldSchema);
     }
     // Needs special handling for date and time.
     InternalType fieldType = fieldSchema.getDataType();
@@ -198,7 +199,8 @@ public class DeltaValueConverter {
     }
   }
 
-  private static Object castObjectToInternalType(Object value, InternalType valueType) {
+  private static Object castObjectToInternalType(Object value, InternalSchema schema) {
+    InternalType valueType = schema.getDataType();
     switch (valueType) {
       case DOUBLE:
         if (value instanceof String)
@@ -232,7 +234,7 @@ public class DeltaValueConverter {
         }
         break;
       case DECIMAL:
-        return numberTypeToBigDecimal(value);
+        return numberTypeToBigDecimal(value, schema);
       case LONG:
         if (value instanceof Integer) {
           return ((Integer) value).longValue();
@@ -242,18 +244,12 @@ public class DeltaValueConverter {
     return value;
   }
 
-  private static BigDecimal numberTypeToBigDecimal(Object value) {
-    // BigDecimal is parsed as Integer, Long, BigInteger and double if none of the above.
-    if (value instanceof Integer) {
-      return BigDecimal.valueOf((Integer) value);
-    } else if (value instanceof Long) {
-      return BigDecimal.valueOf((Long) value);
-    } else if (value instanceof BigInteger) {
-      return new BigDecimal((BigInteger) value);
-    } else if (value instanceof Double) {
-      return BigDecimal.valueOf((Double) value);
-    } else {
-      return (BigDecimal) value;
-    }
+  private static BigDecimal numberTypeToBigDecimal(Object value, InternalSchema schema) {
+    // BigDecimal is parsed by converting the value to a string and setting the proper scale and
+    // precision.
+    int precision = (int) schema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+    int scale = (int) schema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+    return new BigDecimal(String.valueOf(value), new MathContext(precision))
+        .setScale(scale, RoundingMode.UNNECESSARY);
   }
 }
