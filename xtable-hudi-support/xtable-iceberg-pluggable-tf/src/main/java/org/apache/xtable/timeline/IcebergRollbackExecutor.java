@@ -75,11 +75,17 @@ public class IcebergRollbackExecutor {
               MAPPER.readValue(syncMetadata.getLatestTableOperationIdentifier(), InstantDTO.class),
               metaClient.getInstantGenerator());
       if (latestHoodieInstantInIceberg.equals(instantToRollback)) {
-        // The instant to rollback is committed in iceberg, so rollback to previous snapshot.
+        // The instant to rollback is committed in iceberg as the current snapshot, so rollback to
+        // its parent snapshot.
         // NOTE: This is equivalent to hudi restore and should be performed by killing all active
         // writers.
+        Long parentSnapshotId = table.currentSnapshot().parentId();
+        if (parentSnapshotId == null) {
+          throw new IllegalStateException(
+              "Cannot roll back the first Iceberg snapshot of the table");
+        }
         target.beginSync(internalTable);
-        target.rollbackToSnapshotId(table.currentSnapshot().snapshotId());
+        target.rollbackToSnapshotId(parentSnapshotId);
       } else if (InstantComparison.compareTimestamps(
           latestHoodieInstantInIceberg.getCompletionTime(),
           InstantComparison.LESSER_THAN,
