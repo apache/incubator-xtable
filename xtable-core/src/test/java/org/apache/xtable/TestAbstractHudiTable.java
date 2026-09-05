@@ -469,7 +469,6 @@ public abstract class TestAbstractHudiTable
         // follow-up PR.
         .withWriteTableVersion(tableVersion(keyGenProperties).versionCode())
         .withAutoUpgradeVersion(false)
-        .withProperties(keyGenProperties)
         .withPath(this.basePath)
         .withSchema(schema.toString())
         .withKeyGenerator(keyGenerator.getClass().getCanonicalName())
@@ -484,6 +483,9 @@ public abstract class TestAbstractHudiTable
         .withLockConfig(
             HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
         .withProperties(lockProperties)
+        // Applied last so the caller's properties override the defaults this method sets through
+        // the config builders above
+        .withProperties(keyGenProperties)
         .build();
   }
 

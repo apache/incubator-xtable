@@ -60,6 +60,7 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
+import org.apache.hudi.table.action.HoodieWriteMetadata;
 
 import com.google.common.base.Preconditions;
 
@@ -215,6 +216,11 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     super(name, schema, tempDir, partitionConfig);
     this.conf = new Configuration();
     this.conf.set("parquet.avro.write-old-list-structure", "false");
+    // xtable-prefixed properties configure the pluggable table format, which reads them from the
+    // storage configuration rather than the Hudi table or write config.
+    tableProperties.stringPropertyNames().stream()
+        .filter(key -> key.startsWith("xtable."))
+        .forEach(key -> this.conf.set(key, tableProperties.getProperty(key)));
     this.addFieldIds = addFieldIds;
     // The caller's properties also override the defaults this class puts in the write config, so a
     // test can turn off features that its table format does not support, such as the metadata
@@ -269,6 +275,12 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public void deletePartition(String partition, HoodieTableType tableType) {
     throw new UnsupportedOperationException(
         "Hoodie java client does not support delete partitions");
+  }
+
+  public void compact() {
+    String instant = writeClient.scheduleCompaction(Option.empty()).get();
+    HoodieWriteMetadata result = writeClient.compact(instant);
+    writeClient.commitCompaction(instant, result, Option.empty());
   }
 
   public void cluster() {

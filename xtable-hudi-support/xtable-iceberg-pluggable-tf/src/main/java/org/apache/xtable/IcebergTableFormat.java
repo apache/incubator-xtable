@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -35,6 +36,7 @@ import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineFactory;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
 import org.apache.hudi.metadata.TableMetadataFactory;
@@ -55,6 +57,8 @@ import org.apache.xtable.metadata.IcebergMetadataFactory;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.spi.sync.TableFormatSync;
 import org.apache.xtable.timeline.IcebergRollbackExecutor;
 import org.apache.xtable.timeline.IcebergTimelineArchiver;
@@ -84,8 +88,17 @@ public class IcebergTableFormat implements HoodieTableFormat {
       FileSystemViewManager viewManager) {
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
+    IcebergConversionTarget target = getIcebergConversionTarget(metaClient);
+    if (HoodieTimeline.DELTA_COMMIT_ACTION.equals(completedInstant.getAction())) {
+      Map<String, List<Long>> positionalDeletes =
+          HudiPositionalDeleteExtractor.extractPositionalDeletes(
+              commitMetadata, metaClient, viewManager);
+      if (!positionalDeletes.isEmpty()) {
+        target.stagePositionDeletes(positionalDeletes);
+      }
+    }
     completeInstant(
-        metaClient, hudiTableExtractor.extractTableChanges(commitMetadata, completedInstant));
+        target, hudiTableExtractor.extractTableChanges(commitMetadata, completedInstant));
   }
 
   @Override
@@ -97,7 +110,9 @@ public class IcebergTableFormat implements HoodieTableFormat {
       FileSystemViewManager viewManager) {
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
-    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(completedInstant));
+    completeInstant(
+        getIcebergConversionTarget(metaClient),
+        hudiTableExtractor.extractTableChanges(completedInstant));
   }
 
   @Override
@@ -145,7 +160,9 @@ public class IcebergTableFormat implements HoodieTableFormat {
     metaClient.reloadActiveTimeline();
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
-    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(rollbackInstant));
+    completeInstant(
+        getIcebergConversionTarget(metaClient),
+        hudiTableExtractor.extractTableChanges(rollbackInstant));
   }
 
   @Override
@@ -156,7 +173,8 @@ public class IcebergTableFormat implements HoodieTableFormat {
       FileSystemViewManager viewManager) {
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
-    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(instant));
+    completeInstant(
+        getIcebergConversionTarget(metaClient), hudiTableExtractor.extractTableChanges(instant));
   }
 
   @Override
@@ -169,17 +187,33 @@ public class IcebergTableFormat implements HoodieTableFormat {
     return IcebergMetadataFactory.getInstance();
   }
 
-  private void completeInstant(HoodieTableMetaClient metaClient, IncrementalTableChanges changes) {
-    IcebergConversionTarget target = getIcebergConversionTarget(metaClient);
+  private void completeInstant(IcebergConversionTarget target, IncrementalTableChanges changes) {
     TableSyncMetadata tableSyncMetadata =
         target
             .getTableMetadata()
             .orElse(TableSyncMetadata.of(Instant.MIN, Collections.emptyList()));
+    Map<String, List<SyncResult>> results;
     try {
-      tableFormatSync.syncChanges(Collections.singletonMap(target, tableSyncMetadata), changes);
+      results =
+          tableFormatSync.syncChanges(Collections.singletonMap(target, tableSyncMetadata), changes);
     } catch (Exception e) {
       throw new UpdateException("Failed to update iceberg metadata", e);
     }
+    // TableFormatSync converts sync failures into error results, but the table format must not
+    // complete an instant whose Iceberg publish failed
+    results.values().stream()
+        .flatMap(List::stream)
+        .filter(
+            result -> result.getTableFormatSyncStatus().getStatusCode() != SyncStatusCode.SUCCESS)
+        .findFirst()
+        .ifPresent(
+            result -> {
+              throw new UpdateException(
+                  "Failed to update iceberg metadata: "
+                      + (result.getTableFormatSyncStatus().getErrorDetails() == null
+                          ? "unknown error"
+                          : result.getTableFormatSyncStatus().getErrorDetails().toString()));
+            });
   }
 
   private void archiveInstants(

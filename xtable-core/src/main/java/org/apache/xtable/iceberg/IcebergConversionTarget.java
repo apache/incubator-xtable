@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Table table;
   private InternalTable internalTableState;
   private TableSyncMetadata tableSyncMetadata;
+  private Map<String, List<Long>> pendingPositionDeletes = Collections.emptyMap();
 
   public IcebergConversionTarget() {}
 
@@ -277,14 +279,34 @@ public class IcebergConversionTarget implements ConversionTarget {
         tableSyncMetadata);
   }
 
+  /**
+   * Stages positional deletes to include in the next files sync. When set, the next {@link
+   * #syncFilesForDiff} commits a single row delta carrying the added data files and one deletion
+   * vector per referenced data file, instead of an overwrite.
+   */
+  public void stagePositionDeletes(Map<String, List<Long>> positionsByDataFile) {
+    this.pendingPositionDeletes = positionsByDataFile;
+  }
+
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
-    dataFileUpdatesExtractor.applyDiff(
-        transaction,
-        internalFilesDiff,
-        transaction.table().schema(),
-        transaction.table().spec(),
-        tableSyncMetadata);
+    if (!pendingPositionDeletes.isEmpty()) {
+      dataFileUpdatesExtractor.applyRowDelta(
+          table,
+          transaction,
+          internalFilesDiff,
+          pendingPositionDeletes,
+          transaction.table().schema(),
+          transaction.table().spec(),
+          tableSyncMetadata);
+    } else {
+      dataFileUpdatesExtractor.applyDiff(
+          transaction,
+          internalFilesDiff,
+          transaction.table().schema(),
+          transaction.table().spec(),
+          tableSyncMetadata);
+    }
   }
 
   @Override
@@ -383,6 +405,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction = null;
     internalTableState = null;
     tableSyncMetadata = null;
+    pendingPositionDeletes = Collections.emptyMap();
   }
 
   private void rollbackCorruptCommits() {

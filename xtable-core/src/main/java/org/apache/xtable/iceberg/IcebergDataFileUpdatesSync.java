@@ -18,6 +18,7 @@
  
 package org.apache.xtable.iceberg;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -29,17 +30,28 @@ import lombok.AllArgsConstructor;
 
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.OverwriteFiles;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.RowDelta;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.deletes.BaseDVFileWriter;
+import org.apache.iceberg.deletes.DVFileWriter;
+import org.apache.iceberg.deletes.PositionDeleteIndex;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.DeleteWriteResult;
+import org.apache.iceberg.io.IOUtil;
+import org.apache.iceberg.io.OutputFileFactory;
+import org.apache.iceberg.io.SeekableInputStream;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
+import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.FilesDiff;
@@ -114,6 +126,106 @@ public class IcebergDataFileUpdatesSync {
     filesRemoved.forEach(overwriteFiles::deleteFile);
     overwriteFiles.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     overwriteFiles.commit();
+  }
+
+  /**
+   * Commits added data files and positional deletes as a single {@code RowDelta} snapshot. Each
+   * entry of {@code positionsByDataFile} maps an existing Iceberg data file path to the row
+   * positions deleted from it; the positions are written as a format-version 3 deletion vector that
+   * supersedes the data file's current deletion vector, if any.
+   */
+  public void applyRowDelta(
+      Table table,
+      Transaction transaction,
+      InternalFilesDiff internalFilesDiff,
+      Map<String, List<Long>> positionsByDataFile,
+      Schema schema,
+      PartitionSpec partitionSpec,
+      TableSyncMetadata metadata) {
+    if (!internalFilesDiff.dataFilesRemoved().isEmpty()) {
+      throw new NotSupportedException(
+          "Row-delta sync does not support removing data files in the same commit");
+    }
+    RowDelta rowDelta = transaction.newRowDelta();
+    if (table.currentSnapshot() != null) {
+      // The deletion vectors below merge the data files' current deletion vectors, so the current
+      // snapshot is the base state and prior deletion vectors must not count as concurrent
+      rowDelta.validateFromSnapshot(table.currentSnapshot().snapshotId());
+    }
+    internalFilesDiff
+        .dataFilesAdded()
+        .forEach(f -> rowDelta.addRows(getDataFile(partitionSpec, schema, f)));
+    if (!positionsByDataFile.isEmpty()) {
+      Map<String, FileScanTask> existingFiles = new HashMap<>();
+      try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
+        StreamSupport.stream(iterator.spliterator(), false)
+            .forEach(task -> existingFiles.put(task.file().path().toString(), task));
+      } catch (Exception e) {
+        throw new ReadException("Failed to iterate through Iceberg data files", e);
+      }
+      DeleteWriteResult deleteWriteResult =
+          writeDeletionVectors(table, positionsByDataFile, existingFiles);
+      deleteWriteResult.deleteFiles().forEach(rowDelta::addDeletes);
+      deleteWriteResult.rewrittenDeleteFiles().forEach(rowDelta::removeDeletes);
+    }
+    rowDelta.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
+    rowDelta.commit();
+  }
+
+  private DeleteWriteResult writeDeletionVectors(
+      Table table,
+      Map<String, List<Long>> positionsByDataFile,
+      Map<String, FileScanTask> existingFiles) {
+    OutputFileFactory fileFactory =
+        OutputFileFactory.builderFor(table, 1, 1).format(FileFormat.PUFFIN).build();
+    try (DVFileWriter writer =
+        new BaseDVFileWriter(
+            fileFactory, path -> loadPreviousDeletes(table, existingFiles, path))) {
+      for (Map.Entry<String, List<Long>> entry : positionsByDataFile.entrySet()) {
+        FileScanTask task = existingFiles.get(entry.getKey());
+        if (task == null) {
+          throw new NotSupportedException(
+              "Positional deletes reference a data file unknown to the Iceberg table: "
+                  + entry.getKey());
+        }
+        PartitionSpec fileSpec = task.spec();
+        StructLike partition = task.file().partition();
+        for (Long position : entry.getValue()) {
+          writer.delete(entry.getKey(), position, fileSpec, partition);
+        }
+      }
+      writer.close();
+      return writer.result();
+    } catch (IOException e) {
+      throw new UpdateException("Failed to write Iceberg deletion vectors", e);
+    }
+  }
+
+  private PositionDeleteIndex loadPreviousDeletes(
+      Table table, Map<String, FileScanTask> existingFiles, String dataFilePath) {
+    FileScanTask task = existingFiles.get(dataFilePath);
+    if (task == null) {
+      return null;
+    }
+    List<DeleteFile> deleteFiles =
+        task.deletes().stream()
+            .filter(deleteFile -> deleteFile.format() == FileFormat.PUFFIN)
+            .collect(Collectors.toList());
+    if (deleteFiles.isEmpty()) {
+      return null;
+    }
+    if (deleteFiles.size() > 1) {
+      throw new ReadException("Expected at most one deletion vector for data file " + dataFilePath);
+    }
+    DeleteFile dv = deleteFiles.get(0);
+    try (SeekableInputStream in = table.io().newInputFile(dv.location()).newStream()) {
+      in.seek(dv.contentOffset());
+      byte[] bytes = new byte[Math.toIntExact(dv.contentSizeInBytes())];
+      IOUtil.readFully(in, bytes, 0, bytes.length);
+      return PositionDeleteIndex.deserialize(bytes, dv);
+    } catch (IOException e) {
+      throw new ReadException("Failed to read the deletion vector at " + dv.location(), e);
+    }
   }
 
   private DataFile getDataFile(
