@@ -231,6 +231,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
     List<InternalDataFile> filesToRemove = new ArrayList<>();
+    Map<String, StoragePathInfo> fullPathInfo =
+        replaceCommitMetadata.getFullPathToInfo(metaClient.getStorage(), basePath.toString());
     replaceCommitMetadata
         .getPartitionToReplaceFileIds()
         .forEach(
@@ -268,7 +270,18 @@ public class HudiDataFileExtractor implements AutoCloseable {
                           baseFileFullPath ->
                               FSUtils.getCommitTimeWithFullPath(baseFileFullPath)
                                   .equals(commit.requestedTime()))
-                      .map(HoodieBaseFile::new)
+                      .map(
+                          baseFileFullPath -> {
+                            // getFullPathToInfo keys the map by the absolute path and carries the
+                            // file length, without which the registered file cannot be scanned
+                            StoragePathInfo pathInfo = fullPathInfo.get(baseFileFullPath);
+                            if (pathInfo == null) {
+                              throw new ReadException(
+                                  "Commit metadata has no file info for base file "
+                                      + baseFileFullPath);
+                            }
+                            return new HoodieBaseFile(pathInfo);
+                          })
                       .map(hoodieBaseFile -> buildFileWithoutStats(partitionValues, hoodieBaseFile))
                       .collect(Collectors.toList()));
             });
