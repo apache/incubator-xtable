@@ -141,6 +141,64 @@ class ITIcebergMergeOnReadDeletionVectors {
     }
   }
 
+  @Test
+  void repeatedUpdatesOfSameKeysStayConsistent() throws Exception {
+    String tableName = "mor_dv_repeated_updates";
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.MERGE_ON_READ, tableProperties())) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(50, true);
+      Table icebergTable = new HadoopTables(new Configuration()).load(table.getBasePath());
+
+      // The same ten keys move to a new file group on every round; each round adds one deletion
+      // vector for the file group the keys previously lived in.
+      List<HoodieRecord<HoodieAvroPayload>> latest = inserts.subList(0, 10);
+      for (int round = 1; round <= 3; round++) {
+        latest = table.upsertRecords(latest, true);
+        icebergTable.refresh();
+        assertDeletionVectors(icebergTable, 10L * round);
+        assertEquals(
+            50,
+            readKeys(icebergTable).size(),
+            "round " + round + " must neither add nor lose rows");
+      }
+    }
+  }
+
+  @Test
+  void rollbackOfDeletionVectorDeltacommitRevertsIceberg() throws Exception {
+    String tableName = "mor_dv_rollback";
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.MERGE_ON_READ, tableProperties())) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(20, true);
+      table.upsertRecords(inserts.subList(0, 5), true);
+      Table icebergTable = new HadoopTables(new Configuration()).load(table.getBasePath());
+      assertDeletionVectors(icebergTable, 5);
+
+      String updateInstant =
+          table
+              .getMetaClient()
+              .reloadActiveTimeline()
+              .filterCompletedInstants()
+              .lastInstant()
+              .get()
+              .requestedTime();
+      assertTrue(table.getWriteClient().rollback(updateInstant), "rollback must succeed");
+
+      icebergTable.refresh();
+      Set<String> keys = readKeys(icebergTable);
+      assertEquals(20, keys.size(), "rollback must restore the pre-update row set");
+      long remainingDeleteFiles = 0;
+      try (CloseableIterable<FileScanTask> tasks = icebergTable.newScan().planFiles()) {
+        for (FileScanTask task : tasks) {
+          remainingDeleteFiles += task.deletes().size();
+        }
+      }
+      assertEquals(0, remainingDeleteFiles, "rollback must remove the deletion vector");
+    }
+  }
+
   /**
    * Asserts each data file carries at most one deletion vector and the vectors cover the expected
    * number of deleted rows in total.
