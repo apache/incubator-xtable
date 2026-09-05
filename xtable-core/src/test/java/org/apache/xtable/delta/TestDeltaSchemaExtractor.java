@@ -824,6 +824,55 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
+  public void testNestedFieldIdsInDeltaSchema() {
+    // Delta writes these ids for a collection's children when IcebergCompatV2 is enabled, keyed
+    // by the path the child takes in the parquet file.
+    Metadata mapMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 1, \"delta.columnMapping.physicalName\": \"col-map\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-map.key\": 7, \"col-map.value\": 8}}");
+    Metadata listMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 2, \"delta.columnMapping.physicalName\": \"col-list\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-list.element\": 9}}");
+    Metadata plainMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 3, \"delta.columnMapping.physicalName\": \"col-plain\"}");
+    StructType structType =
+        new StructType()
+            .add(
+                "map_field",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                true,
+                mapMetadata)
+            .add("list_field", DataTypes.createArrayType(DataTypes.IntegerType), true, listMetadata)
+            .add(
+                "plain_map",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                true,
+                plainMetadata);
+
+    InternalSchema internalSchema = DeltaSchemaExtractor.getInstance().toInternalSchema(structType);
+
+    Assertions.assertEquals(7, fieldId(internalSchema, "map_field", "_one_field_key"));
+    Assertions.assertEquals(8, fieldId(internalSchema, "map_field", "_one_field_value"));
+    Assertions.assertEquals(9, fieldId(internalSchema, "list_field", "_one_field_element"));
+    // A field without the metadata leaves its children unassigned, as before.
+    Assertions.assertNull(fieldId(internalSchema, "plain_map", "_one_field_key"));
+    Assertions.assertNull(fieldId(internalSchema, "plain_map", "_one_field_value"));
+  }
+
+  private static Integer fieldId(InternalSchema schema, String fieldName, String childName) {
+    return schema.getFields().stream()
+        .filter(field -> fieldName.equals(field.getName()))
+        .flatMap(field -> field.getSchema().getFields().stream())
+        .filter(child -> childName.equals(child.getName()))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("missing " + fieldName + "." + childName))
+        .getFieldId();
+  }
+
+  @Test
   public void testFieldIdsInDeltaSchema() {
     StructType structRepresentation =
         new StructType()
