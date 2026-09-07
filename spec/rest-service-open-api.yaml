@@ -147,9 +147,10 @@ components:
         configurations:
           type: object
           description: >-
-            Additional configuration key/value pairs. Only "partition-spec" is read; every other key
-            is ignored. Credentials do not belong here -- the service reads cloud storage with the
-            credentials in its own environment, and a request body is logged, traced and cached.
+            Additional configuration key/value pairs. Only "partition-spec" is read; every other
+            key is ignored. Do not put storage credentials here. The service reads cloud storage
+            with the credentials in its own environment, and request bodies are not a safe place
+            for secrets in general.
           additionalProperties:
             type: string
 
