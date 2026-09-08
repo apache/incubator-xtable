@@ -62,6 +62,10 @@ public class IcebergColumnStatsConverter {
           InternalField field = columnStats.getField();
           Types.NestedField icebergField =
               schema.findField(IcebergSchemaExtractor.convertFromXTablePath(field.getPath()));
+          if (icebergField == null) {
+            // Stats for a column the published schema leaves out (e.g. Hudi meta columns)
+            return;
+          }
           int fieldId = icebergField.fieldId();
           columnSizes.put(fieldId, columnStats.getTotalSize());
           valueCounts.put(fieldId, columnStats.getNumValues());

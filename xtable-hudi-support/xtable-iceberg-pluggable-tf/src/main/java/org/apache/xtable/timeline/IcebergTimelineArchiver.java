@@ -34,13 +34,13 @@ import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.catalog.TableIdentifier;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import org.apache.xtable.IcebergFormatConfig;
 import org.apache.xtable.iceberg.IcebergConversionTarget;
 import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.InternalTable;
@@ -57,21 +57,28 @@ public class IcebergTimelineArchiver {
   private final HoodieTableMetaClient metaClient;
   private final IcebergConversionTarget target;
   private final IcebergTableManager tableManager;
+  private final IcebergFormatConfig formatConfig;
 
   public IcebergTimelineArchiver(HoodieTableMetaClient metaClient, IcebergConversionTarget target) {
+    this(metaClient, target, IcebergFormatConfig.empty());
+  }
+
+  public IcebergTimelineArchiver(
+      HoodieTableMetaClient metaClient,
+      IcebergConversionTarget target,
+      IcebergFormatConfig formatConfig) {
     this.metaClient = metaClient;
     this.target = target;
-    this.tableManager =
-        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
+    Configuration hadoopConf = (Configuration) metaClient.getStorageConf().unwrap();
+    this.tableManager = IcebergTableManager.of(hadoopConf);
+    this.formatConfig =
+        (formatConfig == null ? IcebergFormatConfig.empty() : formatConfig).resolve(hadoopConf);
   }
 
   @SneakyThrows
   public void archiveInstants(InternalTable internalTable, List<HoodieInstant> archivedInstants) {
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(metaClient.getTableConfig().getTableName());
-    if (tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
-      Table table =
-          tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
+    if (formatConfig.tableExists(tableManager, metaClient)) {
+      Table table = formatConfig.getTable(tableManager, metaClient);
       List<Long> expireSnapshots = new ArrayList<>();
       // Iceberg does not document an ordering for snapshots(), and stopping at the wrong point
       // would expire a snapshot a savepoint still needs, so order explicitly.

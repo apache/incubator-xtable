@@ -27,13 +27,13 @@ import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 
 import org.apache.iceberg.Table;
-import org.apache.iceberg.catalog.TableIdentifier;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import org.apache.xtable.IcebergFormatConfig;
 import org.apache.xtable.iceberg.IcebergConversionTarget;
 import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.InternalTable;
@@ -50,22 +50,32 @@ public class IcebergRollbackExecutor {
   private final HoodieTableMetaClient metaClient;
   private final IcebergConversionTarget target;
   private final IcebergTableManager tableManager;
+  private final IcebergFormatConfig formatConfig;
 
   public IcebergRollbackExecutor(HoodieTableMetaClient metaClient, IcebergConversionTarget target) {
+    this(metaClient, target, IcebergFormatConfig.empty());
+  }
+
+  public IcebergRollbackExecutor(
+      HoodieTableMetaClient metaClient,
+      IcebergConversionTarget target,
+      IcebergFormatConfig formatConfig) {
     this.metaClient = metaClient;
     this.target = target;
-    this.tableManager =
-        IcebergTableManager.of(
-            (org.apache.hadoop.conf.Configuration) metaClient.getStorageConf().unwrap());
+    org.apache.hadoop.conf.Configuration hadoopConf =
+        (org.apache.hadoop.conf.Configuration) metaClient.getStorageConf().unwrap();
+    this.tableManager = IcebergTableManager.of(hadoopConf);
+    this.formatConfig =
+        (formatConfig == null ? IcebergFormatConfig.empty() : formatConfig).resolve(hadoopConf);
   }
 
   @SneakyThrows
   public void rollbackSnapshot(InternalTable internalTable, HoodieInstant instantToRollback) {
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(metaClient.getTableConfig().getTableName());
-    if (tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
-      Table table =
-          tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
+    if (formatConfig.tableExists(tableManager, metaClient)) {
+      Table table = formatConfig.getTable(tableManager, metaClient);
+      if (table.currentSnapshot() == null) {
+        return;
+      }
       TableSyncMetadata syncMetadata =
           TableSyncMetadata.fromJson(
                   table.currentSnapshot().summary().get(TableSyncMetadata.XTABLE_METADATA))

@@ -31,7 +31,6 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.common.HoodieTableFormat;
-import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -39,6 +38,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineFactory;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.metadata.TableMetadataFactory;
 
 import org.apache.xtable.conversion.ConversionTargetFactory;
@@ -66,12 +66,22 @@ import org.apache.xtable.timeline.IcebergTimelineFactory;
 
 public class IcebergTableFormat implements HoodieTableFormat {
   private transient TableFormatSync tableFormatSync;
+  private IcebergFormatConfig formatConfig = IcebergFormatConfig.empty();
 
   public IcebergTableFormat() {}
 
   @Override
   public void init(Properties properties) {
     this.tableFormatSync = TableFormatSync.getInstance();
+    this.formatConfig = IcebergFormatConfig.fromProperties(properties);
+  }
+
+  public IcebergFormatConfig getFormatConfig() {
+    return formatConfig;
+  }
+
+  private IcebergFormatConfig resolvedConfig(HoodieTableMetaClient metaClient) {
+    return formatConfig.resolve((Configuration) metaClient.getStorageConf().unwrap());
   }
 
   @Override
@@ -138,16 +148,19 @@ public class IcebergTableFormat implements HoodieTableFormat {
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
+    Option<HoodieInstant> lastCompleted =
+        metaClient.getActiveTimeline().filterCompletedInstants().lastInstant();
+    if (!lastCompleted.isPresent()) {
+      // Nothing was ever published to Iceberg, so there is no snapshot to roll back
+      return;
+    }
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
     InternalTable internalTable =
-        hudiTableExtractor
-            .getTableExtractor()
-            .table(
-                metaClient,
-                metaClient.getActiveTimeline().filterCompletedInstants().lastInstant().get());
+        hudiTableExtractor.getTableExtractor().table(metaClient, lastCompleted.get());
     IcebergRollbackExecutor rollbackExecutor =
-        new IcebergRollbackExecutor(metaClient, getIcebergConversionTarget(metaClient));
+        new IcebergRollbackExecutor(
+            metaClient, getIcebergConversionTarget(metaClient), resolvedConfig(metaClient));
     rollbackExecutor.rollbackSnapshot(internalTable, completedInstant);
   }
 
@@ -179,7 +192,7 @@ public class IcebergTableFormat implements HoodieTableFormat {
 
   @Override
   public TimelineFactory getTimelineFactory() {
-    return new IcebergTimelineFactory(new HoodieConfig());
+    return new IcebergTimelineFactory(formatConfig);
   }
 
   @Override
@@ -221,7 +234,8 @@ public class IcebergTableFormat implements HoodieTableFormat {
       InternalTable internalTable,
       List<HoodieInstant> archivedInstants) {
     IcebergConversionTarget target = getIcebergConversionTarget(metaClient);
-    IcebergTimelineArchiver timelineArchiver = new IcebergTimelineArchiver(metaClient, target);
+    IcebergTimelineArchiver timelineArchiver =
+        new IcebergTimelineArchiver(metaClient, target, resolvedConfig(metaClient));
     timelineArchiver.archiveInstants(internalTable, archivedInstants);
   }
 
@@ -242,7 +256,10 @@ public class IcebergTableFormat implements HoodieTableFormat {
             .loadSourcePartitionSpecExtractor();
     return new HudiIncrementalTableChangeExtractor(
         metaClient,
-        new HudiTableExtractor(new HudiSchemaExtractor(), sourcePartitionSpecExtractor),
+        new HudiTableExtractor(
+            new HudiSchemaExtractor(),
+            sourcePartitionSpecExtractor,
+            resolvedConfig(metaClient).isExposeMetaFields()),
         new HudiDataFileExtractor(
             metaClient,
             new PathBasedPartitionValuesExtractor(
@@ -252,10 +269,14 @@ public class IcebergTableFormat implements HoodieTableFormat {
   }
 
   private IcebergConversionTarget getIcebergConversionTarget(HoodieTableMetaClient metaClient) {
-    // TODO: Add iceberg catalog config through user inputs.
+    IcebergFormatConfig config = resolvedConfig(metaClient);
     TargetTable targetTable =
         targetTable(
-            metaClient.getTableConfig().getTableName(), metaClient.getBasePath().toString());
+                metaClient.getTableConfig().getTableName(), metaClient.getBasePath().toString())
+            .toBuilder()
+            .namespace(config.getNamespace())
+            .catalogConfig(config.catalogConfig())
+            .build();
     return (IcebergConversionTarget)
         ConversionTargetFactory.getInstance()
             .createForFormat(targetTable, (Configuration) metaClient.getStorageConf().unwrap());

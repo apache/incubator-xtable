@@ -32,6 +32,7 @@ import lombok.SneakyThrows;
 import org.apache.avro.Schema;
 
 import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.schema.HoodieSchemaUtils;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -67,16 +68,32 @@ public class HudiTableExtractor {
           .setSerializationInclusion(JsonInclude.Include.NON_NULL);
   private final HudiSchemaExtractor schemaExtractor;
   private final SourcePartitionSpecExtractor partitionSpecExtractor;
+  private final boolean includeMetaFields;
 
   public HudiTableExtractor(
       HudiSchemaExtractor schemaExtractor,
       SourcePartitionSpecExtractor sourcePartitionSpecExtractor) {
+    this(schemaExtractor, sourcePartitionSpecExtractor, true);
+  }
+
+  /**
+   * @param includeMetaFields whether the Hudi meta columns ({@code _hoodie_*}) are part of the
+   *     published schema. A target that must keep the user-facing schema unchanged (the Iceberg
+   *     pluggable table format) leaves them out; the parquet files still carry them and readers
+   *     project by name mapping, so nothing else has to change.
+   */
+  public HudiTableExtractor(
+      HudiSchemaExtractor schemaExtractor,
+      SourcePartitionSpecExtractor sourcePartitionSpecExtractor,
+      boolean includeMetaFields) {
     this.schemaExtractor = schemaExtractor;
     this.partitionSpecExtractor = sourcePartitionSpecExtractor;
+    this.includeMetaFields = includeMetaFields;
   }
 
   public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
-    InternalSchema canonicalSchema = getCanonicalSchemaFromTimeline(metaClient, commit);
+    InternalSchema canonicalSchema =
+        withoutMetaFieldsIfExcluded(getCanonicalSchemaFromTimeline(metaClient, commit));
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -104,7 +121,8 @@ public class HudiTableExtractor {
       HoodieCommitMetadata commitMetadata,
       HoodieInstant completedInstant) {
     InternalSchema canonicalSchema =
-        getCanonicalSchemaFromCommitMetadata(metaClient, commitMetadata, completedInstant);
+        withoutMetaFieldsIfExcluded(
+            getCanonicalSchemaFromCommitMetadata(metaClient, commitMetadata, completedInstant));
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -169,6 +187,18 @@ public class HudiTableExtractor {
           e);
     }
     return canonicalSchema;
+  }
+
+  private InternalSchema withoutMetaFieldsIfExcluded(InternalSchema schema) {
+    if (includeMetaFields) {
+      return schema;
+    }
+    List<InternalField> userFields =
+        schema.getFields().stream()
+            .filter(
+                field -> !HoodieRecord.HOODIE_META_COLUMNS_NAME_TO_POS.containsKey(field.getName()))
+            .collect(Collectors.toList());
+    return schema.toBuilder().fields(userFields).build();
   }
 
   private List<InternalField> getRecordKeyFields(

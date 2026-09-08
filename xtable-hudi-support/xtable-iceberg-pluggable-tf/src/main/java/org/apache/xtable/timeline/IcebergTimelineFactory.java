@@ -35,10 +35,19 @@ import org.apache.hudi.common.table.timeline.versioning.v2.ArchivedTimelineV2;
 import org.apache.hudi.common.table.timeline.versioning.v2.BaseTimelineV2;
 import org.apache.hudi.common.table.timeline.versioning.v2.CompletionTimeQueryViewV2;
 
+import org.apache.xtable.IcebergFormatConfig;
+
 public class IcebergTimelineFactory extends TimelineFactory {
+
+  private final IcebergFormatConfig formatConfig;
 
   public IcebergTimelineFactory(HoodieConfig config) {
     // To match reflection.
+    this(IcebergFormatConfig.empty());
+  }
+
+  public IcebergTimelineFactory(IcebergFormatConfig formatConfig) {
+    this.formatConfig = formatConfig == null ? IcebergFormatConfig.empty() : formatConfig;
   }
 
   @Override
@@ -49,7 +58,7 @@ public class IcebergTimelineFactory extends TimelineFactory {
 
   @Override
   public HoodieActiveTimeline createActiveTimeline() {
-    return new IcebergActiveTimeline();
+    return new IcebergActiveTimeline(formatConfig);
   }
 
   @Override
@@ -76,13 +85,13 @@ public class IcebergTimelineFactory extends TimelineFactory {
 
   @Override
   public HoodieActiveTimeline createActiveTimeline(HoodieTableMetaClient metaClient) {
-    return new IcebergActiveTimeline(metaClient);
+    return new IcebergActiveTimeline(metaClient, formatConfig);
   }
 
   @Override
   public HoodieActiveTimeline createActiveTimeline(
       HoodieTableMetaClient metaClient, boolean applyLayoutFilter) {
-    return new IcebergActiveTimeline(metaClient, applyLayoutFilter);
+    return new IcebergActiveTimeline(metaClient, formatConfig, applyLayoutFilter);
   }
 
   @Override

@@ -39,13 +39,13 @@ import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.catalog.TableIdentifier;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import org.apache.xtable.IcebergFormatConfig;
 import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 
@@ -56,30 +56,54 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
           .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
           .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
+  private IcebergFormatConfig formatConfig = IcebergFormatConfig.empty();
+
   public IcebergActiveTimeline(
       HoodieTableMetaClient metaClient,
+      IcebergFormatConfig formatConfig,
       Set<String> includedExtensions,
       boolean applyLayoutFilters) {
+    this.formatConfig = formatConfig == null ? IcebergFormatConfig.empty() : formatConfig;
     this.setInstants(getInstantsFromFileSystem(metaClient, includedExtensions, applyLayoutFilters));
     this.metaClient = metaClient;
   }
 
+  public IcebergActiveTimeline(HoodieTableMetaClient metaClient, IcebergFormatConfig formatConfig) {
+    this(
+        metaClient,
+        formatConfig,
+        Collections.unmodifiableSet(VALID_EXTENSIONS_IN_ACTIVE_TIMELINE),
+        true);
+  }
+
+  public IcebergActiveTimeline(
+      HoodieTableMetaClient metaClient,
+      IcebergFormatConfig formatConfig,
+      boolean applyLayoutFilters) {
+    this(
+        metaClient,
+        formatConfig,
+        Collections.unmodifiableSet(VALID_EXTENSIONS_IN_ACTIVE_TIMELINE),
+        applyLayoutFilters);
+  }
+
   public IcebergActiveTimeline(HoodieTableMetaClient metaClient) {
-    this(metaClient, Collections.unmodifiableSet(VALID_EXTENSIONS_IN_ACTIVE_TIMELINE), true);
+    this(metaClient, IcebergFormatConfig.empty());
   }
 
   public IcebergActiveTimeline(HoodieTableMetaClient metaClient, boolean applyLayoutFilters) {
-    this(
-        metaClient,
-        Collections.unmodifiableSet(VALID_EXTENSIONS_IN_ACTIVE_TIMELINE),
-        applyLayoutFilters);
+    this(metaClient, IcebergFormatConfig.empty(), applyLayoutFilters);
+  }
+
+  public IcebergActiveTimeline(IcebergFormatConfig formatConfig) {
+    this.formatConfig = formatConfig == null ? IcebergFormatConfig.empty() : formatConfig;
   }
 
   public IcebergActiveTimeline() {}
 
   @Override
   public HoodieActiveTimeline reload() {
-    return new IcebergActiveTimeline(metaClient);
+    return new IcebergActiveTimeline(metaClient, formatConfig);
   }
 
   /**
@@ -98,16 +122,13 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
       boolean applyLayoutFilters) {
     List<HoodieInstant> instantsFromHoodieTimeline =
         super.getInstantsFromFileSystem(metaClient, includedExtensions, applyLayoutFilters);
-    IcebergTableManager icebergTableManager =
-        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(metaClient.getTableConfig().getTableName());
-    if (!icebergTableManager.tableExists(
-        null, tableIdentifier, metaClient.getBasePath().toString())) {
+    Configuration hadoopConf = (Configuration) metaClient.getStorageConf().unwrap();
+    IcebergTableManager icebergTableManager = IcebergTableManager.of(hadoopConf);
+    IcebergFormatConfig config = formatConfig.resolve(hadoopConf);
+    if (!config.tableExists(icebergTableManager, metaClient)) {
       return Collections.emptyList();
     }
-    Table icebergTable =
-        icebergTableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
+    Table icebergTable = config.getTable(icebergTableManager, metaClient);
     Map<String, HoodieInstant> instantsFromIceberg = new HashMap<>();
     for (Snapshot snapshot : icebergTable.snapshots()) {
       TableSyncMetadata syncMetadata =

@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
@@ -40,6 +41,7 @@ import org.apache.xtable.exception.NotSupportedException;
 
 /** Syncs schema updates for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
+@Log4j2
 public class IcebergSchemaSync {
   private static final IcebergSchemaSync INSTANCE = new IcebergSchemaSync();
 
@@ -138,7 +140,10 @@ public class IcebergSchemaSync {
         if (latestColumn.isOptional()) {
           updates.put(latestColumn.fieldId(), () -> updateSchema.makeColumnOptional(fqName));
         } else {
-          updates.put(latestColumn.fieldId(), () -> updateSchema.requireColumn(fqName));
+          // Iceberg refuses to tighten an optional column to required, and an optional column
+          // holds the source's non-null values just fine, so keep the current nullability.
+          log.info(
+              "Keeping column {} optional although the source schema marks it required", fqName);
         }
       }
       // update the comment of the column

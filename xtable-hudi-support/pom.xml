@@ -33,5 +33,6 @@
         <module>xtable-hudi-support-utils</module>
         <module>xtable-hudi-support-extensions</module>
         <module>xtable-iceberg-pluggable-tf</module>
+        <module>xtable-iceberg-spark-plugin</module>
     </modules>
 </project>
