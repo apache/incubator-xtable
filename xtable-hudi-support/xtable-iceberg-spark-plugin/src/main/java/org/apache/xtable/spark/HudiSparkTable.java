@@ -86,11 +86,15 @@ public class HudiSparkTable extends SparkTable {
     return false;
   }
 
-  /** A write plan the rule left alone reaches here; by default that is an error, not a bypass. */
+  /**
+   * A batch write plan the rule left alone reaches here and is refused at {@code toBatch} (a
+   * bypass, not an error, only with the foreign-writes setting); a streaming write is committed
+   * through Hudi epoch by epoch.
+   */
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
-    checkForeignWriteAllowed("write");
-    return super.newWriteBuilder(info);
+    return new HudiWriteBuilder(
+        this, info, super.newWriteBuilder(info), () -> checkForeignWriteAllowed("write"));
   }
 
   /**

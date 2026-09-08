@@ -366,6 +366,53 @@ class ITHudiIcebergSparkPlugin {
     assertEquals(Arrays.asList("1:a2:3", "2:b2:2", "4:d:3"), rows);
   }
 
+  @Test
+  @Order(15)
+  void structuredStreamingAppendsThroughHudi() throws Exception {
+    spark.sql(
+        "CREATE TABLE hcat.db.stream (id INT, name STRING, region STRING) USING iceberg "
+            + "PARTITIONED BY (region)");
+    Path input = Files.createDirectories(tempDir.resolve("stream-input"));
+    Path checkpoint = tempDir.resolve("stream-checkpoint");
+    Files.write(
+        input.resolve("batch1.json"),
+        Arrays.asList(
+            "{\"id\":1,\"name\":\"a\",\"region\":\"us\"}",
+            "{\"id\":2,\"name\":\"b\",\"region\":\"eu\"}"));
+    org.apache.spark.sql.streaming.StreamingQuery query =
+        spark
+            .readStream()
+            .schema(spark.table("hcat.db.stream").schema())
+            .json(input.toString())
+            .writeStream()
+            .format("iceberg")
+            .option("checkpointLocation", checkpoint.toString())
+            .toTable("hcat.db.stream");
+    query.processAllAvailable();
+    Files.write(
+        input.resolve("batch2.json"), Arrays.asList("{\"id\":3,\"name\":\"c\",\"region\":\"us\"}"));
+    query.processAllAvailable();
+    query.stop();
+
+    List<String> rows =
+        spark
+            .sql("SELECT id, name, region FROM plain.db.stream ORDER BY id")
+            .collectAsList()
+            .stream()
+            .map(r -> r.getInt(0) + ":" + r.getString(1) + ":" + r.getString(2))
+            .collect(Collectors.toList());
+    assertEquals(Arrays.asList("1:a:us", "2:b:eu", "3:c:us"), rows);
+    assertTrue(Files.isDirectory(Paths.get(warehouse, "db", "stream", "data", ".hoodie")));
+    long snapshots = spark.sql("SELECT * FROM plain.db.stream.snapshots").count();
+    assertEquals(2, snapshots, "one Hudi commit and one Iceberg snapshot per micro-batch");
+    long stagedLeftovers =
+        Files.walk(Paths.get(warehouse, "db", "stream", "data"))
+            .filter(p -> p.getFileName().toString().endsWith(".parquet"))
+            .filter(p -> !p.getFileName().toString().contains("_"))
+            .count();
+    assertEquals(0, stagedLeftovers, "staged micro-batch files are removed after the Hudi write");
+  }
+
   private static void usersSource(String view, List<Object[]> rows) {
     spark
         .createDataFrame(
