@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -40,6 +41,7 @@ import org.apache.hudi.keygen.ComplexKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
 
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
@@ -68,6 +70,8 @@ public class HudiTableContext implements Serializable {
   private final List<String> recordKeyFields;
   private final List<String> partitionFields;
   private final String orderingField;
+  private final boolean mergeOnRead;
+  private final int formatVersion;
   private final Map<String, String> writeOverrides;
   /** Non-null when the table shape cannot be handled by Hudi; writes then stay on Iceberg. */
   private final String unsupportedReason;
@@ -82,6 +86,8 @@ public class HudiTableContext implements Serializable {
       List<String> recordKeyFields,
       List<String> partitionFields,
       String orderingField,
+      boolean mergeOnRead,
+      int formatVersion,
       Map<String, String> writeOverrides,
       String unsupportedReason) {
     this.catalogName = catalogName;
@@ -93,6 +99,8 @@ public class HudiTableContext implements Serializable {
     this.recordKeyFields = recordKeyFields;
     this.partitionFields = partitionFields;
     this.orderingField = orderingField;
+    this.mergeOnRead = mergeOnRead;
+    this.formatVersion = formatVersion;
     this.writeOverrides = writeOverrides;
     this.unsupportedReason = unsupportedReason;
   }
@@ -130,6 +138,13 @@ public class HudiTableContext implements Serializable {
                 field.transform(), table.schema().findColumnName(field.sourceId()));
       }
     }
+    boolean mergeOnRead = isMergeOnRead(properties);
+    int formatVersion = formatVersion(table);
+    if (mergeOnRead && formatVersion < 3 && unsupported == null) {
+      unsupported =
+          "merge-on-read needs an Iceberg format-version 3 table for deletion vectors; "
+              + "set TBLPROPERTIES ('format-version'='3')";
+    }
     Map<String, String> overrides = new LinkedHashMap<>();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       if (entry.getKey().startsWith(HudiIcebergConf.TABLE_PROP_WRITE_PREFIX)) {
@@ -148,8 +163,43 @@ public class HudiTableContext implements Serializable {
         Collections.unmodifiableList(recordKeys),
         Collections.unmodifiableList(partitionFields),
         properties.get(HudiIcebergConf.TABLE_PROP_ORDERING_FIELD),
+        mergeOnRead,
+        formatVersion,
         overrides,
         unsupported);
+  }
+
+  /**
+   * Iceberg's own row-level write modes decide the Hudi table type: any of {@code
+   * write.merge.mode}, {@code write.update.mode}, {@code write.delete.mode} set to {@code
+   * merge-on-read} means a Hudi merge-on-read table whose updates land as deletion vectors. {@code
+   * hudi.table-type} overrides.
+   */
+  static boolean isMergeOnRead(Map<String, String> properties) {
+    String explicit = properties.get(HudiIcebergConf.TABLE_PROP_TABLE_TYPE);
+    if (explicit != null) {
+      return explicit.toLowerCase(Locale.ROOT).startsWith("m");
+    }
+    for (String key :
+        new String[] {
+          TableProperties.MERGE_MODE, TableProperties.UPDATE_MODE, TableProperties.DELETE_MODE
+        }) {
+      if ("merge-on-read".equalsIgnoreCase(properties.get(key))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static int formatVersion(Table table) {
+    if (table instanceof HasTableOperations) {
+      return ((HasTableOperations) table).operations().current().formatVersion();
+    }
+    return Integer.parseInt(table.properties().getOrDefault("format-version", "2"));
+  }
+
+  public HoodieTableType tableType() {
+    return mergeOnRead ? HoodieTableType.MERGE_ON_READ : HoodieTableType.COPY_ON_WRITE;
   }
 
   public boolean isKeyed() {
@@ -183,7 +233,14 @@ public class HudiTableContext implements Serializable {
     if (databaseName() != null) {
       params.put("hoodie.database.name", databaseName());
     }
-    params.put("hoodie.datasource.write.table.type", HoodieTableType.COPY_ON_WRITE.name());
+    params.put("hoodie.datasource.write.table.type", tableType().name());
+    if (mergeOnRead) {
+      // Each update becomes a positional delete plus an insert, which is exactly what an Iceberg
+      // V3 deletion vector plus a new data file expresses
+      params.put("hoodie.write.updates.as.deletes.and.inserts", "true");
+      params.put("hoodie.write.record.positions", "true");
+      params.put("hoodie.index.type", "SIMPLE");
+    }
     params.put("hoodie.table.format", TableFormat.ICEBERG);
     params.put("hoodie.metadata.enable", "false");
     params.put("hoodie.datasource.meta.sync.enable", "false");
@@ -194,7 +251,11 @@ public class HudiTableContext implements Serializable {
       params.put("hoodie.datasource.write.recordkey.field", String.join(",", recordKeyFields));
       params.put("hoodie.datasource.write.keygenerator.class", keyGeneratorClass());
     }
-    if (orderingField != null) {
+    if (mergeOnRead) {
+      // A positional delete plus insert has no notion of a newer or older version of a record:
+      // the latest write wins, which is commit-time ordering. An ordering field is ignored.
+      params.put("hoodie.record.merge.mode", "COMMIT_TIME_ORDERING");
+    } else if (orderingField != null) {
       params.put("hoodie.datasource.write.precombine.field", orderingField);
     }
     if (operation.hoodieOperation() != null) {

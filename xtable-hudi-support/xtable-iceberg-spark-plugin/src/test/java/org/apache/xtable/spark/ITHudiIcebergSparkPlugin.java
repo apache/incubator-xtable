@@ -295,11 +295,75 @@ class ITHudiIcebergSparkPlugin {
     // eject: a plain Iceberg table again, Iceberg's own writer takes over
     spark.sql("ALTER TABLE lazy.db.adopted UNSET TBLPROPERTIES ('hudi.managed')");
     spark.sql("INSERT INTO lazy.db.adopted VALUES (3)");
+
+    // re-adopt with a natively written file in place: Hudi ignores files it did not write
+    spark.sql("ALTER TABLE lazy.db.adopted SET TBLPROPERTIES ('hudi.managed' = 'true')");
+    spark.sql("INSERT INTO lazy.db.adopted VALUES (4)");
     List<Integer> ids =
         spark.sql("SELECT id FROM plain.db.adopted ORDER BY id").collectAsList().stream()
             .map(r -> r.getInt(0))
             .collect(Collectors.toList());
-    assertEquals(Arrays.asList(1, 2, 3), ids);
+    assertEquals(Arrays.asList(1, 2, 3, 4), ids);
+  }
+
+  @Test
+  @Order(13)
+  void staticPartitionOverwrite() {
+    spark.sql("INSERT OVERWRITE hcat.db.events PARTITION (region = 'eu') VALUES (20, 'q')");
+    assertEquals(
+        Arrays.asList("4:d:apac", "10:x:us", "11:y:us", "12:w:us", "20:q:eu"),
+        readViaCatalog("plain"));
+  }
+
+  @Test
+  @Order(14)
+  void mergeOnReadTableWritesDeletionVectors() {
+    spark.sql(
+        "CREATE TABLE hcat.db.mor (id INT NOT NULL, name STRING, ts BIGINT) USING iceberg "
+            + "TBLPROPERTIES ('write.merge.mode'='merge-on-read', 'write.update.mode'='merge-on-read', "
+            + "'write.delete.mode'='merge-on-read', 'hudi.ordering-field'='ts')");
+    spark.sql("ALTER TABLE hcat.db.mor SET IDENTIFIER FIELDS id");
+    assertEquals(
+        "3",
+        spark
+            .sql("SHOW TBLPROPERTIES hcat.db.mor ('format-version')")
+            .collectAsList()
+            .get(0)
+            .getString(1));
+    spark.sql("INSERT INTO hcat.db.mor VALUES (1, 'a', 1), (2, 'b', 1), (3, 'c', 1)");
+    spark.sql("UPDATE hcat.db.mor SET name = 'b2', ts = 2 WHERE id = 2");
+    spark.sql("DELETE FROM hcat.db.mor WHERE id = 3");
+    usersSource("morsrc", Arrays.asList(new Object[] {1, "a2", 3L}, new Object[] {4, "d", 3L}));
+    spark.sql(
+        "MERGE INTO hcat.db.mor t USING morsrc s ON t.id = s.id "
+            + "WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *");
+    List<String> rows =
+        spark.sql("SELECT id, name, ts FROM plain.db.mor ORDER BY id").collectAsList().stream()
+            .map(r -> r.getInt(0) + ":" + r.getString(1) + ":" + r.getLong(2))
+            .collect(Collectors.toList());
+    assertEquals(Arrays.asList("1:a2:3", "2:b2:2", "4:d:3"), rows);
+    long deleteFiles = spark.sql("SELECT * FROM plain.db.mor.delete_files").count();
+    assertTrue(
+        deleteFiles > 0, "updates and deletes land as Iceberg delete files (deletion vectors)");
+    assertEquals(
+        Arrays.asList("PUFFIN"),
+        spark
+            .sql("SELECT DISTINCT file_format FROM plain.db.mor.delete_files")
+            .collectAsList()
+            .stream()
+            .map(r -> r.getString(0))
+            .collect(Collectors.toList()));
+
+    spark.sql("CALL hcat.system.rewrite_position_delete_files(table => 'db.mor')").collectAsList();
+    assertEquals(
+        0,
+        spark.sql("SELECT * FROM plain.db.mor.delete_files").count(),
+        "compaction folds the deletion vectors away");
+    rows =
+        spark.sql("SELECT id, name, ts FROM plain.db.mor ORDER BY id").collectAsList().stream()
+            .map(r -> r.getInt(0) + ":" + r.getString(1) + ":" + r.getLong(2))
+            .collect(Collectors.toList());
+    assertEquals(Arrays.asList("1:a2:3", "2:b2:2", "4:d:3"), rows);
   }
 
   private static void usersSource(String view, List<Object[]> rows) {

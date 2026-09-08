@@ -116,6 +116,13 @@ public class HudiSparkCatalog extends SparkCatalog {
       props = new HashMap<>(properties);
       props.put(HudiIcebergConf.TABLE_PROP_MANAGED, "true");
     }
+    if (Boolean.parseBoolean(props.getOrDefault(HudiIcebergConf.TABLE_PROP_MANAGED, "false"))
+        && HudiTableContext.isMergeOnRead(props)
+        && !props.containsKey("format-version")) {
+      // merge-on-read updates are published as deletion vectors, a format-version 3 feature
+      props = new HashMap<>(props);
+      props.put("format-version", "3");
+    }
     return wrap(ident, super.createTable(ident, schema, partitions, props));
   }
 
@@ -124,6 +131,7 @@ public class HudiSparkCatalog extends SparkCatalog {
     Procedure procedure = super.loadProcedure(ident);
     String name = ident.name();
     if (HudiRedirectedProcedure.REWRITE_DATA_FILES.equals(name)
+        || HudiRedirectedProcedure.REWRITE_POSITION_DELETE_FILES.equals(name)
         || HudiRedirectedProcedure.EXPIRE_SNAPSHOTS.equals(name)) {
       return new HudiRedirectedProcedure(name, procedure, this);
     }

@@ -47,6 +47,8 @@ public final class HudiIcebergConf {
 
   /** Iceberg table property marking a table whose writes go through Hudi. */
   public static final String TABLE_PROP_MANAGED = "hudi.managed";
+  /** Optional Iceberg table property forcing the Hudi table type: {@code cow} or {@code mor}. */
+  public static final String TABLE_PROP_TABLE_TYPE = "hudi.table-type";
   /** Optional Iceberg table property naming the Hudi ordering (pre-combine) field. */
   public static final String TABLE_PROP_ORDERING_FIELD = "hudi.ordering-field";
   /** Prefix of Iceberg table properties forwarded to every Hudi write as {@code hoodie.<rest>}. */

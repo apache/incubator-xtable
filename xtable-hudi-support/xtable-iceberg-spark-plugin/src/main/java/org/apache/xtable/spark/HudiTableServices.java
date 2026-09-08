@@ -18,6 +18,7 @@
  
 package org.apache.xtable.spark;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,36 @@ final class HudiTableServices {
 
   private HudiTableServices() {}
 
+  private static HoodieWriteConfig writeConfig(
+      SparkSession spark,
+      HudiTableContext context,
+      HoodieClusteringConfig clustering,
+      Map<String, String> overrides)
+      throws Exception {
+    StorageConfiguration<?> storageConf =
+        HadoopFSUtils.getStorageConfWithCopy(spark.sessionState().newHadoopConf());
+    HoodieTableMetaClient metaClient =
+        HoodieTableMetaClient.builder()
+            .setConf(storageConf)
+            .setBasePath(context.getBasePath())
+            .build();
+    String schema = new TableSchemaResolver(metaClient).getTableSchema().toAvroSchema().toString();
+    Map<String, String> props = new HashMap<>(context.writeParams(HudiWriteOperation.APPEND, null));
+    props.remove("path");
+    props.remove("hoodie.datasource.write.operation");
+    props.putAll(overrides);
+    HoodieWriteConfig.Builder builder =
+        HoodieWriteConfig.newBuilder()
+            .withPath(context.getBasePath())
+            .forTable(context.getTableName())
+            .withSchema(schema)
+            .withProps(props);
+    if (clustering != null) {
+      builder.withClusteringConfig(clustering);
+    }
+    return builder.build();
+  }
+
   /** Outcome of one clustering run, in the shape {@code rewrite_data_files} reports. */
   static final class RewriteResult {
     final int rewrittenFiles;
@@ -59,23 +90,49 @@ final class HudiTableServices {
   }
 
   /**
+   * {@code rewrite_position_delete_files} for a managed merge-on-read table is one Hudi compaction:
+   * the deletion vectors and new data files of the log are folded into new base files, and the
+   * compaction commit is published as an Iceberg overwrite that drops the delete files.
+   */
+  static RewriteResult compact(SparkSession spark, HudiTableContext context) throws Exception {
+    // An explicit maintenance call compacts whatever is pending, not only after N delta commits
+    Map<String, String> overrides = new HashMap<>();
+    overrides.put("hoodie.compact.inline.max.delta.commits", "1");
+    overrides.put("hoodie.compact.inline.trigger.strategy", "NUM_COMMITS");
+    HoodieWriteConfig config = writeConfig(spark, context, null, overrides);
+    HoodieSparkEngineContext engineContext =
+        new HoodieSparkEngineContext(JavaSparkContext.fromSparkContext(spark.sparkContext()));
+    try (SparkRDDWriteClient<?> client = new SparkRDDWriteClient<>(engineContext, config)) {
+      Option<String> instant = client.scheduleCompaction(Option.empty());
+      if (!instant.isPresent()) {
+        LOG.info("No compaction plan for {}: nothing to compact", context.getTableName());
+        return new RewriteResult(0, 0, 0L);
+      }
+      HoodieWriteMetadata<?> result = client.compact(instant.get(), true);
+      int added = 0;
+      long bytes = 0L;
+      if (result.getWriteStats().isPresent()) {
+        for (HoodieWriteStat stat : result.getWriteStats().get()) {
+          added++;
+          bytes += stat.getTotalWriteBytes();
+        }
+      }
+      LOG.info(
+          "Compacted {} at instant {}: {} base files written",
+          context.getTableName(),
+          instant.get(),
+          added);
+      return new RewriteResult(added, added, bytes);
+    }
+  }
+
+  /**
    * {@code rewrite_data_files} for a managed table is one Hudi clustering run: schedule a plan over
    * the small files and execute it. The replace commit it produces is published to Iceberg by the
    * table format like any other commit.
    */
   static RewriteResult cluster(
       SparkSession spark, HudiTableContext context, Map<String, String> options) throws Exception {
-    StorageConfiguration<?> storageConf =
-        HadoopFSUtils.getStorageConfWithCopy(spark.sessionState().newHadoopConf());
-    HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.builder()
-            .setConf(storageConf)
-            .setBasePath(context.getBasePath())
-            .build();
-    String schema = new TableSchemaResolver(metaClient).getTableSchema().toAvroSchema().toString();
-    Map<String, String> props = new HashMap<>(context.writeParams(HudiWriteOperation.APPEND, null));
-    props.remove("path");
-    props.remove("hoodie.datasource.write.operation");
     HoodieClusteringConfig.Builder clustering =
         HoodieClusteringConfig.newBuilder().withInlineClustering(false);
     String targetFileSize = options.get("target-file-size-bytes");
@@ -83,13 +140,7 @@ final class HudiTableServices {
       clustering.withClusteringTargetFileMaxBytes(Long.parseLong(targetFileSize));
     }
     HoodieWriteConfig config =
-        HoodieWriteConfig.newBuilder()
-            .withPath(context.getBasePath())
-            .forTable(context.getTableName())
-            .withSchema(schema)
-            .withProps(props)
-            .withClusteringConfig(clustering.build())
-            .build();
+        writeConfig(spark, context, clustering.build(), Collections.emptyMap());
     HoodieSparkEngineContext engineContext =
         new HoodieSparkEngineContext(JavaSparkContext.fromSparkContext(spark.sparkContext()));
     try (SparkRDDWriteClient<?> client = new SparkRDDWriteClient<>(engineContext, config)) {

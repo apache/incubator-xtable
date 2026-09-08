@@ -45,6 +45,14 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
         <!-- Everything below is on the user's Spark classpath already -->
+        <!-- Listed before the bundle: the bundle relocates RoaringBitmap, so classes compiled against
+             plain hudi-common (the pluggable table format) must see the unrelocated ones in tests.
+             The production jar has to relocate the same way; see the packaging notes. -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.binary.version}</artifactId>
@@ -75,6 +83,12 @@
         <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- plain hudi-common's record size estimator needs the unrelocated jol, like the bundle's shaded one -->
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

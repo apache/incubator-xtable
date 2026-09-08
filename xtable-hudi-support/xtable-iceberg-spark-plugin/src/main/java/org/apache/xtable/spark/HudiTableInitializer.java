@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.config.RecordMergeMode;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.hadoop.fs.HadoopFSUtils;
@@ -62,7 +62,7 @@ final class HudiTableInitializer {
         "Initializing Hudi table for Iceberg table {} at {}", context.getTableName(), basePath);
     HoodieTableMetaClient.TableBuilder builder =
         HoodieTableMetaClient.newTableBuilder()
-            .setTableType(HoodieTableType.COPY_ON_WRITE)
+            .setTableType(context.tableType())
             .setTableName(context.getTableName())
             .setTableFormat(TableFormat.ICEBERG)
             .setHiveStylePartitioningEnable(true)
@@ -76,7 +76,16 @@ final class HudiTableInitializer {
           .setRecordKeyFields(String.join(",", context.getRecordKeyFields()))
           .setKeyGeneratorClassProp(context.keyGeneratorClass());
     }
-    if (context.getOrderingField() != null) {
+    if (context.isMergeOnRead()) {
+      builder.setRecordMergeMode(RecordMergeMode.COMMIT_TIME_ORDERING);
+      if (context.getOrderingField() != null) {
+        LOG.warn(
+            "Ignoring {}={} on merge-on-read table {}: deletion-vector updates use commit-time ordering",
+            HudiIcebergConf.TABLE_PROP_ORDERING_FIELD,
+            context.getOrderingField(),
+            context.getTableName());
+      }
+    } else if (context.getOrderingField() != null) {
       builder.setOrderingFields(context.getOrderingField());
     }
     builder.initTable(storageConf, basePath);

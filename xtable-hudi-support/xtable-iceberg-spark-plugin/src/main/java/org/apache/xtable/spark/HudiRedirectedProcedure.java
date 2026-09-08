@@ -49,6 +49,7 @@ class HudiRedirectedProcedure implements Procedure {
 
   static final String REWRITE_DATA_FILES = "rewrite_data_files";
   static final String EXPIRE_SNAPSHOTS = "expire_snapshots";
+  static final String REWRITE_POSITION_DELETE_FILES = "rewrite_position_delete_files";
 
   private final String name;
   private final Procedure delegate;
@@ -96,6 +97,14 @@ class HudiRedirectedProcedure implements Procedure {
         result.put("rewritten_data_files_count", rewrite.rewrittenFiles);
         result.put("added_data_files_count", rewrite.addedFiles);
         result.put("rewritten_bytes_count", rewrite.rewrittenBytes);
+        catalog.invalidateTable(ident);
+      } else if (REWRITE_POSITION_DELETE_FILES.equals(name)) {
+        HudiTableServices.RewriteResult compaction =
+            HudiTableServices.compact(SparkSession.active(), context);
+        result.put("rewritten_delete_files_count", compaction.rewrittenFiles);
+        result.put("added_delete_files_count", 0);
+        result.put("rewritten_bytes_count", compaction.rewrittenBytes);
+        result.put("added_bytes_count", compaction.rewrittenBytes);
         catalog.invalidateTable(ident);
       } else if (EXPIRE_SNAPSHOTS.equals(name)) {
         LOG.info(

@@ -41,6 +41,7 @@ import org.apache.spark.sql.catalyst.plans.logical.OverwriteByExpression;
 import org.apache.spark.sql.catalyst.plans.logical.OverwritePartitionsDynamic;
 import org.apache.spark.sql.catalyst.plans.logical.ReplaceData;
 import org.apache.spark.sql.catalyst.plans.logical.UpdateTable;
+import org.apache.spark.sql.catalyst.plans.logical.WriteDelta;
 import org.apache.spark.sql.catalyst.rules.Rule;
 import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -130,6 +131,24 @@ public class HudiIcebergWriteRule extends Rule<LogicalPlan> {
           "Rewritten row-level command on {} stays on the Iceberg writer: unrecognized shape {}",
           target.table().name(),
           replace.query().getClass().getSimpleName());
+      return null;
+    }
+    if (node instanceof WriteDelta) {
+      // The merge-on-read counterpart of ReplaceData: a DELETE becomes a delta whose query is
+      // Filter(cond, scan) projected to row ids
+      WriteDelta delta = (WriteDelta) node;
+      DataSourceV2Relation target =
+          managedRowLevelTarget((LogicalPlan) delta.originalTable(), "DELETE");
+      if (target == null) {
+        return null;
+      }
+      if (containsFilter(delta.query(), delta.condition())) {
+        return command(
+            target, new Filter(delta.condition(), target), HudiWriteOperation.DELETE, null);
+      }
+      LOG.warn(
+          "Rewritten row-level delta on {} stays on the Iceberg writer: unrecognized shape",
+          target.table().name());
       return null;
     }
     if (phase == Phase.RESOLUTION
@@ -280,6 +299,18 @@ public class HudiIcebergWriteRule extends Rule<LogicalPlan> {
       kept = ((EqualNullSafe) kept).left();
     }
     return kept.semanticEquals(deleteCondition);
+  }
+
+  private static boolean containsFilter(LogicalPlan plan, Expression condition) {
+    if (plan instanceof Filter && ((Filter) plan).condition().semanticEquals(condition)) {
+      return true;
+    }
+    for (LogicalPlan child : HudiRowLevelPlanner.seq(plan.children())) {
+      if (containsFilter(child, condition)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static DataSourceV2Relation managedTarget(NamedRelation table) {
