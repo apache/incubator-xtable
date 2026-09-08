@@ -64,4 +64,45 @@ class TestDeltaActionsConverter {
     Assertions.assertEquals(
         filePath, actionsConverter.extractDeletionVectorFile(snapshot, addFileAction));
   }
+
+  @Test
+  void getFullPathToFileWithRelativePath() {
+    String tableBasePath = "s3a://bucket/tab";
+    Assertions.assertEquals(
+        "s3a://bucket/tab/part-0.parquet",
+        DeltaActionsConverter.getFullPathToFile(tableBasePath, "part-0.parquet"));
+  }
+
+  @Test
+  void getFullPathToFileWithAbsolutePathUnderTableBase() {
+    String tableBasePath = "s3a://bucket/tab";
+    Assertions.assertEquals(
+        "s3a://bucket/tab/part-0.parquet",
+        DeltaActionsConverter.getFullPathToFile(tableBasePath, "s3a://bucket/tab/part-0.parquet"));
+  }
+
+  @Test
+  void getFullPathToFileWithAbsolutePathOutsideTableBase() {
+    String tableBasePath = "s3a://bucket/tab";
+    Assertions.assertEquals(
+        "s3://other-bucket/x/part-0.parquet",
+        DeltaActionsConverter.getFullPathToFile(
+            tableBasePath, "s3://other-bucket/x/part-0.parquet"));
+  }
+
+  @Test
+  void getFullPathToFileWithSchemeAlias() {
+    String tableBasePath = "s3a://bucket/tab";
+    Assertions.assertEquals(
+        "s3://bucket/tab/part-0.parquet",
+        DeltaActionsConverter.getFullPathToFile(tableBasePath, "s3://bucket/tab/part-0.parquet"));
+  }
+
+  @Test
+  void getFullPathToFileWithFileScheme() {
+    String tableBasePath = "s3a://bucket/tab";
+    Assertions.assertEquals(
+        "file:///local/t/part-0.parquet",
+        DeltaActionsConverter.getFullPathToFile(tableBasePath, "file:///local/t/part-0.parquet"));
+  }
 }

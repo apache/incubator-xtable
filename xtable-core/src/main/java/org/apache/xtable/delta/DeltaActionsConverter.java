@@ -18,6 +18,7 @@
  
 package org.apache.xtable.delta;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
@@ -133,10 +134,20 @@ public class DeltaActionsConverter {
   }
 
   static String getFullPathToFile(String tableBasePath, String dataFilePath) {
-    if (dataFilePath.startsWith(tableBasePath)) {
+    // Delta allows the path of AddFile/RemoveFile actions to be relative or absolute (see
+    // PROTOCOL.md). An absolute path (one with a URI scheme, e.g. s3://, hdfs://, file://, or
+    // starting with the separator) must be used as-is: concatenating it onto the table base
+    // path would point at a non-existent location and silently drop records from the
+    // converted table.
+    if (isAbsolutePath(dataFilePath)) {
       return dataFilePath;
     }
     return tableBasePath + Path.SEPARATOR + dataFilePath;
+  }
+
+  private static boolean isAbsolutePath(String dataFilePath) {
+    URI uri = new Path(dataFilePath).toUri();
+    return uri.getScheme() != null || dataFilePath.startsWith(Path.SEPARATOR);
   }
 
   private static String tableBasePath(Snapshot snapshot) {
