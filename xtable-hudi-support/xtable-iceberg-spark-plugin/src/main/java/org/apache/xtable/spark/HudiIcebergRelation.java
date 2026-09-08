@@ -20,6 +20,7 @@ package org.apache.xtable.spark;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -57,6 +58,8 @@ public class HudiIcebergRelation extends BaseRelation implements InsertableRelat
   private final HudiWriteOperation operation;
   private final TableCatalog catalog;
   private final Identifier identifier;
+  /** Reshapes the command's query output into the rows Hudi should write; identity when null. */
+  private final Function<Dataset<Row>, Dataset<Row>> transform;
 
   public HudiIcebergRelation(
       SparkSession spark,
@@ -64,11 +67,22 @@ public class HudiIcebergRelation extends BaseRelation implements InsertableRelat
       HudiWriteOperation operation,
       TableCatalog catalog,
       Identifier identifier) {
+    this(spark, sparkTable, operation, catalog, identifier, null);
+  }
+
+  public HudiIcebergRelation(
+      SparkSession spark,
+      HudiSparkTable sparkTable,
+      HudiWriteOperation operation,
+      TableCatalog catalog,
+      Identifier identifier,
+      Function<Dataset<Row>, Dataset<Row>> transform) {
     this.spark = spark;
     this.sparkTable = sparkTable;
     this.operation = operation;
     this.catalog = catalog;
     this.identifier = identifier;
+    this.transform = transform;
   }
 
   @Override
@@ -91,6 +105,7 @@ public class HudiIcebergRelation extends BaseRelation implements InsertableRelat
           "Failed to initialize the Hudi table for " + context.getTableName(), e);
     }
     Map<String, String> params = context.writeParams(operation, sessionOverrides());
+    Dataset<Row> rows = transform == null ? data : transform.apply(data);
     LOG.info(
         "Writing to Iceberg table {} through Hudi ({}, keyed={}, partitions={})",
         context.getTableName(),
@@ -108,7 +123,7 @@ public class HudiIcebergRelation extends BaseRelation implements InsertableRelat
         spark.sqlContext(),
         SaveMode.Append,
         toScalaMap(params),
-        data,
+        rows,
         Option.empty(),
         Option.empty(),
         Option.apply(catalogSchema));

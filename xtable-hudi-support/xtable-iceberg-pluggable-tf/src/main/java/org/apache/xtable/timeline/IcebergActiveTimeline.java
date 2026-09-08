@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -131,9 +132,14 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
     Table icebergTable = config.getTable(icebergTableManager, metaClient);
     Map<String, HoodieInstant> instantsFromIceberg = new HashMap<>();
     for (Snapshot snapshot : icebergTable.snapshots()) {
-      TableSyncMetadata syncMetadata =
-          TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
-              .get();
+      Optional<TableSyncMetadata> syncMetadataOpt =
+          TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA));
+      if (!syncMetadataOpt.isPresent()) {
+        // Written by something other than this table format (a native Iceberg writer); it does
+        // not correspond to a Hudi instant
+        continue;
+      }
+      TableSyncMetadata syncMetadata = syncMetadataOpt.get();
       HoodieInstant hoodieInstant =
           InstantDTO.toInstant(
               MAPPER.readValue(syncMetadata.getLatestTableOperationIdentifier(), InstantDTO.class),

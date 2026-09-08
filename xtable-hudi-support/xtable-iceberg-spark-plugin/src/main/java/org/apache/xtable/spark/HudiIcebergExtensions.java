@@ -27,6 +27,31 @@ import scala.runtime.BoxedUnit;
 public class HudiIcebergExtensions extends AbstractFunction1<SparkSessionExtensions, BoxedUnit> {
   @Override
   public BoxedUnit apply(SparkSessionExtensions extensions) {
+    extensions.injectParser(
+        new scala.runtime.AbstractFunction2<
+            org.apache.spark.sql.SparkSession,
+            org.apache.spark.sql.catalyst.parser.ParserInterface,
+            org.apache.spark.sql.catalyst.parser.ParserInterface>() {
+          @Override
+          public org.apache.spark.sql.catalyst.parser.ParserInterface apply(
+              org.apache.spark.sql.SparkSession session,
+              org.apache.spark.sql.catalyst.parser.ParserInterface delegate) {
+            return new HudiIcebergSqlParser(session, delegate);
+          }
+        });
+    extensions.injectResolutionRule(
+        new AbstractFunction1<
+            org.apache.spark.sql.SparkSession,
+            org.apache.spark.sql.catalyst.rules.Rule<
+                org.apache.spark.sql.catalyst.plans.logical.LogicalPlan>>() {
+          @Override
+          public org.apache.spark.sql.catalyst.rules.Rule<
+                  org.apache.spark.sql.catalyst.plans.logical.LogicalPlan>
+              apply(org.apache.spark.sql.SparkSession session) {
+            HudiCatalogRewrite.rewrite(session);
+            return new HudiIcebergWriteRule(session, HudiIcebergWriteRule.Phase.RESOLUTION);
+          }
+        });
     extensions.injectPostHocResolutionRule(
         new AbstractFunction1<
             org.apache.spark.sql.SparkSession,
@@ -39,7 +64,7 @@ public class HudiIcebergExtensions extends AbstractFunction1<SparkSessionExtensi
             // Runs while the session's analyzer is being built, i.e. before its first catalog
             // lookup, so a catalog the builder options reverted is still rewritten in time.
             HudiCatalogRewrite.rewrite(session);
-            return new HudiIcebergWriteRule(session);
+            return new HudiIcebergWriteRule(session, HudiIcebergWriteRule.Phase.POST_HOC);
           }
         });
     return BoxedUnit.UNIT;

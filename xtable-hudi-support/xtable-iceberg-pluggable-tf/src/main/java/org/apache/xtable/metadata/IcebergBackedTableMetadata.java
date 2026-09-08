@@ -18,24 +18,78 @@
  
 package org.apache.xtable.metadata;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.apache.hudi.common.engine.HoodieEngineContext;
+import org.apache.hudi.common.fs.FSUtils;
+import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.metadata.FileSystemBackedTableMetadata;
 import org.apache.hudi.storage.HoodieStorage;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.StoragePathFilter;
+import org.apache.hudi.storage.StoragePathInfo;
 
 /**
- * Serves Hudi's table metadata for a table using the Iceberg table format. It deliberately lists
- * the file system for now rather than reading Iceberg manifests, which is why the Hudi metadata
- * table has to stay disabled for such a table: the superclass throws on every index lookup, so an
- * enabled metadata table fails with "Unsupported operation: getColumnsStats".
- *
- * <p>The type exists to be replaced rather than removed. Iceberg manifests already carry the
- * per-column bounds and file listings this should eventually answer from, which is what RFC-93
- * means by the plugin's metadata serving the Hudi writer.
+ * File listing for a table under the Iceberg table format. Iceberg is the source of truth for
+ * readers, so this is plain storage listing on the Hudi side, restricted to the files Hudi wrote.
  */
 public class IcebergBackedTableMetadata extends FileSystemBackedTableMetadata {
-
   public IcebergBackedTableMetadata(
       HoodieEngineContext engineContext, HoodieStorage storage, String datasetBasePath) {
     super(engineContext, storage, datasetBasePath);
+  }
+
+  /**
+   * The Iceberg table may hold data files Hudi did not write (written before the table was adopted,
+   * or by a native Iceberg writer). They belong to Iceberg snapshots, not to Hudi file groups, and
+   * Hudi cannot parse a file id or commit time out of their names, so keep them out of the listing
+   * the file-system view is built from.
+   */
+  static boolean isHudiFile(StoragePathInfo pathInfo) {
+    StoragePath path = pathInfo.getPath();
+    if (!FSUtils.isDataFile(path) || FSUtils.isLogFile(path)) {
+      return true;
+    }
+    try {
+      return FSUtils.getCommitTime(path.getName()) != null;
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
+  private static List<StoragePathInfo> hudiFiles(List<StoragePathInfo> files) {
+    return files.stream()
+        .filter(IcebergBackedTableMetadata::isHudiFile)
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  public List<StoragePathInfo> getAllFilesInPartition(StoragePath partitionPath)
+      throws IOException {
+    return hudiFiles(super.getAllFilesInPartition(partitionPath));
+  }
+
+  @Override
+  public Map<String, List<StoragePathInfo>> getAllFilesInPartitions(
+      Collection<String> partitionPaths, Option<StoragePathFilter> pathFilter) throws IOException {
+    Map<String, List<StoragePathInfo>> result = new HashMap<>();
+    super.getAllFilesInPartitions(partitionPaths, pathFilter)
+        .forEach((partition, files) -> result.put(partition, hudiFiles(files)));
+    return result;
+  }
+
+  @Override
+  public Map<Pair<String, StoragePath>, List<StoragePathInfo>> listPartitions(
+      List<Pair<String, StoragePath>> partitionPaths) throws IOException {
+    Map<Pair<String, StoragePath>, List<StoragePathInfo>> result = new HashMap<>();
+    super.listPartitions(partitionPaths)
+        .forEach((partition, files) -> result.put(partition, hudiFiles(files)));
+    return result;
   }
 }

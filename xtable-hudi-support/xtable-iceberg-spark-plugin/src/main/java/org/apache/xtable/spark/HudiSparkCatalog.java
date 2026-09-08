@@ -22,16 +22,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.analysis.NoSuchProcedureException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.iceberg.catalog.Procedure;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
@@ -116,11 +119,26 @@ public class HudiSparkCatalog extends SparkCatalog {
     return wrap(ident, super.createTable(ident, schema, partitions, props));
   }
 
+  @Override
+  public Procedure loadProcedure(Identifier ident) throws NoSuchProcedureException {
+    Procedure procedure = super.loadProcedure(ident);
+    String name = ident.name();
+    if (HudiRedirectedProcedure.REWRITE_DATA_FILES.equals(name)
+        || HudiRedirectedProcedure.EXPIRE_SNAPSHOTS.equals(name)) {
+      return new HudiRedirectedProcedure(name, procedure, this);
+    }
+    return procedure;
+  }
+
   private Table wrap(Identifier ident, Table table) {
     if (!(table instanceof SparkTable) || table instanceof HudiSparkTable) {
       return table;
     }
     org.apache.iceberg.Table icebergTable = ((SparkTable) table).table();
+    if (icebergTable instanceof BaseMetadataTable) {
+      // db.t.files, db.t.snapshots, ...: read-only views over the same metadata
+      return table;
+    }
     if (!Boolean.parseBoolean(
         icebergTable.properties().getOrDefault(HudiIcebergConf.TABLE_PROP_MANAGED, "false"))) {
       return table;

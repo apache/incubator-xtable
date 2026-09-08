@@ -27,7 +27,11 @@ public enum HudiWriteOperation {
   /**
    * {@code OverwritePartitionsDynamic} / static partition overwrite: replace touched partitions.
    */
-  INSERT_OVERWRITE("insert_overwrite");
+  INSERT_OVERWRITE("insert_overwrite"),
+  /** {@code UpdateTable} / {@code MergeIntoTable} on a keyed table: upsert the affected rows. */
+  UPSERT("upsert"),
+  /** {@code DeleteFromTable} on a keyed table: delete the affected rows by record key. */
+  DELETE("delete");
 
   private final String hoodieOperation;
 

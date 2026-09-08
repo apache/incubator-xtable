@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -83,6 +84,11 @@ class ITHudiIcebergSparkPlugin {
             .set("spark.sql.catalog.plain.hudi.enabled", "false")
             // a plain reader over the same table; no caching so it behaves like a separate engine
             .set("spark.sql.catalog.plain.cache-enabled", "false")
+            // a catalog that does not manage new tables by default: adopt/eject per table
+            .set("spark.sql.catalog.lazy", "org.apache.iceberg.spark.SparkCatalog")
+            .set("spark.sql.catalog.lazy.type", "hadoop")
+            .set("spark.sql.catalog.lazy.warehouse", warehouse)
+            .set("spark.sql.catalog.lazy.hudi.manage-new-tables", "false")
             .set("spark.sql.shuffle.partitions", "2")
             .set("spark.ui.enabled", "false");
     spark = SparkSession.builder().config(conf).getOrCreate();
@@ -207,6 +213,116 @@ class ITHudiIcebergSparkPlugin {
             .map(r -> r.getInt(0) + ":" + r.getString(1) + ":" + r.getLong(2))
             .collect(Collectors.toList());
     assertEquals(Arrays.asList("1:a2:2", "2:b:1", "3:c:2"), rows);
+  }
+
+  @Test
+  @Order(8)
+  void updateAndDeleteOnKeyedTable() {
+    spark.sql("UPDATE hcat.db.users SET name = 'b2', ts = 3 WHERE id = 2");
+    assertEquals(Arrays.asList("1:a2:2", "2:b2:3", "3:c:2"), readUsers());
+    spark.sql("DELETE FROM hcat.db.users WHERE id = 3");
+    assertEquals(Arrays.asList("1:a2:2", "2:b2:3"), readUsers());
+  }
+
+  @Test
+  @Order(9)
+  void mergeIntoKeyedTable() {
+    usersSource("src", Arrays.asList(new Object[] {2, "b3", 4L}, new Object[] {4, "d", 4L}));
+    spark.sql(
+        "MERGE INTO hcat.db.users t USING src s ON t.id = s.id "
+            + "WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *");
+    assertEquals(Arrays.asList("1:a2:2", "2:b3:4", "4:d:4"), readUsers());
+
+    usersSource("src2", Arrays.asList(new Object[] {1, "a3", 5L}, new Object[] {5, "e", 5L}));
+    spark.sql(
+        "MERGE INTO hcat.db.users t USING src2 s ON t.id = s.id "
+            + "WHEN MATCHED THEN UPDATE SET name = s.name, ts = s.ts");
+    assertEquals(Arrays.asList("1:a3:5", "2:b3:4", "4:d:4"), readUsers());
+
+    usersSource("src3", Arrays.asList(new Object[] {4, "zz", 9L}, new Object[] {6, "f", 6L}));
+    spark.sql(
+        "MERGE INTO hcat.db.users t USING src3 s ON s.id = t.id "
+            + "WHEN NOT MATCHED THEN INSERT *");
+    assertEquals(Arrays.asList("1:a3:5", "2:b3:4", "4:d:4", "6:f:6"), readUsers());
+  }
+
+  @Test
+  @Order(10)
+  void rowLevelWriteOnKeylessTableIsRejectedNotSilentlyBypassed() {
+    Exception e =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            Exception.class, () -> spark.sql("DELETE FROM hcat.db.events WHERE id = 10"));
+    assertTrue(e.getMessage().contains("not routed through Hudi"), e.getMessage());
+    assertEquals(Arrays.asList("2:b:eu", "4:d:apac", "10:x:us"), readViaCatalog("hcat"));
+  }
+
+  @Test
+  @Order(11)
+  void rewriteDataFilesRunsHudiClustering() {
+    spark.sql("INSERT INTO hcat.db.events VALUES (11, 'y', 'us')");
+    spark.sql("INSERT INTO hcat.db.events VALUES (12, 'w', 'us')");
+    assertEquals(3, visibleFiles("us"));
+    long snapshotsBefore = spark.sql("SELECT * FROM hcat.db.events.snapshots").count();
+
+    List<Row> result =
+        spark.sql("CALL hcat.system.rewrite_data_files(table => 'db.events')").collectAsList();
+    assertEquals(1, result.size());
+    assertTrue(result.get(0).getInt(0) >= 3, "files rewritten: " + result.get(0));
+
+    assertEquals(1, visibleFiles("us"));
+    assertEquals(
+        Arrays.asList("2:b:eu", "4:d:apac", "10:x:us", "11:y:us", "12:w:us"),
+        readViaCatalog("plain"));
+    assertEquals(snapshotsBefore + 1, spark.sql("SELECT * FROM hcat.db.events.snapshots").count());
+
+    spark.sql("CALL hcat.system.expire_snapshots(table => 'db.events')").collectAsList();
+    assertEquals(snapshotsBefore + 1, spark.sql("SELECT * FROM hcat.db.events.snapshots").count());
+  }
+
+  @Test
+  @Order(12)
+  void adoptAndEjectThroughTheTableProperty() {
+    spark.sql("CREATE TABLE lazy.db.adopted (id INT) USING iceberg");
+    Path hoodie = Paths.get(warehouse, "db", "adopted", "data", ".hoodie");
+    assertFalse(Files.exists(hoodie), "not managed until adopted");
+
+    // adopt: from here on writes go through Hudi
+    spark.sql("ALTER TABLE lazy.db.adopted SET TBLPROPERTIES ('hudi.managed' = 'true')");
+    spark.sql("INSERT INTO lazy.db.adopted VALUES (1)");
+    spark.sql("INSERT INTO lazy.db.adopted VALUES (2)");
+    assertTrue(Files.isDirectory(hoodie), "adopted: Hudi table initialized");
+
+    // eject: a plain Iceberg table again, Iceberg's own writer takes over
+    spark.sql("ALTER TABLE lazy.db.adopted UNSET TBLPROPERTIES ('hudi.managed')");
+    spark.sql("INSERT INTO lazy.db.adopted VALUES (3)");
+    List<Integer> ids =
+        spark.sql("SELECT id FROM plain.db.adopted ORDER BY id").collectAsList().stream()
+            .map(r -> r.getInt(0))
+            .collect(Collectors.toList());
+    assertEquals(Arrays.asList(1, 2, 3), ids);
+  }
+
+  private static void usersSource(String view, List<Object[]> rows) {
+    spark
+        .createDataFrame(
+            rows.stream().map(org.apache.spark.sql.RowFactory::create).collect(Collectors.toList()),
+            new org.apache.spark.sql.types.StructType()
+                .add("id", "int", false)
+                .add("name", "string")
+                .add("ts", "long"))
+        .createOrReplaceTempView(view);
+  }
+
+  private static List<String> readUsers() {
+    return spark.sql("SELECT id, name, ts FROM plain.db.users ORDER BY id").collectAsList().stream()
+        .map(r -> r.getInt(0) + ":" + r.getString(1) + ":" + r.getLong(2))
+        .collect(Collectors.toList());
+  }
+
+  private static long visibleFiles(String region) {
+    return spark
+        .sql("SELECT file_path FROM hcat.db.events.files WHERE partition.region = '" + region + "'")
+        .count();
   }
 
   private static List<String> readViaCatalog(String catalog) {

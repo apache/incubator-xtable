@@ -90,6 +90,7 @@ public class HudiIcebergPlugin implements SparkPlugin {
         }
       }
       if (!extensions.contains(extension)) {
+        // Last, so the Hudi parser wraps Iceberg's and sees its UPDATE/MERGE nodes first
         extensions.add(extension);
         conf.set(key, String.join(",", extensions));
         LOG.info("Setting {}={}", key, conf.get(key));

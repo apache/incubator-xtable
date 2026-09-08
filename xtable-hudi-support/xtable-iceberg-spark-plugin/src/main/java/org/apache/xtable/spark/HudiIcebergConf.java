@@ -30,6 +30,15 @@ public final class HudiIcebergConf {
   public static final String MANAGE_NEW_TABLES = "spark.hudi.iceberg.manage-new-tables";
   /** Prefix of Spark confs forwarded to every Hudi write as {@code hoodie.<rest>}. */
   public static final String WRITE_CONF_PREFIX = "spark.hudi.iceberg.write.";
+  /**
+   * What to do with a write to a managed table that the plugin could not route through Hudi: {@code
+   * reject} (default) fails the statement with the reason, {@code allow} lets Iceberg's own writer
+   * commit it, leaving Hudi unaware of the resulting files.
+   */
+  public static final String FOREIGN_WRITES = "spark.hudi.iceberg.foreign-writes";
+
+  public static final String FOREIGN_WRITES_REJECT = "reject";
+  public static final String FOREIGN_WRITES_ALLOW = "allow";
 
   /** Per-catalog opt out: {@code spark.sql.catalog.<name>.hudi.enabled=false}. */
   public static final String CATALOG_OPTION_ENABLED = "hudi.enabled";
