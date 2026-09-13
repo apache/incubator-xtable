@@ -248,8 +248,7 @@ class ITIcebergMergeOnReadDeletionVectors {
    * Asserts each data file carries at most one deletion vector and the vectors cover the expected
    * number of deleted rows in total.
    */
-  private void assertDeletionVectors(Table icebergTable, long expectedDeletedRows)
-      throws Exception {
+  static void assertDeletionVectors(Table icebergTable, long expectedDeletedRows) throws Exception {
     Map<String, List<DeleteFile>> deletesByDataFile = new HashMap<>();
     try (CloseableIterable<FileScanTask> tasks = icebergTable.newScan().planFiles()) {
       tasks.forEach(task -> deletesByDataFile.put(task.file().path().toString(), task.deletes()));

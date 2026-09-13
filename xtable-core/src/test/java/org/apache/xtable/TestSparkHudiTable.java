@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -146,6 +147,23 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         tableType);
   }
 
+  /**
+   * Same as {@link #forStandardSchema(String, Path, JavaSparkContext, String, HoodieTableType)},
+   * but persists the given table-level properties into {@code hoodie.properties} and applies them
+   * to the write config. Use this to set {@code hoodie.table.format} so that a pluggable table
+   * format is active for a table written through the Spark client.
+   */
+  public static TestSparkHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      JavaSparkContext jsc,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Properties tableProperties) {
+    return new TestSparkHudiTable(
+        tableName, BASIC_SCHEMA, tempDir, jsc, partitionConfig, tableType, tableProperties);
+  }
+
   private TestSparkHudiTable(
       String name,
       Schema schema,
@@ -153,11 +171,29 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       JavaSparkContext jsc,
       String partitionConfig,
       HoodieTableType hoodieTableType) {
+    this(name, schema, tempDir, jsc, partitionConfig, hoodieTableType, new Properties());
+  }
+
+  private TestSparkHudiTable(
+      String name,
+      Schema schema,
+      Path tempDir,
+      JavaSparkContext jsc,
+      String partitionConfig,
+      HoodieTableType hoodieTableType,
+      Properties tableProperties) {
     super(name, schema, tempDir, partitionConfig);
     // initialize spark session
     this.jsc = jsc;
+    // xtable-prefixed properties configure the pluggable table format, which reads them from the
+    // storage configuration rather than the Hudi table or write config.
+    tableProperties.stringPropertyNames().stream()
+        .filter(key -> key.startsWith("xtable."))
+        .forEach(key -> jsc.hadoopConfiguration().set(key, tableProperties.getProperty(key)));
+    // The caller's properties also override the defaults this class puts in the write config.
+    tableProperties.forEach((key, value) -> typedProperties.put(key, value));
+    this.metaClient = initMetaClient(jsc, hoodieTableType, typedProperties, tableProperties);
     this.writeClient = initSparkWriteClient(schema, typedProperties);
-    this.metaClient = initMetaClient(jsc, hoodieTableType, typedProperties);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
@@ -287,7 +323,11 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   }
 
   private HoodieTableMetaClient initMetaClient(
-      JavaSparkContext jsc, HoodieTableType hoodieTableType, TypedProperties keyGenProperties) {
-    return getMetaClient(keyGenProperties, hoodieTableType, jsc.hadoopConfiguration(), true);
+      JavaSparkContext jsc,
+      HoodieTableType hoodieTableType,
+      TypedProperties keyGenProperties,
+      Properties tableProperties) {
+    return getMetaClient(
+        keyGenProperties, hoodieTableType, jsc.hadoopConfiguration(), true, tableProperties);
   }
 }
