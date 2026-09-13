@@ -254,13 +254,24 @@ public class IcebergTableFormat implements HoodieTableFormat {
   private IcebergConversionTarget getIcebergConversionTarget(HoodieTableMetaClient metaClient) {
     // TODO: Add iceberg catalog config through user inputs.
     TargetTable targetTable =
-        TargetTable.builder()
-            .name(metaClient.getTableConfig().getTableName())
-            .formatName(org.apache.xtable.model.storage.TableFormat.ICEBERG)
-            .basePath(metaClient.getBasePath().toString())
-            .build();
+        targetTable(
+            metaClient.getTableConfig().getTableName(), metaClient.getBasePath().toString());
     return (IcebergConversionTarget)
         ConversionTargetFactory.getInstance()
             .createForFormat(targetTable, (Configuration) metaClient.getStorageConf().unwrap());
+  }
+
+  /**
+   * Iceberg snapshots are expired only as Hudi archives the instants they record, since the
+   * reconstructed timeline treats a completed instant without a snapshot as inflight; time-based
+   * expiry would otherwise remove snapshots the active timeline still needs.
+   */
+  static TargetTable targetTable(String tableName, String basePath) {
+    return TargetTable.builder()
+        .name(tableName)
+        .formatName(org.apache.xtable.model.storage.TableFormat.ICEBERG)
+        .basePath(basePath)
+        .metadataRetention(TargetTable.NO_METADATA_EXPIRY)
+        .build();
   }
 }

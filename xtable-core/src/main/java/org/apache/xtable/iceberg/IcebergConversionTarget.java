@@ -18,8 +18,8 @@
  
 package org.apache.xtable.iceberg;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -73,7 +73,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private TableIdentifier tableIdentifier;
   private IcebergCatalogConfig catalogConfig;
   private Configuration configuration;
-  private int snapshotRetentionInHours;
+  private Duration metadataRetention;
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
@@ -119,7 +119,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     String tableName = targetTable.getName();
     this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    this.metadataRetention = targetTable.getMetadataRetention();
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
@@ -311,13 +311,14 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void completeSync() {
-    transaction
-        .expireSnapshots()
-        .expireOlderThan(
-            Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
-        .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
-        .cleanExpiredFiles(true)
-        .commit();
+    if (!metadataRetention.isNegative()) {
+      transaction
+          .expireSnapshots()
+          .expireOlderThan(Instant.now().minus(metadataRetention).toEpochMilli())
+          .deleteWith(this::safeDelete)
+          .cleanExpiredFiles(true)
+          .commit();
+    }
     transaction.commitTransaction();
     resetTransactionState();
   }
