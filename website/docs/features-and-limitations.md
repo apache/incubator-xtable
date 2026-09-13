@@ -42,3 +42,7 @@ HMS and AWS Glue are the two catalogs supported right now, support for other cat
 ### Delta
 - When using Delta as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions for enabling column mapping [here](https://docs.delta.io/latest/delta-column-mapping.html).
 - When Delta is the source, Generated Columns are not synced to the target schema. For tables that are partitioned on Generated Columns, there is limited support. For example, we support date functions like transforming a timestamp to `yyyy-MM-dd` format. Please file a GitHub issue or pull-request for any cases that you think should be supported.
+
+### Parquet
+- Schema evolution across files in a Parquet source directory is not supported. XTable derives the table schema from the footer of a file with the most recent filesystem modification time; it does not merge or comprehensively validate schemas across all files. If the files have different schemas, synchronization may use a schema that does not represent every file or may fail while processing them. Copying or restoring files can also change their modification times and therefore change which schema XTable selects.
+- Hive-style partition columns that exist only in directory paths are not supported. When partition extraction is configured, XTable resolves each source field against the selected file's schema. If a partition column exists only in a directory path, such as `region=eu/`, XTable cannot synthesize the field or infer its type, and synchronization fails.
