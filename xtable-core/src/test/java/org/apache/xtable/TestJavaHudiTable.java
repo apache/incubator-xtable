@@ -119,6 +119,28 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, true, new Properties());
   }
 
+  /**
+   * Same as {@link #forStandardSchema(String, Path, String, HoodieTableType, Properties)} with an
+   * archival configuration, for tests that need archival to run against a pluggable table format.
+   */
+  public static TestJavaHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      HoodieArchivalConfig archivalConfig,
+      Properties tableProperties) {
+    return new TestJavaHudiTable(
+        tableName,
+        BASIC_SCHEMA,
+        tempDir,
+        partitionConfig,
+        tableType,
+        archivalConfig,
+        false,
+        tableProperties);
+  }
+
   public static TestJavaHudiTable forStandardSchema(
       String tableName,
       Path tempDir,

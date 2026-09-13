@@ -63,6 +63,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 @Log4j2
 public class IcebergConversionTarget implements ConversionTarget {
   private static final String METADATA_DIR_PATH = "/metadata/";
+  private static final String PUFFIN_SUFFIX = ".puffin";
   private IcebergSchemaExtractor schemaExtractor;
   private IcebergSchemaSync schemaSync;
   private IcebergPartitionSpecExtractor partitionSpecExtractor;
@@ -323,8 +324,12 @@ public class IcebergConversionTarget implements ConversionTarget {
     resetTransactionState();
   }
 
+  /**
+   * Deletes only the files this target owns: metadata files, and Puffin deletion-vector files it
+   * wrote itself. Data files belong to the source table and are never deleted here.
+   */
   private void safeDelete(String file) {
-    if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH)) {
+    if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH) || file.endsWith(PUFFIN_SUFFIX)) {
       table.io().deleteFile(file);
     }
   }

@@ -19,12 +19,18 @@
 package org.apache.xtable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.Row;
@@ -40,9 +46,12 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableVersion;
+import org.apache.hudi.config.HoodieArchivalConfig;
 
+import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.io.CloseableIterable;
 
 import org.apache.xtable.hudi.HudiTestUtil;
 
@@ -125,6 +134,62 @@ class ITIcebergMorDvTableServices {
       Table icebergTable = new HadoopTables(new Configuration()).load(table.getBasePath());
       assertEquals(
           50, readKeys(icebergTable).size(), "cleaning must not change the current Iceberg view");
+    }
+  }
+
+  @Test
+  void archivalDeletesSupersededDeletionVectors() throws Exception {
+    String tableName = "mor_dv_archival";
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName,
+            tempDir,
+            null,
+            HoodieTableType.MERGE_ON_READ,
+            HoodieArchivalConfig.newBuilder().archiveCommitsWith(2, 3).build(),
+            tableProperties())) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(50, true);
+      // Two update rounds against the same base file: the second deletion vector supersedes the
+      // first, which from then on is referenced only by the older snapshot.
+      table.upsertRecords(inserts.subList(0, 10), true);
+      table.upsertRecords(inserts.subList(10, 20), true);
+      Set<java.nio.file.Path> puffinFilesBeforeArchival = puffinFiles(table.getBasePath());
+      assertEquals(
+          2, puffinFilesBeforeArchival.size(), "expected one Puffin file per update round");
+
+      // Enough further commits for archival to expire the snapshots holding the superseded vector.
+      table.insertRecords(10, true);
+      table.insertRecords(10, true);
+
+      Table icebergTable = new HadoopTables(new Configuration()).load(table.getBasePath());
+      long snapshotCount =
+          StreamSupport.stream(icebergTable.snapshots().spliterator(), false).count();
+      assertTrue(snapshotCount < 5, "archival must have expired snapshots, kept " + snapshotCount);
+
+      Set<java.nio.file.Path> puffinFilesAfterArchival = puffinFiles(table.getBasePath());
+      Set<String> liveDeletionVectors = new HashSet<>();
+      try (CloseableIterable<FileScanTask> tasks = icebergTable.newScan().planFiles()) {
+        for (FileScanTask task : tasks) {
+          task.deletes().forEach(deleteFile -> liveDeletionVectors.add(deleteFile.location()));
+        }
+      }
+      assertEquals(1, liveDeletionVectors.size(), "one live deletion vector after supersede");
+      assertEquals(
+          liveDeletionVectors.stream()
+              .map(location -> java.nio.file.Paths.get(URI.create(location).getPath()))
+              .collect(Collectors.toSet()),
+          puffinFilesAfterArchival,
+          "expiry must delete the superseded Puffin file and keep the live one");
+      assertEquals(70, readKeys(icebergTable).size(), "reads must be unaffected by archival");
+    }
+  }
+
+  private static Set<java.nio.file.Path> puffinFiles(String basePath) throws IOException {
+    try (java.util.stream.Stream<java.nio.file.Path> files =
+        Files.list(java.nio.file.Paths.get(URI.create(basePath).getPath()))) {
+      return files
+          .filter(file -> file.getFileName().toString().endsWith(".puffin"))
+          .collect(Collectors.toSet());
     }
   }
 
