@@ -105,6 +105,7 @@ class ITIcebergMorDvTableServices {
       table.cluster();
       icebergTable.refresh();
       assertEquals(50, readKeys(icebergTable).size(), "clustering must not change the merged view");
+      ITIcebergMergeOnReadDeletionVectors.assertNoDeletionVectors(icebergTable, "clustering");
 
       // Updates after clustering must keep working against the clustered base files.
       table.upsertRecords(inserts.subList(10, 20), true);

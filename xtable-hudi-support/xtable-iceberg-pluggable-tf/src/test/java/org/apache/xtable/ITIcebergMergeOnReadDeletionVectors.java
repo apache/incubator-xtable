@@ -134,10 +134,55 @@ class ITIcebergMergeOnReadDeletionVectors {
           .map(HoodieRecord::getRecordKey)
           .forEach(key -> assertFalse(keysAfterDelete.contains(key), "deleted key still visible"));
 
-      // Compaction rewrites the tombstoned base files; the merged view must be unchanged.
+      // Compaction rewrites the tombstoned base files; the merged view must be unchanged and the
+      // deletion vectors the rewrite folded in must be gone from the table metadata.
       table.compact();
       icebergTable.refresh();
       assertEquals(45, readKeys(icebergTable).size(), "compaction must not change the merged view");
+      assertNoDeletionVectors(icebergTable, "compaction");
+    }
+  }
+
+  /** Asserts the current snapshot neither attaches nor counts any delete file. */
+  static void assertNoDeletionVectors(Table icebergTable, String afterWhat) throws Exception {
+    try (CloseableIterable<FileScanTask> tasks = icebergTable.newScan().planFiles()) {
+      for (FileScanTask task : tasks) {
+        assertTrue(
+            task.deletes().isEmpty(),
+            "no deletion vector may attach after " + afterWhat + ": " + task.file().path());
+      }
+    }
+    assertEquals(
+        "0",
+        icebergTable.currentSnapshot().summary().getOrDefault("total-delete-files", "0"),
+        "superseded deletion vectors must not linger in the metadata after " + afterWhat);
+  }
+
+  @Test
+  void partitionedTableProducesDeletionVectors() throws Exception {
+    String tableName = "mor_dv_partitioned";
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, "level:SIMPLE", HoodieTableType.MERGE_ON_READ, tableProperties())) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(60, true);
+      Table icebergTable = new HadoopTables(new Configuration()).load(table.getBasePath());
+      assertTrue(icebergTable.spec().isPartitioned(), "the Iceberg table must be partitioned");
+      assertEquals(60, readKeys(icebergTable).size());
+
+      // Deletion vectors must carry the partition of the base file they reference.
+      table.upsertRecords(inserts.subList(0, 15), true);
+      icebergTable.refresh();
+      assertDeletionVectors(icebergTable, 15);
+      assertEquals(60, readKeys(icebergTable).size(), "updates must not add or lose rows");
+
+      table.deleteRecords(inserts.subList(15, 20), true);
+      icebergTable.refresh();
+      assertEquals(55, readKeys(icebergTable).size(), "deleted rows must disappear");
+
+      table.compact();
+      icebergTable.refresh();
+      assertEquals(55, readKeys(icebergTable).size(), "compaction must not change the merged view");
+      assertNoDeletionVectors(icebergTable, "compaction");
     }
   }
 
