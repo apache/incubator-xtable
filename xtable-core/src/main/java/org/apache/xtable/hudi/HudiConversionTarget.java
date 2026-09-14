@@ -595,14 +595,15 @@ public class HudiConversionTarget implements ConversionTarget {
                           entry.getValue().stream()
                               .map(HoodieCleanFileInfo::getFilePath)
                               .collect(Collectors.toList());
-                      return new HoodieCleanStat(
-                          HoodieCleaningPolicy.KEEP_LATEST_COMMITS,
-                          partitionPath,
-                          deletePaths,
-                          deletePaths,
-                          Collections.emptyList(),
-                          earliestInstant.get().requestedTime(),
-                          instantTime);
+                      return HoodieCleanStat.builder()
+                          .withPolicy(HoodieCleaningPolicy.KEEP_LATEST_COMMITS)
+                          .withPartitionPath(partitionPath)
+                          .withDeletePathPatterns(deletePaths)
+                          .withSuccessDeleteFiles(deletePaths)
+                          .withFailedDeleteFiles(Collections.emptyList())
+                          .withEarliestCommitToRetain(earliestInstant.get().requestedTime())
+                          .withLastCompletedCommitTimestamp(instantTime)
+                          .build();
                     })
                 .collect(Collectors.toList());
         HoodieCleanMetadata cleanMetadata =
