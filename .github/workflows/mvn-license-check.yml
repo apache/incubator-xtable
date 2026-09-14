@@ -106,6 +106,12 @@ jobs:
       - name: Validate Bundled License Texts
         run: python3 release/scripts/validate_bundled_license_texts.py
 
+      # The step above checks that the right texts are present. This one checks
+      # where they sit: one canonical LICENSE and NOTICE per jar, no duplicate
+      # copy under a -bundled name, and a single licenses directory (#701).
+      - name: Validate Jar License Layout
+        run: python3 release/scripts/validate_bundled_jar_license_layout.py
+
       # Nothing above this line resolves xtable-utilities or xtable-service:
       # `apache-rat:check` requires no dependency resolution, `dependency:tree`
       # collects poms rather than jars, and the shaded-bundle build reaches only
