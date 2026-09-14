@@ -215,10 +215,30 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-aws</artifactId>
+            <exclusions>
+                <!-- The all-services SDK jar. We name the artifacts S3A uses instead. -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>bundle</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- What hadoop-aws S3A needs. The all-services `bundle` artifact was 63% of the shaded jar. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
-            <artifactId>bundle</artifactId>
+            <artifactId>sts</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3-transfer-manager</artifactId>
         </dependency>
 
         <!-- Azure Dependencies -->
@@ -434,7 +454,6 @@
                             <include>io.grpc:grpc-services</include>
                             <include>io.grpc:grpc-stub</include>
                             <include>io.grpc:grpc-util</include>
-                            <include>io.grpc:grpc-xds</include>
                             <include>io.javalin:javalin</include>
                             <include>io.netty:netty</include>
                             <include>io.netty:netty-all</include>
@@ -658,7 +677,6 @@
                             <include>org.bouncycastle:bcprov-jdk18on</include>
                             <include>org.checkerframework:checker-compat-qual</include>
                             <include>org.checkerframework:checker-qual</include>
-                            <include>org.codehaus.groovy:groovy-all</include>
                             <include>org.codehaus.jackson:jackson-core-asl</include>
                             <include>org.codehaus.jackson:jackson-jaxrs</include>
                             <include>org.codehaus.jackson:jackson-mapper-asl</include>
@@ -742,9 +760,16 @@
                             <include>software.amazon.awssdk:annotations</include>
                             <include>software.amazon.awssdk:apache-client</include>
                             <include>software.amazon.awssdk:auth</include>
+                            <include>software.amazon.awssdk:arns</include>
+                            <include>software.amazon.awssdk:aws-query-protocol</include>
+                            <include>software.amazon.awssdk:aws-xml-protocol</include>
+                            <include>software.amazon.awssdk:crt-core</include>
                             <include>software.amazon.awssdk:aws-core</include>
                             <include>software.amazon.awssdk:aws-json-protocol</include>
-                            <include>software.amazon.awssdk:bundle</include>
+                            <include>software.amazon.awssdk:s3</include>
+                            <include>software.amazon.awssdk:sts</include>
+                            <include>software.amazon.awssdk:netty-nio-client</include>
+                            <include>software.amazon.awssdk:s3-transfer-manager</include>
                             <include>software.amazon.awssdk:checksums</include>
                             <include>software.amazon.awssdk:checksums-spi</include>
                             <include>software.amazon.awssdk:endpoints-spi</include>
@@ -757,7 +782,6 @@
                             <include>software.amazon.awssdk:identity-spi</include>
                             <include>software.amazon.awssdk:json-utils</include>
                             <include>software.amazon.awssdk:metrics-spi</include>
-                            <include>software.amazon.awssdk:netty-nio-client</include>
                             <include>software.amazon.awssdk:profiles</include>
                             <include>software.amazon.awssdk:protocol-core</include>
                             <include>software.amazon.awssdk:regions</include>

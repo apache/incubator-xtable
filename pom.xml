@@ -448,17 +448,13 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- AWS -->
+            <!-- AWS. The BOM manages every SDK artifact, so modules name only what they use. -->
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bundle</artifactId>
+                <artifactId>bom</artifactId>
                 <version>${aws.version}</version>
-                <scope>runtime</scope>
-            </dependency>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>glue</artifactId>
-                <version>${aws.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- Protobuf -->
@@ -674,6 +670,10 @@
                                             <exclude>META-INF/*.DSA</exclude>
                                             <exclude>META-INF/*.RSA</exclude>
                                             <exclude>**/Log4j2Plugins.dat</exclude>
+                                            <!-- RocksDB natives for platforms we do not run on. -->
+                                            <exclude>librocksdbjni-linux-ppc64le*</exclude>
+                                            <exclude>librocksdbjni-linux-s390x*</exclude>
+                                            <exclude>librocksdbjni-linux32*</exclude>
                                         </excludes>
                                     </filter>
                                 </filters>
