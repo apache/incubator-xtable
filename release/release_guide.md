@@ -399,8 +399,13 @@ Once the release candidate has been reviewed and approved by the community, the 
 4. Use the Apache Nexus repository to release the staged binary artifacts to the Maven Central repository. In the Staging Repositories section, find the relevant release candidate orgapachextable-XXX entry and click `Release`.
    > Note: make sure and check you click `Release` repo, it cannot be withdrawn.
 5. Drop all other release candidates that are not being released. It can take up to 24 hours for the new release to show up in [Maven Central repository](https://search.maven.org/search?q=g:org.apache.xtable).
-6. Finalize the Release in GH by providing the release date.
-7. Update [DOAP]
+6. After the artifacts are visible on Maven Central, update `website/releases/downloads.mdx`.
+   1. Keep the signed source archive as the first and official Apache release download.
+   2. Label Maven Central JARs as convenience binaries.
+   3. Add direct links for the published, user-facing JARs and retain a version-filtered Maven search link for the complete artifact list.
+   4. Verify every exact JAR URL before adding it. Do not assume that every repository module is published.
+7. Finalize the Release in GH by providing the release date.
+8. Update [DOAP]
 
 # Promote the release
 
