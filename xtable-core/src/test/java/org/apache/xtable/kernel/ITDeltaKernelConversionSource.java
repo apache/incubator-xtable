@@ -413,6 +413,31 @@ public class ITDeltaKernelConversionSource {
   }
 
   @Test
+  void testGetCommitsBacklogWithNoNewCommits() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    testSparkDeltaTable.insertRows(50);
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaKernelConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(
+            InstantsForIncrementalSync.builder()
+                .lastSyncInstant(Instant.ofEpochMilli(testSparkDeltaTable.getLastCommitTimestamp()))
+                .build());
+
+    assertTrue(commitsBacklog.getCommitsToProcess().isEmpty());
+  }
+
+  @Test
   public void testsShowingVacuumHasNoEffectOnIncrementalSync() {
     boolean isPartitioned = true;
     String tableName = GenericTable.getTableName();

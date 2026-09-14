@@ -37,6 +37,7 @@ env:
 
 jobs:
   build:
+    name: Maven CI Build
     runs-on: ubuntu-latest
     # A cold build is ~27 min, which left no headroom under the previous 30.
     # TEMPORARY: raised from 40 to accommodate building Hudi from source on a
