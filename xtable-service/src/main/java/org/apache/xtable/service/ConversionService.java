@@ -19,6 +19,7 @@
 package org.apache.xtable.service;
 
 import static org.apache.xtable.conversion.ConversionUtils.convertToSourceTable;
+import static org.apache.xtable.delta.DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS;
 import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
@@ -195,6 +196,13 @@ public class ConversionService {
           convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
       if (partitionSpec != null) {
         sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionSpec);
+      }
+      String allowUnsupportedDeletionVectors =
+          convertTableRequest
+              .getConfigurations()
+              .getOrDefault(ALLOW_UNSUPPORTED_DELETION_VECTORS, null);
+      if (allowUnsupportedDeletionVectors != null) {
+        sourceProperties.put(ALLOW_UNSUPPORTED_DELETION_VECTORS, allowUnsupportedDeletionVectors);
       }
     }
 
