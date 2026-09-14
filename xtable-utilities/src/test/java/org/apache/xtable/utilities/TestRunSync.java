@@ -40,6 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionSourceConfig;
 import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
@@ -97,6 +98,45 @@ class TestRunSync {
     hudiProperties.setProperty("xtable.hudi.target.secondary.index.column", "email");
     Assertions.assertEquals(hudiProperties, targetTables.get(0).getAdditionalProperties());
     Assertions.assertEquals(new Properties(), targetTables.get(1).getAdditionalProperties());
+  }
+
+  @Test
+  public void testAllowUnsupportedDeletionVectorsSourceProperty() {
+    DatasetConfig.Table table =
+        DatasetConfig.Table.builder().allowUnsupportedDeletionVectors("true").build();
+
+    Properties sourceProperties = RunSync.getSourceProperties(table);
+
+    Assertions.assertEquals(
+        "true",
+        sourceProperties.getProperty(
+            DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS));
+  }
+
+  @Test
+  public void testAllowUnsupportedDeletionVectorsUsesStrictBooleanParsing() throws IOException {
+    String[][] configuredValues = {
+      {"true", "true"},
+      {"TRUE", "true"},
+      {"false", "false"},
+      {"yes", "false"},
+      {"on", "false"},
+      {"1", "false"}
+    };
+
+    for (String[] configuredValue : configuredValues) {
+      DatasetConfig config =
+          RunSync.YAML_MAPPER.readValue(
+              "datasets:\n  - allowUnsupportedDeletionVectors: " + configuredValue[0],
+              DatasetConfig.class);
+
+      Properties sourceProperties = RunSync.getSourceProperties(config.getDatasets().get(0));
+
+      Assertions.assertEquals(
+          configuredValue[1],
+          sourceProperties.getProperty(
+              DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS));
+    }
   }
 
   /** Tests that the default hadoop configs are loaded. */
