@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -46,6 +47,7 @@ import org.apache.hudi.metadata.HoodieIndexVersion;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.hudi.engine.HudiExecutionEngineProvider;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
@@ -66,6 +68,8 @@ public class TestHudiConversionTarget {
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1598644800000L);
   private static final String COMMIT = "20200828200000000";
   private static final String BASE_PATH = "test-base-path";
+  private static final HudiTargetConfig TARGET_CONFIG =
+      HudiTargetConfig.fromProperties(new Properties());
   private static final InternalTable TABLE =
       InternalTable.builder()
           .name("table")
@@ -79,6 +83,8 @@ public class TestHudiConversionTarget {
   private final HudiTableManager mockHudiTableManager = mock(HudiTableManager.class);
   private final HudiConversionTarget.CommitStateCreator mockCommitStateCreator =
       mock(HudiConversionTarget.CommitStateCreator.class);
+  private final HudiExecutionEngineProvider mockEngineProvider =
+      mock(HudiExecutionEngineProvider.class);
 
   private HudiConversionTarget getTargetClient(HoodieTableMetaClient mockMetaClient) {
     when(mockHudiTableManager.loadTableMetaClientIfExists(BASE_PATH))
@@ -87,6 +93,8 @@ public class TestHudiConversionTarget {
         BASE_PATH,
         RETENTION_IN_HOURS,
         MAX_DELTA_COMMITS,
+        TARGET_CONFIG,
+        mockEngineProvider,
         mockBaseFileUpdatesExtractor,
         mockAvroSchemaConverter,
         mockHudiTableManager,
@@ -266,7 +274,13 @@ public class TestHudiConversionTarget {
     verify(mockMetaClient).reloadActiveTimeline();
     // verify existing meta client is used to create commit state
     verify(mockCommitStateCreator)
-        .create(mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS);
+        .create(
+            mockMetaClient,
+            COMMIT,
+            RETENTION_IN_HOURS,
+            MAX_DELTA_COMMITS,
+            TARGET_CONFIG,
+            mockEngineProvider);
   }
 
   private Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
@@ -276,11 +290,17 @@ public class TestHudiConversionTarget {
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.getRecordKeyFields())
         .thenReturn(Option.of(new String[] {"record_key_field"}));
-    when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE, null))
+    when(mockHudiTableManager.initializeHudiTable(
+            BASE_PATH, TABLE, null, HudiTargetConfig.DEFAULT_TABLE_VERSION))
         .thenReturn(mockMetaClient);
     HudiConversionTarget.CommitState mockCommitState = mock(HudiConversionTarget.CommitState.class);
     when(mockCommitStateCreator.create(
-            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS))
+            mockMetaClient,
+            COMMIT,
+            RETENTION_IN_HOURS,
+            MAX_DELTA_COMMITS,
+            TARGET_CONFIG,
+            mockEngineProvider))
         .thenReturn(mockCommitState);
     targetClient.beginSync(TABLE);
     return Pair.of(mockCommitState, mockMetaClient);
