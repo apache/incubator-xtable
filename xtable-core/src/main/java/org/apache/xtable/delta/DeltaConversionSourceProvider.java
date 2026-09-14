@@ -40,6 +40,8 @@ public class DeltaConversionSourceProvider extends ConversionSourceProvider<Long
         .deltaTable(deltaTable)
         .deltaLog(deltaTable.deltaLog())
         .reuseMetadataAcrossCommits(sourceConfig.isReuseMetadataAcrossCommits())
+        .deletionVectorHandler(
+            new DeltaDeletionVectorHandler(sourceConfig.isAllowUnsupportedDeletionVectors()))
         .build();
   }
 }
