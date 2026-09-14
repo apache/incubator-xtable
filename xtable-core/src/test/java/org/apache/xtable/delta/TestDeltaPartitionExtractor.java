@@ -18,7 +18,7 @@
  
 package org.apache.xtable.delta;
 
-import static org.apache.xtable.delta.DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION;
+import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

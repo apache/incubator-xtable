@@ -19,6 +19,7 @@
 package org.apache.xtable.delta;
 
 import static org.apache.xtable.collectors.CustomCollectors.toList;
+import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
 import static org.apache.xtable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
 import static org.apache.xtable.delta.DeltaValueConverter.convertToDeltaPartitionValue;
 
@@ -79,7 +80,6 @@ public class DeltaPartitionExtractor {
   // For timestamp partition fields, actual partition column names in delta format will be of type
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "xtable_partition_col_%s_%s";
-  public static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
   private static final List<ParsedGeneratedExpr.GeneratedExprType> GRANULARITIES =
       Arrays.asList(
           ParsedGeneratedExpr.GeneratedExprType.YEAR,
