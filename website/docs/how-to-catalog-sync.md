@@ -174,6 +174,13 @@ datasets:
 </TabItem>
 </Tabs>
 
+For a Delta source only, `sourceCatalogTableIdentifier` accepts the temporary
+`allowUnsupportedDeletionVectors: "true"` safety override. It should normally be omitted so
+unsupported deletion vectors fail the sync. Enabling it warns and continues without applying the
+deletes, so the target may expose deleted rows; rebuild the target with a full sync before disabling
+the override. Direct integrations can set the equivalent source property
+`xtable.delta.source.allow_unsupported_deletion_vectors=true`.
+
 :::note Note:
 1. `catalogId` is a user defined unique identifier for each catalog, useful if you want to sync a table to multiple glue/hms catalogs. 
 2. Replace with appropriate values for `hierarchicalId`, a 2-part or 3-part tableIdentifier. 
