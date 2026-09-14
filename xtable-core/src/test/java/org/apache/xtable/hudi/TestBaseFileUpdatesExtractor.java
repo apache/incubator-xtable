@@ -19,7 +19,7 @@
 package org.apache.xtable.hudi;
 
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
-import static org.apache.hudi.stats.XTableValueMetadata.getValueMetadata;
+import static org.apache.hudi.metadata.stats.XTableValueMetadata.getValueMetadata;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -60,9 +60,9 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
-import org.apache.hudi.stats.HoodieColumnRangeMetadata;
-import org.apache.hudi.stats.ValueMetadata;
-import org.apache.hudi.stats.ValueType;
+import org.apache.hudi.metadata.stats.HoodieColumnRangeMetadata;
+import org.apache.hudi.metadata.stats.ValueMetadata;
+import org.apache.hudi.metadata.stats.ValueType;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
