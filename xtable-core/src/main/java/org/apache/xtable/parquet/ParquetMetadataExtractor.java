@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.HadoopReadOptions;
 import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.schema.MessageType;
@@ -45,6 +46,11 @@ public class ParquetMetadataExtractor {
 
   public MessageType getSchema(ParquetMetadata footer) {
     return footer.getFileMetaData().getSchema();
+  }
+
+  /** Returns the total number of rows in the parquet file by summing row counts of all blocks. */
+  public long getRowCount(ParquetMetadata footer) {
+    return footer.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
   }
 
   public ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
