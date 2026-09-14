@@ -18,6 +18,14 @@
  
 package org.apache.xtable.kernel;
 
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_ID;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NAME;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NESTED_IDS;
+import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
+import static org.apache.xtable.delta.Constants.PARQUET_LIST_ELEMENT_FIELD_NAME;
+import static org.apache.xtable.delta.Constants.PARQUET_MAP_KEY_FIELD_NAME;
+import static org.apache.xtable.delta.Constants.PARQUET_MAP_VALUE_FIELD_NAME;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,7 +51,6 @@ import io.delta.kernel.types.TimestampNTZType;
 import io.delta.kernel.types.TimestampType;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.delta.DeltaPartitionExtractor;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -52,24 +59,11 @@ import org.apache.xtable.schema.SchemaUtils;
 
 public class DeltaKernelSchemaExtractor {
 
-  private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
-  private static final String DELTA_COLUMN_MAPPING_NAME = "delta.columnMapping.physicalName";
-  // Written by Delta 3.x when IcebergCompatV2 is enabled. Holds the parquet field ids of a
-  // field's map keys, map values and list elements, keyed by the path those take in the file,
-  // for example "col-1234.key". Delta assigns column mapping ids to struct fields only, so
-  // without these the nested fields of a collection have no id to match a reader against.
-  private static final String DELTA_COLUMN_MAPPING_NESTED_IDS = "delta.columnMapping.nested.ids";
-  // The names Delta uses for a collection's children inside that metadata, which are the names
-  // parquet gives them rather than the ones this class uses internally.
-  private static final String PARQUET_LIST_ELEMENT_FIELD_NAME = "element";
-  private static final String PARQUET_MAP_KEY_FIELD_NAME = "key";
-  private static final String PARQUET_MAP_VALUE_FIELD_NAME = "value";
   private static final DeltaKernelSchemaExtractor INSTANCE = new DeltaKernelSchemaExtractor();
   private static final Map<InternalSchema.MetadataKey, Object>
       DEFAULT_TIMESTAMP_PRECISION_METADATA =
           Collections.singletonMap(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
-  static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
 
   public static DeltaKernelSchemaExtractor getInstance() {
     return INSTANCE;
@@ -150,11 +144,7 @@ public class DeltaKernelSchemaExtractor {
 
       fields =
           structType.fields().stream()
-              .filter(
-                  field ->
-                      !field
-                          .getMetadata()
-                          .contains(DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION))
+              .filter(field -> !field.getMetadata().contains(DELTA_GENERATION_EXPRESSION))
               .map(
                   field -> {
                     Integer fieldId =

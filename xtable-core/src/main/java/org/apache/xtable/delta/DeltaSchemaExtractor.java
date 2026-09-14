@@ -18,6 +18,14 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_ID;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NAME;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NESTED_IDS;
+import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
+import static org.apache.xtable.delta.Constants.PARQUET_LIST_ELEMENT_FIELD_NAME;
+import static org.apache.xtable.delta.Constants.PARQUET_MAP_KEY_FIELD_NAME;
+import static org.apache.xtable.delta.Constants.PARQUET_MAP_VALUE_FIELD_NAME;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,18 +62,6 @@ import org.apache.xtable.schema.SchemaUtils;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
-  private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
-  private static final String DELTA_COLUMN_MAPPING_NAME = "delta.columnMapping.physicalName";
-  // Written by Delta 3.x when IcebergCompatV2 is enabled. Holds the parquet field ids of a
-  // field's map keys, map values and list elements, keyed by the path those take in the file,
-  // for example "col-1234.key". Delta assigns column mapping ids to struct fields only, so
-  // without these the nested fields of a collection have no id to match a reader against.
-  private static final String DELTA_COLUMN_MAPPING_NESTED_IDS = "delta.columnMapping.nested.ids";
-  // The names Delta uses for a collection's children inside that metadata, which are the names
-  // parquet gives them rather than the ones this class uses internally.
-  private static final String PARQUET_LIST_ELEMENT_FIELD_NAME = "element";
-  private static final String PARQUET_MAP_KEY_FIELD_NAME = "key";
-  private static final String PARQUET_MAP_VALUE_FIELD_NAME = "value";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
   // Timestamps in Delta are microsecond precision by default
   private static final Map<InternalSchema.MetadataKey, Object>
@@ -165,11 +161,7 @@ public class DeltaSchemaExtractor {
         StructType structType = (StructType) dataType;
         fields =
             Arrays.stream(structType.fields())
-                .filter(
-                    field ->
-                        !field
-                            .metadata()
-                            .contains(DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION))
+                .filter(field -> !field.metadata().contains(DELTA_GENERATION_EXPRESSION))
                 .map(
                     field -> {
                       Integer fieldId =
