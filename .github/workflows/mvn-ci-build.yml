@@ -44,11 +44,11 @@ jobs:
     # 2-core runner. Restore to 40 once XTable depends on a released Hudi.
     timeout-minutes: 90
     env:
-      # TEMPORARY: apache/hudi release-1.2.0 plus the changes proposed for
-      # 1.2.1 (apache/hudi#19111, #19126, #19123, #19869), built as
-      # 1.2.1-SNAPSHOT. Pinned by SHA so the build is reproducible.
+      # TEMPORARY: the Hudi 1.2.1 staging branch of the release manager, plus
+      # the backport of apache/hudi#19869 proposed for it in voonhous/hudi#6,
+      # built as 1.2.1-SNAPSHOT. Pinned by SHA so the build is reproducible.
       HUDI_REPO: https://github.com/vinishjail97/hudi.git
-      HUDI_SHA: f7e9ded442130d9c75fd0629cebefe5d4c594f8f
+      HUDI_SHA: 6774cb6f7cf9090ee1c53ff1cb7b6dba80fb28a1
     steps:
       - uses: actions/checkout@v7
 
