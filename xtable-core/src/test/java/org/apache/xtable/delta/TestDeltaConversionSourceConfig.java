@@ -18,9 +18,11 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.xtable.delta.DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS;
 import static org.apache.xtable.delta.DeltaConversionSourceConfig.REUSE_METADATA_ACROSS_COMMITS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Properties;
 
@@ -32,14 +34,25 @@ public class TestDeltaConversionSourceConfig {
 
   @Test
   public void nullPropertiesUsesDefault() {
-    assertFalse(DeltaConversionSourceConfig.fromProperties(null).isReuseMetadataAcrossCommits());
+    DeltaConversionSourceConfig config = DeltaConversionSourceConfig.fromProperties(null);
+    assertFalse(config.isReuseMetadataAcrossCommits());
+    assertFalse(config.isAllowUnsupportedDeletionVectors());
   }
 
   @Test
   public void absentKeyUsesDefault() {
-    assertFalse(
-        DeltaConversionSourceConfig.fromProperties(new Properties())
-            .isReuseMetadataAcrossCommits());
+    DeltaConversionSourceConfig config =
+        DeltaConversionSourceConfig.fromProperties(new Properties());
+    assertFalse(config.isReuseMetadataAcrossCommits());
+    assertFalse(config.isAllowUnsupportedDeletionVectors());
+  }
+
+  @Test
+  public void oneArgumentConstructorPreservesDefaults() {
+    DeltaConversionSourceConfig config = new DeltaConversionSourceConfig(true);
+
+    assertTrue(config.isReuseMetadataAcrossCommits());
+    assertFalse(config.isAllowUnsupportedDeletionVectors());
   }
 
   @ParameterizedTest
@@ -58,5 +71,23 @@ public class TestDeltaConversionSourceConfig {
     assertEquals(
         expected,
         DeltaConversionSourceConfig.fromProperties(properties).isReuseMetadataAcrossCommits());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "true, true",
+    "TRUE, true",
+    "True, true",
+    "false, false",
+    "FALSE, false",
+    "yes, false"
+  })
+  public void allowUnsupportedDeletionVectorsIsParsedFromProperties(
+      String value, boolean expected) {
+    Properties properties = new Properties();
+    properties.setProperty(ALLOW_UNSUPPORTED_DELETION_VECTORS, value);
+    assertEquals(
+        expected,
+        DeltaConversionSourceConfig.fromProperties(properties).isAllowUnsupportedDeletionVectors());
   }
 }
