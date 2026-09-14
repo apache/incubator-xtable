@@ -18,12 +18,17 @@
  
 package org.apache.xtable.delta;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -45,17 +50,21 @@ import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
 import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class ITDeltaDeleteVectorConvert {
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
 
   private DeltaConversionSourceProvider conversionSourceProvider;
+  private DeltaKernelConversionSourceProvider kernelConversionSourceProvider;
 
   @BeforeAll
   public static void setupOnce() {
@@ -89,6 +98,59 @@ public class ITDeltaDeleteVectorConvert {
 
     conversionSourceProvider = new DeltaConversionSourceProvider();
     conversionSourceProvider.init(hadoopConf);
+    kernelConversionSourceProvider = new DeltaKernelConversionSourceProvider();
+    kernelConversionSourceProvider.init(hadoopConf);
+  }
+
+  @Test
+  public void unsupportedDeletionVectorsRequireExplicitOptIn() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    testSparkDeltaTable
+        .getSparkSession()
+        .sql(
+            "ALTER TABLE "
+                + tableName
+                + " SET TBLPROPERTIES ('delta.enableDeletionVectors' = true)");
+
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestampBeforeDelete = testSparkDeltaTable.getLastCommitTimestamp();
+    testSparkDeltaTable.deleteRows(rows.subList(0, 10));
+    Long timestampAfterDelete = testSparkDeltaTable.getLastCommitTimestamp();
+    List<String> activeFilesAfterDelete = testSparkDeltaTable.getAllActiveFiles();
+
+    SourceTable strictTableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
+    assertRejectsDeletionVectors(
+        conversionSourceProvider.getConversionSourceInstance(strictTableConfig),
+        timestampAfterDelete);
+    assertRejectsDeletionVectors(
+        kernelConversionSourceProvider.getConversionSourceInstance(strictTableConfig),
+        timestampAfterDelete);
+
+    Properties allowUnsupportedDeletionVectors = new Properties();
+    allowUnsupportedDeletionVectors.setProperty(
+        DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS, "true");
+    SourceTable permissiveTableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .additionalProperties(allowUnsupportedDeletionVectors)
+            .build();
+    assertContinuesWithDeletionVectors(
+        conversionSourceProvider.getConversionSourceInstance(permissiveTableConfig),
+        timestampBeforeDelete,
+        activeFilesAfterDelete);
+    assertContinuesWithDeletionVectors(
+        kernelConversionSourceProvider.getConversionSourceInstance(permissiveTableConfig),
+        timestampBeforeDelete,
+        activeFilesAfterDelete);
   }
 
   @Test
@@ -154,11 +216,15 @@ public class ITDeltaDeleteVectorConvert {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     assertEquals(228L, testSparkDeltaTable.getNumRows());
 
+    Properties sourceProperties = new Properties();
+    sourceProperties.setProperty(
+        DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS, "true");
     SourceTable tableConfig =
         SourceTable.builder()
             .name(testSparkDeltaTable.getTableName())
             .basePath(testSparkDeltaTable.getBasePath())
             .formatName(TableFormat.DELTA)
+            .additionalProperties(sourceProperties)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -180,6 +246,48 @@ public class ITDeltaDeleteVectorConvert {
       allTableChanges.add(tableChange);
     }
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  private void assertRejectsDeletionVectors(
+      ConversionSource<Long> conversionSource, Long timestampBeforeDelete) {
+    NotSupportedException fullSyncException =
+        assertThrows(NotSupportedException.class, conversionSource::getCurrentSnapshot);
+    assertTrue(fullSyncException.getMessage().contains("contains a deletion vector"));
+
+    NotSupportedException incrementalSyncException =
+        assertThrows(
+            NotSupportedException.class,
+            () -> {
+              CommitsBacklog<Long> commitsBacklog =
+                  conversionSource.getCommitsBacklog(
+                      InstantsForIncrementalSync.builder()
+                          .lastSyncInstant(Instant.ofEpochMilli(timestampBeforeDelete))
+                          .build());
+              for (Long version : commitsBacklog.getCommitsToProcess()) {
+                conversionSource.getTableChangeForCommit(version);
+              }
+            });
+    assertTrue(incrementalSyncException.getMessage().contains("contains a deletion vector"));
+  }
+
+  private void assertContinuesWithDeletionVectors(
+      ConversionSource<Long> conversionSource,
+      Long timestampBeforeDelete,
+      List<String> expectedActiveFiles) {
+    InternalSnapshot internalSnapshot = assertDoesNotThrow(conversionSource::getCurrentSnapshot);
+    ValidationTestHelper.validateSnapshot(internalSnapshot, expectedActiveFiles);
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(
+            InstantsForIncrementalSync.builder()
+                .lastSyncInstant(Instant.ofEpochMilli(timestampBeforeDelete))
+                .build());
+    assertFalse(commitsBacklog.getCommitsToProcess().isEmpty());
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
+      TableChange tableChange =
+          assertDoesNotThrow(() -> conversionSource.getTableChangeForCommit(version));
+      assertTrue(tableChange.getFilesDiff().getFilesAdded().isEmpty());
+      assertTrue(tableChange.getFilesDiff().getFilesRemoved().isEmpty());
+    }
   }
 
   private void validateDeletedRecordCount(
