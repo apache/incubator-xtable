@@ -23,15 +23,21 @@ import io.delta.kernel.engine.Engine;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.delta.DeltaConversionSourceConfig;
+import org.apache.xtable.delta.DeltaDeletionVectorHandler;
 
 public class DeltaKernelConversionSourceProvider extends ConversionSourceProvider<Long> {
   @Override
   public DeltaKernelConversionSource getConversionSourceInstance(SourceTable sourceTable) {
     Engine engine = DefaultEngine.create(hadoopConf);
+    DeltaConversionSourceConfig sourceConfig =
+        DeltaConversionSourceConfig.fromProperties(sourceTable.getAdditionalProperties());
     return DeltaKernelConversionSource.builder()
         .tableName(sourceTable.getName())
         .basePath(sourceTable.getBasePath())
         .engine(engine)
+        .deletionVectorHandler(
+            new DeltaDeletionVectorHandler(sourceConfig.isAllowUnsupportedDeletionVectors()))
         .build();
   }
 }
