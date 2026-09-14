@@ -28,6 +28,7 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -100,12 +101,16 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
 
 public class ITConversionController {
@@ -155,6 +160,16 @@ public class ITConversionController {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceFormat, syncMode, isPartitioned));
         }
+      }
+    }
+    return arguments.stream();
+  }
+
+  private static Stream<Arguments> generateTestParametersForSyncModesAndPartitioning() {
+    List<Arguments> arguments = new ArrayList<>();
+    for (SyncMode syncMode : SyncMode.values()) {
+      for (boolean isPartitioned : new boolean[] {true, false}) {
+        arguments.add(Arguments.of(syncMode, isPartitioned));
       }
     }
     return arguments.stream();
@@ -226,6 +241,116 @@ public class ITConversionController {
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
       String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
+    runVariousOperationsTest(
+        sourceTableFormat, syncMode, isPartitioned, getConversionSourceProvider(sourceTableFormat));
+  }
+
+  // Runs the same equivalence checks as testVariousOperations above, but forces the Delta Kernel
+  // conversion source rather than resolving the provider from sourceTableFormat. This covers the
+  // Kernel source path against the same assertions the Standalone source is validated with today,
+  // per https://github.com/apache/incubator-xtable/issues/886. A targeted (sync mode x
+  // partitioning) subset is used here rather than folding DELTA_KERNEL into
+  // generateTestParametersForFormatsSyncModesAndPartitioning, since sourceTableFormat there also
+  // drives GenericTable selection, Spark format-name reads, and target-format exclusion for every
+  // other format, none of which differ for Kernel vs Standalone.
+  @ParameterizedTest
+  @MethodSource("generateTestParametersForSyncModesAndPartitioning")
+  public void testVariousOperationsDeltaKernelSource(SyncMode syncMode, boolean isPartitioned) {
+    ConversionSourceProvider<Long> deltaKernelConversionSourceProvider =
+        new DeltaKernelConversionSourceProvider();
+    deltaKernelConversionSourceProvider.init(jsc.hadoopConfiguration());
+    runVariousOperationsTest(DELTA, syncMode, isPartitioned, deltaKernelConversionSourceProvider);
+  }
+
+  // Validates the DELTA target routed through DeltaKernelConversionTarget (via
+  // DeltaConversionTargetConfig.USE_KERNEL on that target's properties, using
+  // ConversionTargetFactory's normal dispatch path). Source is fixed to HUDI, a simple,
+  // always-available source unrelated to what's under test here (the target-side dispatch).
+  // Covers the "as a target" half of prerequisite #1 in
+  // https://github.com/apache/incubator-xtable/issues/886.
+  //
+  // DeltaKernelConversionTarget does not support schema evolution on an already-existing table
+  // (Delta Kernel 4.0.0 only applies withSchema() at CREATE_TABLE; see
+  // https://github.com/delta-io/delta/issues/4305) and throws NotSupportedException rather than
+  // silently committing a stale schema. ConversionController.sync() catches that per-target
+  // (TableFormatSync#buildResultForError) rather than propagating it, so the exception surfaces
+  // as a SyncStatusCode.ERROR entry in the returned result map, not as a thrown exception from
+  // sync() itself. This test therefore doesn't reuse runVariousOperationsTest: it syncs an
+  // initial snapshot (expected to succeed, verified via the normal equivalence check), resyncs
+  // the same unchanged schema to an existing table (expected to still succeed -- this guards
+  // against a false positive in syncSchema()'s drift check, since it compares in Kernel's
+  // StructType rather than InternalSchema specifically to avoid InternalSchema<->StructType
+  // round-trip asymmetry causing an unchanged schema to look "evolved"), then evolves the schema
+  // and syncs again, asserting the DELTA target's sync result is ERROR with the expected message,
+  // and that the target's data was left at its last-good state rather than partially written.
+  @ParameterizedTest
+  @MethodSource("generateTestParametersForSyncModesAndPartitioning")
+  public void testVariousOperationsDeltaKernelTarget(SyncMode syncMode, boolean isPartitioned) {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    String partitionConfig = isPartitioned ? "level:VALUE" : null;
+    List<String> targetTableFormats = Collections.singletonList(DELTA);
+
+    try (GenericTable table =
+        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, HUDI, isPartitioned)) {
+      table.insertRows(100);
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI, syncMode, tableName, table, targetTableFormats, partitionConfig, null, true);
+      Map<String, SyncResult> results =
+          conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS, results.get(DELTA).getTableFormatSyncStatus().getStatusCode());
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
+
+      // Resync the same table with its unchanged schema. The table now exists, so this exercises
+      // syncSchema()'s drift check on the existing-table path without any real schema evolution.
+      table.insertRows(50);
+      results = conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS,
+          results.get(DELTA).getTableFormatSyncStatus().getStatusCode(),
+          "An unchanged-schema resync of an existing table must not be flagged as schema drift");
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 150);
+    }
+
+    try (GenericTable tableWithUpdatedSchema =
+        GenericTable.getInstanceWithAdditionalColumns(
+            tableName, tempDir, sparkSession, jsc, HUDI, isPartitioned)) {
+      tableWithUpdatedSchema.insertRows(100);
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI,
+              syncMode,
+              tableName,
+              tableWithUpdatedSchema,
+              targetTableFormats,
+              partitionConfig,
+              null,
+              true);
+      Map<String, SyncResult> results =
+          conversionController.sync(conversionConfig, conversionSourceProvider);
+      SyncResult.SyncStatus deltaStatus = results.get(DELTA).getTableFormatSyncStatus();
+      assertEquals(SyncStatusCode.ERROR, deltaStatus.getStatusCode());
+      assertTrue(
+          deltaStatus
+              .getErrorDetails()
+              .getErrorMessage()
+              .contains("https://github.com/delta-io/delta/issues/4305"));
+
+      // The target should be left exactly at its last successfully-synced state (150 rows, old
+      // schema), not partially written with some but not all of the new rows/columns.
+      long targetRowCount =
+          sparkSession.read().format("delta").load(tableWithUpdatedSchema.getDataPath()).count();
+      assertEquals(150, targetRowCount);
+    }
+  }
+
+  private void runVariousOperationsTest(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      boolean isPartitioned,
+      ConversionSourceProvider<?> conversionSourceProvider) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
     if (sourceTableFormat.equals(PAIMON)) {
@@ -237,8 +362,6 @@ public class ITConversionController {
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
     }
-    ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(sourceTableFormat);
     List<?> insertRecords;
     try (GenericTable table =
         GenericTable.getInstance(
@@ -1194,6 +1317,32 @@ public class ITConversionController {
       List<String> targetTableFormats,
       String partitionConfig,
       Duration metadataRetention) {
+    return getTableSyncConfig(
+        sourceTableFormat,
+        syncMode,
+        tableName,
+        table,
+        targetTableFormats,
+        partitionConfig,
+        metadataRetention,
+        false);
+  }
+
+  // Same as above, but when useDeltaKernelTarget is true, routes any DELTA target through
+  // ConversionTargetFactory's DeltaKernelConversionTarget rather than the default Standalone one,
+  // by setting DeltaConversionTargetConfig.USE_KERNEL on that target's additional properties. This
+  // lets a test validate the Kernel target writer through the same dispatch path (and the same
+  // equivalence assertions) a Standalone target is validated with, per
+  // https://github.com/apache/incubator-xtable/issues/886.
+  private static ConversionConfig getTableSyncConfig(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      String tableName,
+      GenericTable table,
+      List<String> targetTableFormats,
+      String partitionConfig,
+      Duration metadataRetention,
+      boolean useDeltaKernelTarget) {
     Properties sourceProperties = new Properties();
     if (partitionConfig != null) {
       sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
@@ -1210,15 +1359,20 @@ public class ITConversionController {
     List<TargetTable> targetTables =
         targetTableFormats.stream()
             .map(
-                formatName ->
-                    TargetTable.builder()
-                        .name(tableName)
-                        .formatName(formatName)
-                        // set the metadata path to the data path as the default (required by Hudi)
-                        .basePath(table.getDataPath())
-                        .metadataRetention(metadataRetention)
-                        .additionalProperties(new TypedProperties())
-                        .build())
+                formatName -> {
+                  TypedProperties targetProperties = new TypedProperties();
+                  if (useDeltaKernelTarget && formatName.equals(DELTA)) {
+                    targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
+                  }
+                  return TargetTable.builder()
+                      .name(tableName)
+                      .formatName(formatName)
+                      // set the metadata path to the data path as the default (required by Hudi)
+                      .basePath(table.getDataPath())
+                      .metadataRetention(metadataRetention)
+                      .additionalProperties(targetProperties)
+                      .build();
+                })
             .collect(Collectors.toList());
 
     return ConversionConfig.builder()
