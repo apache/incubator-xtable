@@ -101,7 +101,8 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
         .tableType(GLUE_EXTERNAL_TABLE_TYPE)
         .parameters(parameters)
         .storageDescriptor(
-            getStorageDescriptor(table, schemaExtractor.getNonPartitionColumns(table, columnsMap)))
+            getUpdatedStorageDescriptor(
+                table, catalogTable, schemaExtractor.getNonPartitionColumns(table, columnsMap)))
         .partitionKeys(schemaExtractor.getPartitionColumns(table, columnsMap))
         .build();
   }
@@ -117,6 +118,24 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
                 .serializationLibrary(PARQUET_SERDE_CLASS)
                 .parameters(getSerDeParameters(table))
                 .build())
+        .build();
+  }
+
+  // Refresh must build off the existing StorageDescriptor rather than rebuilding one from
+  // scratch (like getStorageDescriptor does for create) -- a from-scratch rebuild silently drops
+  // additionalLocations and any custom serde parameters/settings a user set directly in Glue.
+  private StorageDescriptor getUpdatedStorageDescriptor(
+      InternalTable table, Table catalogTable, List<Column> columns) {
+    StorageDescriptor existing = catalogTable.storageDescriptor();
+    SerDeInfo.Builder serdeInfo =
+        existing.serdeInfo() == null
+            ? SerDeInfo.builder().parameters(getSerDeParameters(table))
+            : existing.serdeInfo().toBuilder();
+    return existing.toBuilder()
+        .columns(columns)
+        .inputFormat(PARQUET_INPUT_FORMAT)
+        .outputFormat(PARQUET_OUTPUT_FORMAT)
+        .serdeInfo(serdeInfo.serializationLibrary(PARQUET_SERDE_CLASS).build())
         .build();
   }
 

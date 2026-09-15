@@ -21,7 +21,10 @@ package org.apache.xtable.glue.table;
 import static org.apache.xtable.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,6 +93,48 @@ public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
         deltaGlueCatalogTableBuilder.getUpdateTableRequest(
             TEST_UPDATED_DELTA_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
     assertEquals(expected, output);
+  }
+
+  @Test
+  void testGetUpdateTableInputPreservesExistingStorageSettings() {
+    // Regression test: a from-scratch StorageDescriptor rebuild (like getCreateTableRequest
+    // uses) would silently drop additionalLocations and any custom serde parameter set directly
+    // in Glue outside of XTable -- refresh must instead build off the existing descriptor.
+    setupCommonMocks();
+    List<String> additionalLocations = Collections.singletonList("s3://base-path/extra-location");
+    Map<String, String> existingSerdeParams =
+        new HashMap<>(deltaGlueCatalogTableBuilder.getSerDeParameters(TEST_DELTA_INTERNAL_TABLE));
+    existingSerdeParams.put("custom.serde.param", "custom-value");
+
+    StorageDescriptor existingStorageDescriptor =
+        StorageDescriptor.builder()
+            .columns(DELTA_GLUE_SCHEMA)
+            .location(TEST_BASE_PATH)
+            .additionalLocations(additionalLocations)
+            .inputFormat("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat")
+            .outputFormat("org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat")
+            .serdeInfo(
+                SerDeInfo.builder()
+                    .serializationLibrary(
+                        "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe")
+                    .parameters(existingSerdeParams)
+                    .build())
+            .build();
+    Table glueTable =
+        Table.builder()
+            .parameters(deltaGlueCatalogTableBuilder.getTableParameters())
+            .storageDescriptor(existingStorageDescriptor)
+            .partitionKeys(PARTITION_KEYS)
+            .build();
+
+    TableInput output =
+        deltaGlueCatalogTableBuilder.getUpdateTableRequest(
+            TEST_UPDATED_DELTA_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+
+    StorageDescriptor outputStorageDescriptor = output.storageDescriptor();
+    assertEquals(additionalLocations, outputStorageDescriptor.additionalLocations());
+    assertEquals(existingSerdeParams, outputStorageDescriptor.serdeInfo().parameters());
+    assertEquals(UPDATED_DELTA_GLUE_SCHEMA, outputStorageDescriptor.columns());
   }
 
   private StorageDescriptor getTestStorageDescriptor(List<Column> columns) {
