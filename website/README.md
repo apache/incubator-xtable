@@ -103,7 +103,9 @@ npm run serve
 ## Releases
 ### Adding new release
 1. Create a `.mdx` file similar to `website/releases/release-0.2.0-incubating.mdx`
-2. Update the [downloads](releases/downloads.mdx) file to include the new release similar to the existing releases
+2. After the release artifacts are available on Maven Central, verify the exact artifact and JAR URLs as described in the [release guide](../release/release_guide.md).
+3. Update the [downloads](releases/downloads.mdx) file with the signed source release first, followed by verified direct links to selected convenience binaries and the version-filtered Maven search.
+4. Do not construct links for artifacts that were not published. If a commonly requested artifact is unavailable, document how users can build or obtain it instead.
 
 ## Changes to the website homepage
 1. The homepage is a `.html` file located at `website/homepage/index.html`. That directory holds the

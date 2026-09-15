@@ -7,7 +7,7 @@ export default function BlogLayout(props) {
   const hasSidebar = false;
   return (
     <Layout {...layoutProps}>
-      <div className="container margin-vert--lg">
+      <div className="container blogLayoutContainer margin-vert--lg">
         <div className="row">
           <main
             className={clsx('col row')}

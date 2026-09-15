@@ -21,3 +21,15 @@ updates:
     schedule:
       interval: "weekly"
       day: "sunday"
+    # The PR Title Validation workflow accepts "[<issue-number>] <description>",
+    # "[MINOR] <description>", or a Conventional Commits prefix. Dependabot names
+    # its pull requests "Bump <dependency> from <a> to <b>", which matches none of
+    # them, so every Dependabot pull request failed the check. Prefix the commit
+    # message and the title with [MINOR] instead.
+    #
+    # The trailing space in the prefix is deliberate. Dependabot appends a colon
+    # to any prefix that ends with an alphanumeric character or a closing bracket,
+    # which would produce "[MINOR]: Bump ..." and fail the check again. A prefix
+    # that already ends with a space is used verbatim.
+    commit-message:
+      prefix: "[MINOR] "

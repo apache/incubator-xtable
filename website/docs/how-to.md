@@ -55,7 +55,7 @@ values={[
 
 ```shell md title="shell"
 pyspark \
-  --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
+  --packages org.apache.hudi:hudi-spark3.4-bundle_2.12:1.2.0 \
   --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" \
   --conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
@@ -65,7 +65,7 @@ pyspark \
 
 ```shell md title="shell"
 pyspark \
-  --packages io.delta:delta-core_2.12:2.1.0 \
+  --packages io.delta:delta-core_2.12:2.4.0 \
   --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 ```
@@ -74,7 +74,7 @@ pyspark \
 
 ```shell md title="shell"
 pyspark \
-  --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.4.1 \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2 \
   --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog"
 ```
