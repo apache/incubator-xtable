@@ -31,6 +31,18 @@ Snowflake. Creating transformations from one format to another is straightforwar
 of a few interfaces, which we believe will facilitate the expansion of supported source and target formats in the
 future.
 
+# macOS Setup
+
+**New to macOS?** Get set up in one command:
+
+```bash
+cd macos-setup && ./setup-macos.sh
+```
+
+This installs Java 11, Maven, Docker, and configures all environment variables automatically.
+
+See **[macos-setup/](./macos-setup/)** for the automation script, manual setup guide, and command reference.
+
 # Building the project and running tests.
 1. Use Java 11 for building the project. If you are using another Java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple Java versions locally.
 2. Build the project using `./mvnw clean package`. Use `./mvnw clean package -DskipTests` to skip tests while building.
