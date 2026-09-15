@@ -178,16 +178,7 @@
             <artifactId>hudi-hadoop-common</artifactId>
             <version>${hudi.version}</version>
         </dependency>
-        <!--
-          Same story as hudi-hadoop-common above: xtable-aws declares this
-          provided (a real cluster supplies it), which doesn't propagate to
-          this standalone jar. Needed for org.apache.hudi.hive.MultiPartKeysValueExtractor,
-          referenced by Jackson when deserializing GlueCatalogConfig's
-          partition value extractor field. Without it, RunCatalogSync's Glue
-          catalog sync fails with NoClassDefFoundError at runtime despite
-          compiling fine (the reference is a string class name resolved via
-          reflection, so javac never catches the missing dependency).
-        -->
+        <!-- Required for MultiPartKeysValueExtractor in standalone Glue catalog sync. -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-hive-sync</artifactId>
@@ -755,18 +746,7 @@
                             <include>org.xerial.snappy:snappy-java</include>
                             <include>org.yaml:snakeyaml</include>
                             <include>oro:oro</include>
-                            <!-- Only bundle; it already contains internally-consistent
-                                 copies of every individual software.amazon.awssdk:* module
-                                 (annotations/auth/aws-core/glue/profiles/etc). Including any
-                                 of those separately alongside bundle makes the shade plugin
-                                 merge two different builds of the same classes, pairing
-                                 (e.g.) bundle's auth/sts classes with an IoUtils/AttributeMap
-                                 from the standalone jar that's missing a method they call,
-                                 causing a NoSuchMethodError at JVM shutdown when closing S3A's
-                                 credentials provider. Compile-time resolution of the individual
-                                 modules is untouched (controlled by <dependencies>, not this
-                                 list); this only changes which copy's bytes end up in the
-                                 final jar. -->
+                            <!-- Use only the AWS SDK bundle to avoid mixing incompatible SDK classes. -->
                             <include>software.amazon.awssdk:bundle</include>
                             <include>software.amazon.eventstream:eventstream</include>
                             <include>stax:stax-api</include>
