@@ -151,7 +151,8 @@ public final class XTableSparkSync {
               Option.builder()
                   .longOpt(PARTITION_SPEC)
                   .hasArg()
-                  .desc("The Hudi source partition field spec, e.g. level:VALUE")
+                  .desc(
+                      "The source partition field spec, e.g. level:VALUE (Hudi and Parquet sources)")
                   .build())
           .addOption(
               Option.builder()

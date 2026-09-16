@@ -44,6 +44,7 @@ import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
 import org.apache.xtable.parquet.ParquetConversionSourceProvider;
+import org.apache.xtable.parquet.ParquetSourceConfig;
 
 /**
  * Builds a {@link ConversionConfig} from a {@link TableSyncSpec} and runs an incremental {@link
@@ -61,7 +62,12 @@ public class XTableSyncService {
   public Map<String, SyncResult> sync(TableSyncSpec spec, Configuration hadoopConf) {
     Properties sourceProperties = new Properties();
     if (spec.getPartitionSpec() != null && !spec.getPartitionSpec().isEmpty()) {
-      sourceProperties.put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, spec.getPartitionSpec());
+      if (TableFormat.PARQUET.equals(spec.getSourceFormat())) {
+        sourceProperties.put(
+            ParquetSourceConfig.PARTITION_FIELD_SPEC_CONFIG, spec.getPartitionSpec());
+      } else {
+        sourceProperties.put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, spec.getPartitionSpec());
+      }
     }
     // The data files may live at a different path than the source table root (e.g. Iceberg keeps
     // them under <basePath>/data). Targets write their metadata alongside the data files, so the
