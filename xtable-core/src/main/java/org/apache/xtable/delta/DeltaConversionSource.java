@@ -70,6 +70,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
+  @Builder.Default
   private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState = Optional.empty();
 
   private final SparkSession sparkSession;
