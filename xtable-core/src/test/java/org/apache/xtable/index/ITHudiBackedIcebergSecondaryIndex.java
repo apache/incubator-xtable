@@ -20,15 +20,18 @@ package org.apache.xtable.index;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -102,59 +105,87 @@ public class ITHudiBackedIcebergSecondaryIndex {
 
       index.syncIndex(icebergTable, INDEXED_COLUMN);
       assertTrue(index.doesIndexExist(INDEXED_COLUMN));
-      assertLookupMatchesIceberg(table, index, records, partitionField != null);
+      assertLookupMatchesIceberg(table, index, partitionField != null, Collections.emptyList());
 
       // a second batch of files is added to the index by an incremental sync
       records.addAll(table.insertRows(50));
       icebergTable.refresh();
       index.syncIndex(icebergTable, INDEXED_COLUMN);
-      assertLookupMatchesIceberg(table, index, records, partitionField != null);
+      assertLookupMatchesIceberg(table, index, partitionField != null, Collections.emptyList());
+
+      // updating rows rewrites the files that hold them, so the index must resolve the updated keys
+      // to their new file and row position instead of the ones the previous sync recorded
+      table.upsertRows(records.subList(0, 30));
+      icebergTable.refresh();
+      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      assertLookupMatchesIceberg(table, index, partitionField != null, Collections.emptyList());
+
+      // deleting rows must drop their keys from the index, and must not strand the rows that are
+      // rewritten alongside them
+      List<Record> deletedRecords = new ArrayList<>(records.subList(30, 50));
+      List<String> deletedKeys =
+          deletedRecords.stream()
+              .map(record -> record.getField(INDEXED_COLUMN).toString())
+              .collect(Collectors.toList());
+      table.deleteRows(deletedRecords);
+      records.removeAll(deletedRecords);
+      icebergTable.refresh();
+      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      assertLookupMatchesIceberg(table, index, partitionField != null, deletedKeys);
     }
   }
 
+  /**
+   * Looks every key currently in the Iceberg table up in the index and checks the result against
+   * Iceberg's own {@code _file}, {@code _pos} and partition values. Expectations are read from the
+   * table rather than from the records the test wrote, so this stays correct after rows are updated
+   * or deleted. {@code keysThatMustNotResolve} are looked up as well and must return nothing.
+   */
   private void assertLookupMatchesIceberg(
       TestIcebergTable table,
       HudiBackedIcebergSecondaryIndex index,
-      List<Record> records,
-      boolean partitioned) {
-    List<String> keys =
-        records.stream()
-            .map(record -> record.getField(INDEXED_COLUMN).toString())
-            .collect(Collectors.toList());
+      boolean partitioned,
+      List<String> keysThatMustNotResolve) {
+    Map<String, Pair<String, Long>> expectedLocations = new HashMap<>();
+    Map<String, String> expectedPartitions = new HashMap<>();
+    sparkSession
+        .read()
+        .format("iceberg")
+        .load(table.getBasePath())
+        .selectExpr(INDEXED_COLUMN, "_file", "_pos", PARTITION_COLUMN)
+        .collectAsList()
+        .forEach(
+            row -> {
+              expectedLocations.put(
+                  row.getString(0),
+                  Pair.of(new Path(row.getString(1)).toUri().getPath(), row.getLong(2)));
+              expectedPartitions.put(row.getString(0), row.getString(3));
+            });
+
+    List<String> keys = new ArrayList<>(expectedLocations.keySet());
     // keys that are not in the table must not produce a result
     keys.add("missing-key-1");
     keys.add("missing-key-2");
+    keys.addAll(keysThatMustNotResolve);
     List<IndexLookupResult> lookupResults =
         index
             .lookup(table.getIcebergTable(), jsc.parallelize(keys, 2).rdd(), INDEXED_COLUMN)
             .toJavaRDD()
             .collect();
-    assertEquals(records.size(), lookupResults.size());
+    assertEquals(expectedLocations.size(), lookupResults.size());
 
-    Map<String, Pair<String, Long>> expectedLocations =
-        sparkSession
-            .read()
-            .format("iceberg")
-            .load(table.getBasePath())
-            .selectExpr(INDEXED_COLUMN, "_file", "_pos")
-            .collectAsList()
-            .stream()
-            .collect(
-                Collectors.toMap(
-                    row -> row.getString(0),
-                    row -> Pair.of(new Path(row.getString(1)).toUri().getPath(), row.getLong(2))));
-    Map<String, Record> recordsByKey =
-        records.stream()
-            .collect(
-                Collectors.toMap(
-                    record -> record.getField(INDEXED_COLUMN).toString(), Function.identity()));
+    Set<String> resolvedKeys =
+        lookupResults.stream().map(IndexLookupResult::getKey).collect(Collectors.toSet());
+    keysThatMustNotResolve.forEach(key -> assertFalse(resolvedKeys.contains(key)));
+
     for (IndexLookupResult lookupResult : lookupResults) {
       Pair<String, Long> expected = expectedLocations.get(lookupResult.getKey());
+      assertNotNull(expected, "index returned a key that is not in the table");
       assertEquals(expected.getLeft(), new Path(lookupResult.getFile()).toUri().getPath());
       assertEquals(expected.getRight(), lookupResult.getPosition());
       if (partitioned) {
         assertEquals(
-            recordsByKey.get(lookupResult.getKey()).getField(PARTITION_COLUMN).toString(),
+            expectedPartitions.get(lookupResult.getKey()),
             lookupResult.getPartition().getUTF8String(0).toString());
       } else {
         assertNull(lookupResult.getPartition());
