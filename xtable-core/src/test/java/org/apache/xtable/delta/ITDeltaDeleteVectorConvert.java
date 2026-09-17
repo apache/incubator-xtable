@@ -185,7 +185,7 @@ public class ITDeltaDeleteVectorConvert {
   private void validateDeletedRecordCount(
       DeltaLog deltaLog, int version, int deleteVectorFileCount, int deletionRecordCount) {
     List<AddFile> allFiles =
-        deltaLog.getSnapshotAt(version, Option.empty()).allFiles().collectAsList();
+        deltaLog.getSnapshotAt(version, Option.empty(), Option.empty()).allFiles().collectAsList();
     List<AddFile> filesWithDeletionVectors =
         allFiles.stream().filter(f -> f.deletionVector() != null).collect(Collectors.toList());
 

@@ -26,9 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -887,7 +885,7 @@ public class ITDeltaConversionSource {
     assertTrue(
         commitsBacklog.getCommitsToProcess().size() >= 2,
         "backlog must span multiple commits for this assertion to be meaningful");
-    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test
@@ -943,7 +941,7 @@ public class ITDeltaConversionSource {
     }
     // The refresh comes from the commit's own metaData action, not a snapshot reload: the only
     // snapshot read is the baseline at the first commit.
-    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test
@@ -984,10 +982,11 @@ public class ITDeltaConversionSource {
 
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
     // With reuse disabled the pre-optimization behaviour is restored in full: one snapshot
-    // reconstruction per commit, and no second listing of the log for commit-file mtimes.
+    // reconstruction per commit. The absence of the extra mtime listing is no longer assertable
+    // here, because DeltaLog.getChanges itself delegates to getChangeLogFiles as of Delta 3.x,
+    // so the spy cannot tell that call apart from one this class makes.
     verify(spiedDeltaLog, times(commitsBacklog.getCommitsToProcess().size()))
-        .getSnapshotAt(anyLong(), any());
-    verify(spiedDeltaLog, never()).getChangeLogFiles(anyLong(), anyBoolean());
+        .getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test

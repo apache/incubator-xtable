@@ -60,7 +60,7 @@ coursier fetch --quiet \
   "org.apache.spark:spark-hive_${SCALA_BINARY_VERSION}:${SPARK_VERSION}" \
   "org.apache.hudi:hudi-spark${SPARK_VERSION_PREFIX}-bundle_${SCALA_BINARY_VERSION}:${HUDI_VERSION}" \
   "org.apache.hudi:hudi-java-client:${HUDI_VERSION}" \
-  "io.delta:delta-core_${SCALA_BINARY_VERSION}:${DELTA_VERSION}" \
+  "io.delta:delta-spark_${SCALA_BINARY_VERSION}:${DELTA_VERSION}" \
   "io.delta:delta-kernel-api:${DELTA_KERNEL_VERSION}" \
   "io.delta:delta-kernel-defaults:${DELTA_KERNEL_VERSION}" \
   "org.apache.iceberg:iceberg-hive-runtime:${ICEBERG_HIVE_RUNTIME_VERSION}" \
