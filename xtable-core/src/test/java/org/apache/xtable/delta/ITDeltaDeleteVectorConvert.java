@@ -68,6 +68,10 @@ public class ITDeltaDeleteVectorConvert {
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog")
             .config("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+            // Delta 3.x persists deletion vectors for MERGE as well as DELETE. This test uses
+            // merges to model plain upserts and counts vectors only from the delete steps that
+            // follow, so keep merges on the rewrite path.
+            .config("spark.databricks.delta.merge.deletionVectors.persistent", "false")
             .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
             .config("spark.sql.shuffle.partitions", "1")
             .config("spark.default.parallelism", "1")
@@ -104,6 +108,10 @@ public class ITDeltaDeleteVectorConvert {
             "ALTER TABLE "
                 + tableName
                 + " SET TBLPROPERTIES ('delta.enableDeletionVectors' = true)");
+    // The DeltaTable handle resolved at construction still carries the pre-ALTER protocol, and
+    // as of Delta 3.x a merge planned against it does not see deletion vectors as readable, so
+    // the row_index metadata column the DV write path needs is never exposed.
+    testSparkDeltaTable.reload();
 
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
