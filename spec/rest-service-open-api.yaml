@@ -122,6 +122,7 @@ components:
         - source-format
         - source-table-name
         - source-table-path
+        - source-data-path
         - target-formats
       properties:
         source-format:
@@ -133,6 +134,11 @@ components:
         source-table-path:
           type: string
           description: Path to the source table's metadata
+        source-data-path:
+          type: string
+          description: >-
+            Path to the source table's data files. Required: the service passes it straight to
+            TargetTable.basePath, whose declaration is @NonNull, so omitting it fails the request.
         target-formats:
           type: array
           items:
@@ -140,7 +146,11 @@ components:
           description: List of desired output table formats (e.g., "ICEBERG", "HUDI", "DELTA")
         configurations:
           type: object
-          description: Additional configuration key/value pairs (e.g., storage credentials or other service configs)
+          description: >-
+            Additional configuration key/value pairs. Only "partition-spec" is read; every other
+            key is ignored. Do not put storage credentials here. The service reads cloud storage
+            with the credentials in its own environment, and request bodies are not a safe place
+            for secrets in general.
           additionalProperties:
             type: string
 
