@@ -19,6 +19,7 @@
 package org.apache.xtable.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -380,6 +381,53 @@ public class TestIcebergColumnStatsConverter {
                 .range(Range.vector(10000000L, 20000000L))
                 .build());
     assertEquals(expected, actual);
+  }
+
+  @Test
+  public void testSchemaEvolutionStatsCoercionAndSkip() {
+    Schema icebergSchema =
+        new Schema(
+            Types.NestedField.required(1, "int_field", Types.IntegerType.get()),
+            Types.NestedField.optional(2, "decimal_field", Types.DecimalType.of(9, 2)));
+
+    InternalField intField =
+        InternalField.builder()
+            .name("int_field")
+            .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
+            .build();
+    InternalField decimalField =
+        InternalField.builder()
+            .name("decimal_field")
+            .schema(InternalSchema.builder().name("decimal").dataType(InternalType.DECIMAL).build())
+            .build();
+
+    ColumnStat intStats =
+        ColumnStat.builder()
+            .field(intField)
+            .numValues(10)
+            .numNulls(0)
+            .totalSize(40)
+            .range(Range.vector(10L, 20L))
+            .build();
+    ColumnStat decimalStats =
+        ColumnStat.builder()
+            .field(decimalField)
+            .numValues(5)
+            .numNulls(0)
+            .totalSize(80)
+            .range(Range.vector("not-a-decimal", "also-bad"))
+            .build();
+
+    Metrics actual =
+        IcebergColumnStatsConverter.getInstance()
+            .toIceberg(icebergSchema, 10L, Arrays.asList(intStats, decimalStats));
+
+    assertEquals(
+        Conversions.toByteBuffer(Types.IntegerType.get(), 10), actual.lowerBounds().get(1));
+    assertEquals(
+        Conversions.toByteBuffer(Types.IntegerType.get(), 20), actual.upperBounds().get(1));
+    assertFalse(actual.lowerBounds().containsKey(2));
+    assertFalse(actual.upperBounds().containsKey(2));
   }
 
   private Map<Integer, ByteBuffer> getBoundsMap(
