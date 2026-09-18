@@ -34,6 +34,7 @@ import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
 
+import scala.Option;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -125,7 +126,12 @@ public class DeltaDataFileUpdatesExtractor {
             true,
             getColumnStats(schema, dataFile.getRecordCount(), dataFile.getColumnStats()),
             null,
-            null));
+            null,
+            // baseRowId, defaultRowCommitVersion and clusteringProvider: row tracking and
+            // clustering are not written by the sync, so all three are left unset.
+            Option.empty(),
+            Option.empty(),
+            Option.empty()));
   }
 
   private String getColumnStats(

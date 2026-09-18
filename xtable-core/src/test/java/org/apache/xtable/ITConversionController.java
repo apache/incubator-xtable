@@ -28,6 +28,7 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -59,6 +60,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkException;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -106,6 +108,8 @@ import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
 
 public class ITConversionController {
@@ -750,6 +754,42 @@ public class ITConversionController {
       table.insertRows(10);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
+    }
+  }
+
+  // Pins what happens for a column mapped Delta table that does not enable IcebergCompatV2 and
+  // holds a map column. Delta 3.x writes parquet field ids for the top level columns only, so
+  // Iceberg resolves by id and never applies the name mapping, and a map key, which carries no
+  // id of its own, cannot be resolved. The sync itself reports success; the Iceberg table it
+  // leaves behind is unreadable. Whether XTable should instead refuse the sync is open in
+  // https://github.com/apache/incubator-xtable/issues/911.
+  @Test
+  public void testColumnMappingWithoutIcebergCompatIsNotReadableAsIceberg() {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(DELTA);
+    try (TestSparkDeltaTable table =
+        TestSparkDeltaTable.forColumnMappingWithoutIcebergCompat(
+            tableName, tempDir, sparkSession, null)) {
+      table.insertRows(20);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              DELTA,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Collections.singletonList(ICEBERG),
+              null,
+              null);
+      Map<String, SyncResult> results =
+          conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS, results.get(ICEBERG).getTableFormatSyncStatus().getStatusCode());
+
+      assertThrows(
+          SparkException.class,
+          () -> checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 20));
     }
   }
 
