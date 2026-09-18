@@ -18,6 +18,7 @@
  
 package org.apache.xtable.kernel;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -131,7 +132,15 @@ public class DeltaKernelActionsConverter {
    * @return the full absolute path to the file
    */
   static String getFullPathToFile(String dataFilePath, String tableBasePath) {
-    // Check if the file path is already absolute and under the table base path
+    // Delta allows the path of AddFile/RemoveFile actions to be relative or absolute (see
+    // PROTOCOL.md). An absolute path (one with a URI scheme, e.g. s3://, hdfs://, file://, or
+    // starting with the separator) must be used as-is: concatenating it onto the table base
+    // path would point at a non-existent location and silently drop records from the
+    // converted table.
+    if (isAbsolutePath(dataFilePath)) {
+      return dataFilePath;
+    }
+    // Check if the file path is already under the table base path
     // Use separator check to avoid false positives (e.g., "/foo" matching "/foobar/x.parquet")
     String basePathWithSeparator =
         tableBasePath.endsWith(Path.SEPARATOR) ? tableBasePath : tableBasePath + Path.SEPARATOR;
@@ -139,5 +148,10 @@ public class DeltaKernelActionsConverter {
       return dataFilePath;
     }
     return basePathWithSeparator + dataFilePath;
+  }
+
+  private static boolean isAbsolutePath(String dataFilePath) {
+    URI uri = new Path(dataFilePath).toUri();
+    return uri.getScheme() != null || dataFilePath.startsWith(Path.SEPARATOR);
   }
 }
