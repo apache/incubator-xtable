@@ -47,6 +47,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -115,6 +116,17 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         tableName, BASIC_SCHEMA, tempDir, jsc, partitionConfig, tableType);
   }
 
+  public static TestSparkHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      JavaSparkContext jsc,
+      String partitionConfig,
+      HoodieTableType tableType,
+      HoodieTableVersion tableVersion) {
+    return new TestSparkHudiTable(
+        tableName, BASIC_SCHEMA, tempDir, jsc, partitionConfig, tableType, tableVersion);
+  }
+
   /**
    * Create a test table instance with a schema that has more fields than an instance returned by
    * {@link #forStandardSchema(String, Path, JavaSparkContext, String, HoodieTableType)}.
@@ -153,7 +165,20 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       JavaSparkContext jsc,
       String partitionConfig,
       HoodieTableType hoodieTableType) {
+    this(name, schema, tempDir, jsc, partitionConfig, hoodieTableType, HoodieTableVersion.SIX);
+  }
+
+  private TestSparkHudiTable(
+      String name,
+      Schema schema,
+      Path tempDir,
+      JavaSparkContext jsc,
+      String partitionConfig,
+      HoodieTableType hoodieTableType,
+      HoodieTableVersion tableVersion) {
     super(name, schema, tempDir, partitionConfig);
+    // set the table version before initializing the write/meta clients, which read it
+    this.tableVersion = tableVersion;
     // initialize spark session
     this.jsc = jsc;
     this.writeClient = initSparkWriteClient(schema, typedProperties);

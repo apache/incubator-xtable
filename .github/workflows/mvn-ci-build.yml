@@ -40,7 +40,15 @@ jobs:
     name: Maven CI Build
     runs-on: ubuntu-latest
     # A cold build is ~27 min, which left no headroom under the previous 30.
-    timeout-minutes: 40
+    # TEMPORARY: raised from 40 to accommodate building Hudi from source on a
+    # 2-core runner. Restore to 40 once XTable depends on a released Hudi.
+    timeout-minutes: 90
+    env:
+      # TEMPORARY: the Hudi 1.2.1 staging branch of the release manager, plus
+      # the backport of apache/hudi#19869 proposed for it in voonhous/hudi#6,
+      # built as 1.2.1-SNAPSHOT. Pinned by SHA so the build is reproducible.
+      HUDI_REPO: https://github.com/vinishjail97/hudi.git
+      HUDI_SHA: 6774cb6f7cf9090ee1c53ff1cb7b6dba80fb28a1
     steps:
       - uses: actions/checkout@v7
 
@@ -99,6 +107,38 @@ jobs:
           key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
           restore-keys: |
             maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
+
+      # TEMPORARY: XTable's pom pins hudi.version to 1.2.1-SNAPSHOT, which no
+      # repository publishes. Build the modules XTable needs from source until
+      # Hudi 1.2.1 is released with the changes above, then delete every step
+      # marked TEMPORARY.
+      - name: Cache Hudi artifacts
+        id: hudi-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/apache/hudi
+          key: hudi-m2-${{ env.HUDI_SHA }}-spark3.4-scala2.12
+
+      - name: Build Hudi from source
+        if: steps.hudi-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          # Clone OUTSIDE the workspace. A checkout under the repo directory gets
+          # scanned by apache-rat, which then fails on Hudi's own files.
+          git init "$RUNNER_TEMP/hudi-src"
+          cd "$RUNNER_TEMP/hudi-src"
+          git remote add origin "$HUDI_REPO"
+          git fetch --depth 1 origin "$HUDI_SHA"
+          git checkout FETCH_HEAD
+          # Only the modules XTable depends on. A full reactor build also fails on
+          # hudi-flink-client, whose hudi-flink2.1.x dependency is not in the reactor.
+          # -Dspark3.4 sets hudi.spark.module so hudi-spark3.4-bundle_2.12 is built.
+          mvn install -ntp -B -DskipTests -T 1C \
+            -Dscala-2.12 -Dspark3.4 \
+            -Drat.skip=true -Dcheckstyle.skip=true -Dspotless.check.skip=true \
+            -Denforcer.skip=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+            -pl packaging/hudi-spark-bundle,hudi-utilities,hudi-client/hudi-java-client,hudi-sync/hudi-sync-common,hudi-sync/hudi-hive-sync,hudi-common,hudi-hadoop-common,hudi-client/hudi-client-common \
+            -am
 
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
