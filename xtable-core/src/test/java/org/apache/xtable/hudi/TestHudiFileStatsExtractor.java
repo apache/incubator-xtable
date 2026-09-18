@@ -61,6 +61,8 @@ import org.apache.parquet.hadoop.util.HadoopOutputFile;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
@@ -142,14 +144,27 @@ public class TestHudiFileStatsExtractor {
                   decimalField))
           .build();
 
-  @Test
-  void columnStatsWithMetadataTable(@TempDir Path tempDir) throws Exception {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  void columnStatsWithMetadataTable(HoodieTableVersion tableVersion, @TempDir Path tempDir)
+      throws Exception {
+    // Column-stats index V1 (table version 6) excludes DECIMAL/FIXED columns (HUDI-8585), so the
+    // decimal_field gets no stats and 8 columns are indexed. Index V2 (table version 9) supports
+    // these types, so the decimal_field is present and 9 columns are indexed. See #834.
+    boolean includeDecimal = tableVersion == HoodieTableVersion.NINE;
     String tableName = GenericTable.getTableName();
     String basePath;
     HoodieTableMetaClient metaClient;
     try (TestJavaHudiTable table =
         TestJavaHudiTable.withSchema(
-            tableName, tempDir, "long_field:SIMPLE", HoodieTableType.COPY_ON_WRITE, AVRO_SCHEMA)) {
+            tableName,
+            tempDir,
+            "long_field:SIMPLE",
+            HoodieTableType.COPY_ON_WRITE,
+            AVRO_SCHEMA,
+            tableVersion)) {
       List<HoodieRecord<HoodieAvroPayload>> records =
           getRecords().stream().map(this::buildRecord).collect(Collectors.toList());
       table.insertRecords(true, records);
@@ -182,7 +197,7 @@ public class TestHudiFileStatsExtractor {
         fileStatsExtractor
             .addStatsToFiles(tableMetadata, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
-    validateOutput(output, false);
+    validateOutput(output, includeDecimal);
   }
 
   @Test
