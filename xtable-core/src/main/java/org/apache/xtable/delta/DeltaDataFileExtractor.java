@@ -45,15 +45,6 @@ public class DeltaDataFileExtractor {
   @Builder.Default
   private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
 
-  /**
-   * Initializes an iterator for Delta Lake files.
-   *
-   * @return Delta table file iterator
-   */
-  public DataFileIterator iterator(Snapshot deltaSnapshot, InternalSchema schema) {
-    return new DeltaDataFileIterator(deltaSnapshot, schema, true, null);
-  }
-
   public DataFileIterator iterator(
       Snapshot deltaSnapshot,
       InternalSchema schema,
@@ -82,8 +73,8 @@ public class DeltaDataFileExtractor {
           snapshot.allFiles().collectAsList().stream()
               .map(
                   addFile -> {
-                    if (deletionVectorHandler != null && addFile.deletionVector() != null) {
-                      deletionVectorHandler.handle(
+                    if (addFile.deletionVector() != null) {
+                      deletionVectorHandler.onDeletionVectorFound(
                           actionsConverter.extractDeletionVectorFile(snapshot, addFile));
                     }
                     return actionsConverter.convertAddActionToInternalDataFile(

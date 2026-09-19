@@ -127,7 +127,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         tableExtractor.table(table, snapshot, engine, tableName, basePath);
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
     Map<String, InternalDataFile> removedFiles = new HashMap<>();
-    Set<String> deletionVectors = new HashSet<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
     String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
     FileFormat fileFormat = actionsConverter.convertToFileFormat(provider);
 
@@ -142,8 +142,8 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         if (addFile.getDeletionVector().isPresent()) {
           String dataFilePath =
               DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath);
-          deletionVectorHandler.handle(dataFilePath);
-          deletionVectors.add(dataFilePath);
+          deletionVectorHandler.onDeletionVectorFound(dataFilePath);
+          dataFilesWithDeletionVectors.add(dataFilePath);
         }
         Map<String, String> partitionValues = VectorUtils.toJavaMap(addFile.getPartitionValues());
         InternalDataFile dataFile =
@@ -182,14 +182,14 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     // entry which is replaced by a new entry, AddFile with delete vector information. Since the
     // same data file is removed and added, we need to remove it from the added and removed file
     // maps which are used to track actual added and removed data files.
-    for (String deletionVector : deletionVectors) {
-      if (removedFiles.containsKey(deletionVector)) {
-        addedFiles.remove(deletionVector);
-        removedFiles.remove(deletionVector);
+    for (String dataFilePath : dataFilesWithDeletionVectors) {
+      if (removedFiles.containsKey(dataFilePath)) {
+        addedFiles.remove(dataFilePath);
+        removedFiles.remove(dataFilePath);
       } else {
         log.warn(
             "No Remove action found for the data file for which deletion vector is added {}. This is unexpected.",
-            deletionVector);
+            dataFilePath);
       }
     }
 
