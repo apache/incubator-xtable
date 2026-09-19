@@ -42,7 +42,7 @@ public final class DeltaDeletionVectorHandler {
     this.warningLogger = warningLogger;
   }
 
-  public void handle(String dataFilePath) {
+  public void onDeletionVectorFound(String dataFilePath) {
     String message =
         String.format(
             "Delta deletion vectors are not supported by XTable conversion targets. "

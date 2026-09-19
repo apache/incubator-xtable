@@ -100,7 +100,7 @@ public class DeltaKernelDataFileExtractor {
             AddFile addFile =
                 new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
             if (addFile.getDeletionVector().isPresent()) {
-              deletionVectorHandler.handle(
+              deletionVectorHandler.onDeletionVectorFound(
                   DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath));
             }
           }
@@ -201,7 +201,7 @@ public class DeltaKernelDataFileExtractor {
           AddFile addFile =
               new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
           if (deletionVectorHandler != null && addFile.getDeletionVector().isPresent()) {
-            deletionVectorHandler.handle(
+            deletionVectorHandler.onDeletionVectorFound(
                 DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath));
           }
           Map<String, String> partitionValues =
