@@ -32,6 +32,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+
 import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.delta.DeltaConversionSourceConfig;
 import org.apache.xtable.utilities.RunSync.DatasetConfig;
@@ -76,14 +78,14 @@ class TestRunSync {
   }
 
   @Test
-  public void testAllowUnsupportedDeletionVectorsUsesStrictBooleanParsing() throws IOException {
+  public void testAllowUnsupportedDeletionVectorsAcceptsBooleanLiterals() throws IOException {
     String[][] configuredValues = {
       {"true", "true"},
       {"TRUE", "true"},
+      {"\"true\"", "true"},
       {"false", "false"},
-      {"yes", "false"},
-      {"on", "false"},
-      {"1", "false"}
+      {"FALSE", "false"},
+      {"\"false\"", "false"}
     };
 
     for (String[] configuredValue : configuredValues) {
@@ -98,6 +100,40 @@ class TestRunSync {
           configuredValue[1],
           sourceProperties.getProperty(
               DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS));
+    }
+  }
+
+  @Test
+  public void testAllowUnsupportedDeletionVectorsRejectsInvalidValues() {
+    String[] invalidValues = {"ture", "yes", "on", "1", "no", "off", "0"};
+
+    for (String invalidValue : invalidValues) {
+      InvalidFormatException exception =
+          Assertions.assertThrows(
+              InvalidFormatException.class,
+              () ->
+                  RunSync.YAML_MAPPER.readValue(
+                      "datasets:\n  - allowUnsupportedDeletionVectors: " + invalidValue,
+                      DatasetConfig.class));
+
+      Assertions.assertTrue(
+          exception.getPathReference().contains("allowUnsupportedDeletionVectors"));
+    }
+  }
+
+  @Test
+  public void testAllowUnsupportedDeletionVectorsAllowsMissingAndNullValues() throws IOException {
+    for (String yaml :
+        new String[] {
+          "datasets:\n  - tableName: test", "datasets:\n  - allowUnsupportedDeletionVectors: null"
+        }) {
+      DatasetConfig config = RunSync.YAML_MAPPER.readValue(yaml, DatasetConfig.class);
+      DatasetConfig.Table table = config.getDatasets().get(0);
+
+      Assertions.assertNull(table.getAllowUnsupportedDeletionVectors());
+      Assertions.assertNull(
+          RunSync.getSourceProperties(table)
+              .getProperty(DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS));
     }
   }
 
