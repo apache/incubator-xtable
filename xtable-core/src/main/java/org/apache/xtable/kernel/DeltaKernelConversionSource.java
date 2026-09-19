@@ -33,6 +33,8 @@ import java.util.Set;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
 import io.delta.kernel.engine.Engine;
@@ -40,6 +42,7 @@ import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
+import io.delta.kernel.internal.tablefeatures.TableFeatures;
 import io.delta.kernel.internal.util.VectorUtils;
 
 import org.apache.xtable.delta.DeltaDeletionVectorHandler;
@@ -202,7 +205,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Table table = Table.forPath(engine, basePath);
     Snapshot latestSnapshot = table.getLatestSnapshot(engine);
-    dataFileExtractor.validateDeletionVectors(latestSnapshot, table, engine, deletionVectorHandler);
+    validateActiveDeletionVectors(latestSnapshot, table);
     Snapshot snapshot =
         table.getSnapshotAsOfTimestamp(
             engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
@@ -222,6 +225,16 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
+  }
+
+  @VisibleForTesting
+  void validateActiveDeletionVectors(Snapshot latestSnapshot, Table table) {
+    if (((SnapshotImpl) latestSnapshot)
+        .getProtocol()
+        .supportsFeature(TableFeatures.DELETION_VECTORS_RW_FEATURE)) {
+      dataFileExtractor.validateDeletionVectors(
+          latestSnapshot, table, engine, deletionVectorHandler);
+    }
   }
 
   @Override
