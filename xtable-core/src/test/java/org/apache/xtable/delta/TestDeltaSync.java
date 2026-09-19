@@ -358,7 +358,9 @@ public class TestDeltaSync {
             .expr();
     org.apache.spark.sql.delta.DeltaLog deltaLog =
         org.apache.spark.sql.delta.DeltaLog.forTable(sparkSession, basePath.toString());
-    org.apache.spark.sql.delta.Snapshot snapshot = deltaLog.getSnapshotAtInit().snapshot();
+    // update() lists the log and returns the latest snapshot; snapshot() is only the cached one.
+    org.apache.spark.sql.delta.Snapshot snapshot =
+        deltaLog.update(false, scala.Option.empty(), scala.Option.empty());
     Seq<org.apache.spark.sql.catalyst.expressions.Expression> expressionSeq =
         scala.collection.JavaConversions.asScalaBuffer(Collections.singletonList(expression));
     Seq<org.apache.spark.sql.catalyst.expressions.Expression> translatedExpression =

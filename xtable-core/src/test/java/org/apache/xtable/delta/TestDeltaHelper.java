@@ -118,6 +118,7 @@ public class TestDeltaHelper {
   String partitionField;
   boolean includeAdditionalColumns;
   boolean enableColumnMapping;
+  boolean enableIcebergCompatV2;
 
   public static TestDeltaHelper createTestDataHelper(
       String partitionField, boolean includeAdditionalColumns) {
@@ -126,12 +127,22 @@ public class TestDeltaHelper {
 
   public static TestDeltaHelper createTestDataHelper(
       String partitionField, boolean includeAdditionalColumns, boolean enableColumnMapping) {
+    return createTestDataHelper(
+        partitionField, includeAdditionalColumns, enableColumnMapping, true);
+  }
+
+  public static TestDeltaHelper createTestDataHelper(
+      String partitionField,
+      boolean includeAdditionalColumns,
+      boolean enableColumnMapping,
+      boolean enableIcebergCompatV2) {
     StructType tableSchema = generateDynamicSchema(partitionField, includeAdditionalColumns);
     return TestDeltaHelper.builder()
         .tableStructSchema(tableSchema)
         .partitionField(partitionField)
         .includeAdditionalColumns(includeAdditionalColumns)
         .enableColumnMapping(enableColumnMapping)
+        .enableIcebergCompatV2(enableIcebergCompatV2)
         .build();
   }
 
@@ -169,8 +180,17 @@ public class TestDeltaHelper {
     }
     if (enableColumnMapping) {
       tableBuilder.property("delta.minReaderVersion", "2");
-      tableBuilder.property("delta.minWriterVersion", "5");
       tableBuilder.property("delta.columnMapping.mode", "name");
+      // Delta 3.x writes parquet field ids for the top level columns but assigns none to a map
+      // key, a map value or a list element. Iceberg reads a file that carries any id by id
+      // alone and ignores the name mapping, so those children become unresolvable.
+      // IcebergCompatV2 is what makes Delta assign and record them.
+      if (enableIcebergCompatV2) {
+        tableBuilder.property("delta.minWriterVersion", "7");
+        tableBuilder.property("delta.enableIcebergCompatV2", "true");
+      } else {
+        tableBuilder.property("delta.minWriterVersion", "5");
+      }
     }
     tableBuilder.execute();
   }

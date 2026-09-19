@@ -71,7 +71,14 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
 
   public static TestSparkDeltaTable forColumnMappingEnabled(
       String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true, true);
+    return new TestSparkDeltaTable(
+        tableName, tempDir, sparkSession, partitionField, true, true, true);
+  }
+
+  public static TestSparkDeltaTable forColumnMappingWithoutIcebergCompat(
+      String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
+    return new TestSparkDeltaTable(
+        tableName, tempDir, sparkSession, partitionField, true, true, false);
   }
 
   public TestSparkDeltaTable(
@@ -80,7 +87,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
       SparkSession sparkSession,
       String partitionField,
       boolean includeAdditionalColumns) {
-    this(name, tempDir, sparkSession, partitionField, includeAdditionalColumns, false);
+    this(name, tempDir, sparkSession, partitionField, includeAdditionalColumns, false, true);
   }
 
   public TestSparkDeltaTable(
@@ -89,7 +96,8 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
       SparkSession sparkSession,
       String partitionField,
       boolean includeAdditionalColumns,
-      boolean enableColumnMapping) {
+      boolean enableColumnMapping,
+      boolean enableIcebergCompatV2) {
     try {
       this.tableName = name;
       this.basePath = initBasePath(tempDir, tableName);
@@ -98,7 +106,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
       this.includeAdditionalColumns = includeAdditionalColumns;
       this.testDeltaHelper =
           TestDeltaHelper.createTestDataHelper(
-              partitionField, includeAdditionalColumns, enableColumnMapping);
+              partitionField, includeAdditionalColumns, enableColumnMapping, enableIcebergCompatV2);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);

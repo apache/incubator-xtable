@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -887,7 +886,7 @@ public class ITDeltaConversionSource {
     assertTrue(
         commitsBacklog.getCommitsToProcess().size() >= 2,
         "backlog must span multiple commits for this assertion to be meaningful");
-    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test
@@ -943,7 +942,7 @@ public class ITDeltaConversionSource {
     }
     // The refresh comes from the commit's own metaData action, not a snapshot reload: the only
     // snapshot read is the baseline at the first commit.
-    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test
@@ -984,10 +983,12 @@ public class ITDeltaConversionSource {
 
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
     // With reuse disabled the pre-optimization behaviour is restored in full: one snapshot
-    // reconstruction per commit, and no second listing of the log for commit-file mtimes.
+    // reconstruction per commit, and no second listing of the log for commit-file mtimes. As of
+    // Delta 3.x DeltaLog.getChanges itself delegates to getChangeLogFiles, and the spy sees that
+    // self-call, so the one listing the backlog load makes is the whole count.
     verify(spiedDeltaLog, times(commitsBacklog.getCommitsToProcess().size()))
-        .getSnapshotAt(anyLong(), any());
-    verify(spiedDeltaLog, never()).getChangeLogFiles(anyLong(), anyBoolean());
+        .getSnapshotAt(anyLong(), any(), any());
+    verify(spiedDeltaLog, times(1)).getChangeLogFiles(anyLong(), anyBoolean());
   }
 
   @Test

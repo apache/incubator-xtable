@@ -33,8 +33,11 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.AddFile;
@@ -51,6 +54,8 @@ import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.TableFormat;
 
+// The invocations flip a session conf on the shared SparkSession, so they must not interleave.
+@Execution(ExecutionMode.SAME_THREAD)
 public class ITDeltaDeleteVectorConvert {
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
@@ -91,8 +96,20 @@ public class ITDeltaDeleteVectorConvert {
     conversionSourceProvider.init(hadoopConf);
   }
 
-  @Test
-  public void testInsertsUpsertsAndDeletes() {
+  // Delta 3.x persists deletion vectors for MERGE as well as DELETE, which is the default. The
+  // false run keeps merges on the rewrite path so the upsert step contributes no vectors, as
+  // under Delta 2.4; the true run covers the 3.x default, where the upsert marks the rows it
+  // replaces as deleted in the file they came from.
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testInsertsUpsertsAndDeletes(boolean mergePersistsDeletionVectors) {
+    sparkSession
+        .conf()
+        .set(
+            "spark.databricks.delta.merge.deletionVectors.persistent",
+            String.valueOf(mergePersistsDeletionVectors));
+    int upsertVectorFiles = mergePersistsDeletionVectors ? 1 : 0;
+    int upsertDeletedRecords = mergePersistsDeletionVectors ? 20 : 0;
     String tableName = GenericTable.getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
@@ -104,6 +121,10 @@ public class ITDeltaDeleteVectorConvert {
             "ALTER TABLE "
                 + tableName
                 + " SET TBLPROPERTIES ('delta.enableDeletionVectors' = true)");
+    // The DeltaTable handle resolved at construction still carries the pre-ALTER protocol, and
+    // as of Delta 3.x a merge planned against it does not see deletion vectors as readable, so
+    // the row_index metadata column the DV write path needs is never exposed.
+    testSparkDeltaTable.reload();
 
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
@@ -116,11 +137,15 @@ public class ITDeltaDeleteVectorConvert {
     assertEquals(100L, testSparkDeltaTable.getNumRows());
     validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 0, 0);
 
-    // upsert does not create delete vectors
+    // the upsert creates a deletion vector only when merges persist them
     testSparkDeltaTable.upsertRows(rows.subList(0, 20));
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     assertEquals(100L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 0, 0);
+    validateDeletedRecordCount(
+        testSparkDeltaTable.getDeltaLog(),
+        allActiveFiles.size() + 1,
+        upsertVectorFiles,
+        upsertDeletedRecords);
 
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
@@ -135,7 +160,10 @@ public class ITDeltaDeleteVectorConvert {
     testSparkDeltaTable.deleteRows(rowsToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     assertEquals(135L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 2, 15);
+    // both deleted ranges land in files the upsert already vectored or never touched, so the
+    // file count is the same either way and only the record count carries the upsert's share
+    validateDeletedRecordCount(
+        testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 2, 15 + upsertDeletedRecords);
 
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
@@ -148,7 +176,8 @@ public class ITDeltaDeleteVectorConvert {
     testSparkDeltaTable.deleteRows(rowsToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     assertEquals(178L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 2, 22);
+    validateDeletedRecordCount(
+        testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 2, 22 + upsertDeletedRecords);
 
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
@@ -185,7 +214,7 @@ public class ITDeltaDeleteVectorConvert {
   private void validateDeletedRecordCount(
       DeltaLog deltaLog, int version, int deleteVectorFileCount, int deletionRecordCount) {
     List<AddFile> allFiles =
-        deltaLog.getSnapshotAt(version, Option.empty()).allFiles().collectAsList();
+        deltaLog.getSnapshotAt(version, Option.empty(), Option.empty()).allFiles().collectAsList();
     List<AddFile> filesWithDeletionVectors =
         allFiles.stream().filter(f -> f.deletionVector() != null).collect(Collectors.toList());
 
