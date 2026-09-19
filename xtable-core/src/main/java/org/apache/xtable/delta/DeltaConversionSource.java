@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,10 +44,12 @@ import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import io.delta.tables.DeltaTable;
 
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -72,6 +75,10 @@ public class DeltaConversionSource implements ConversionSource<Long> {
 
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
+
+  @Builder.Default
+  private final DeltaDeletionVectorHandler deletionVectorHandler =
+      new DeltaDeletionVectorHandler(false);
 
   private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState = Optional.empty();
 
@@ -139,7 +146,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
     Map<String, InternalDataFile> removedFiles = new HashMap<>();
     // Set of data file paths for which deletion vectors exists.
-    Set<String> deletionVectors = new HashSet<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
 
     for (Action action : actionsForVersion) {
       if (action instanceof AddFile) {
@@ -154,10 +161,11 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 DeltaPartitionExtractor.getInstance(),
                 DeltaStatsExtractor.getInstance());
         addedFiles.put(dataFile.getPhysicalPath(), dataFile);
-        String deleteVectorPath =
+        String dataFilePath =
             actionsConverter.extractDeletionVectorFile(tableBasePath, (AddFile) action);
-        if (deleteVectorPath != null) {
-          deletionVectors.add(deleteVectorPath);
+        if (dataFilePath != null) {
+          deletionVectorHandler.onDeletionVectorFound(dataFilePath);
+          dataFilesWithDeletionVectors.add(dataFilePath);
         }
       } else if (action instanceof RemoveFile) {
         InternalDataFile dataFile =
@@ -176,15 +184,15 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     // entry which is replaced by a new entry, AddFile with delete vector information. Since the
     // same data file is removed and added, we need to remove it from the added and removed file
     // maps which are used to track actual added and removed data files.
-    for (String deletionVector : deletionVectors) {
+    for (String dataFilePath : dataFilesWithDeletionVectors) {
       // validate that a Remove action is also added for the data file
-      if (removedFiles.containsKey(deletionVector)) {
-        addedFiles.remove(deletionVector);
-        removedFiles.remove(deletionVector);
+      if (removedFiles.containsKey(dataFilePath)) {
+        addedFiles.remove(dataFilePath);
+        removedFiles.remove(dataFilePath);
       } else {
         log.warn(
             "No Remove action found for the data file for which deletion vector is added {}. This is unexpected.",
-            deletionVector);
+            dataFilePath);
       }
     }
 
@@ -203,6 +211,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
+    validateActiveDeletionVectors(deltaLog.snapshot());
     DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
         deltaLog
             .history()
@@ -213,6 +222,22 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
+  }
+
+  @VisibleForTesting
+  void validateActiveDeletionVectors(Snapshot snapshot) {
+    if (!snapshot.deletionVectorsSupported()) {
+      return;
+    }
+
+    Iterator<AddFile> activeFiles = snapshot.allFiles().toLocalIterator();
+    while (activeFiles.hasNext()) {
+      AddFile addFile = activeFiles.next();
+      if (addFile.deletionVector() != null) {
+        deletionVectorHandler.onDeletionVectorFound(
+            actionsConverter.extractDeletionVectorFile(snapshot, addFile));
+      }
+    }
   }
 
   /*
@@ -290,10 +315,13 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   }
 
   private List<PartitionFileGroup> getInternalDataFiles(Snapshot snapshot, InternalSchema schema) {
-    try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+    try (DataFileIterator fileIterator =
+        dataFileExtractor.iterator(snapshot, schema, deletionVectorHandler)) {
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       return PartitionFileGroup.fromFiles(dataFiles);
+    } catch (NotSupportedException e) {
+      throw e;
     } catch (Exception e) {
       throw new ReadException("Failed to iterate through Delta data files", e);
     }

@@ -45,13 +45,11 @@ public class DeltaDataFileExtractor {
   @Builder.Default
   private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
 
-  /**
-   * Initializes an iterator for Delta Lake files.
-   *
-   * @return Delta table file iterator
-   */
-  public DataFileIterator iterator(Snapshot deltaSnapshot, InternalSchema schema) {
-    return new DeltaDataFileIterator(deltaSnapshot, schema, true);
+  public DataFileIterator iterator(
+      Snapshot deltaSnapshot,
+      InternalSchema schema,
+      DeltaDeletionVectorHandler deletionVectorHandler) {
+    return new DeltaDataFileIterator(deltaSnapshot, schema, true, deletionVectorHandler);
   }
 
   public class DeltaDataFileIterator implements DataFileIterator {
@@ -61,7 +59,10 @@ public class DeltaDataFileExtractor {
     private final Iterator<InternalDataFile> dataFilesIterator;
 
     private DeltaDataFileIterator(
-        Snapshot snapshot, InternalSchema schema, boolean includeColumnStats) {
+        Snapshot snapshot,
+        InternalSchema schema,
+        boolean includeColumnStats,
+        DeltaDeletionVectorHandler deletionVectorHandler) {
       this.fileFormat =
           actionsConverter.convertToFileFormat(snapshot.metadata().format().provider());
       this.fields = schema.getAllFields();
@@ -71,16 +72,21 @@ public class DeltaDataFileExtractor {
       this.dataFilesIterator =
           snapshot.allFiles().collectAsList().stream()
               .map(
-                  addFile ->
-                      actionsConverter.convertAddActionToInternalDataFile(
-                          addFile,
-                          snapshot,
-                          fileFormat,
-                          partitionFields,
-                          fields,
-                          includeColumnStats,
-                          partitionExtractor,
-                          fileStatsExtractor))
+                  addFile -> {
+                    if (addFile.deletionVector() != null) {
+                      deletionVectorHandler.onDeletionVectorFound(
+                          actionsConverter.extractDeletionVectorFile(snapshot, addFile));
+                    }
+                    return actionsConverter.convertAddActionToInternalDataFile(
+                        addFile,
+                        snapshot,
+                        fileFormat,
+                        partitionFields,
+                        fields,
+                        includeColumnStats,
+                        partitionExtractor,
+                        fileStatsExtractor);
+                  })
               .iterator();
     }
 
