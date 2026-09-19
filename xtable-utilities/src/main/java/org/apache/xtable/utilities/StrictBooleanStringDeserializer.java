@@ -19,13 +19,15 @@
 package org.apache.xtable.utilities;
 
 import java.io.IOException;
+import java.util.Locale;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
-/** Deserializes only the literal value {@code true} as enabled. */
+/** Deserializes boolean literals as canonical strings and rejects all other values. */
 public class StrictBooleanStringDeserializer extends StdDeserializer<String> {
 
   public StrictBooleanStringDeserializer() {
@@ -37,6 +39,12 @@ public class StrictBooleanStringDeserializer extends StdDeserializer<String> {
     if (parser.currentToken() == JsonToken.VALUE_NULL) {
       return null;
     }
-    return Boolean.toString(Boolean.TRUE.toString().equalsIgnoreCase(parser.getText()));
+    String value = parser.getText();
+    if (Boolean.TRUE.toString().equalsIgnoreCase(value)
+        || Boolean.FALSE.toString().equalsIgnoreCase(value)) {
+      return value.toLowerCase(Locale.ROOT);
+    }
+    throw InvalidFormatException.from(
+        parser, "Expected true or false for allowUnsupportedDeletionVectors", value, String.class);
   }
 }
