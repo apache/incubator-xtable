@@ -146,7 +146,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
     Map<String, InternalDataFile> removedFiles = new HashMap<>();
     // Set of data file paths for which deletion vectors exists.
-    Set<String> deletionVectors = new HashSet<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
 
     for (Action action : actionsForVersion) {
       if (action instanceof AddFile) {
@@ -161,11 +161,11 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 DeltaPartitionExtractor.getInstance(),
                 DeltaStatsExtractor.getInstance());
         addedFiles.put(dataFile.getPhysicalPath(), dataFile);
-        String deleteVectorPath =
+        String dataFilePath =
             actionsConverter.extractDeletionVectorFile(tableBasePath, (AddFile) action);
-        if (deleteVectorPath != null) {
-          deletionVectorHandler.handle(deleteVectorPath);
-          deletionVectors.add(deleteVectorPath);
+        if (dataFilePath != null) {
+          deletionVectorHandler.onDeletionVectorFound(dataFilePath);
+          dataFilesWithDeletionVectors.add(dataFilePath);
         }
       } else if (action instanceof RemoveFile) {
         InternalDataFile dataFile =
@@ -184,15 +184,15 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     // entry which is replaced by a new entry, AddFile with delete vector information. Since the
     // same data file is removed and added, we need to remove it from the added and removed file
     // maps which are used to track actual added and removed data files.
-    for (String deletionVector : deletionVectors) {
+    for (String dataFilePath : dataFilesWithDeletionVectors) {
       // validate that a Remove action is also added for the data file
-      if (removedFiles.containsKey(deletionVector)) {
-        addedFiles.remove(deletionVector);
-        removedFiles.remove(deletionVector);
+      if (removedFiles.containsKey(dataFilePath)) {
+        addedFiles.remove(dataFilePath);
+        removedFiles.remove(dataFilePath);
       } else {
         log.warn(
             "No Remove action found for the data file for which deletion vector is added {}. This is unexpected.",
-            deletionVector);
+            dataFilePath);
       }
     }
 
@@ -234,7 +234,8 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     while (activeFiles.hasNext()) {
       AddFile addFile = activeFiles.next();
       if (addFile.deletionVector() != null) {
-        deletionVectorHandler.handle(actionsConverter.extractDeletionVectorFile(snapshot, addFile));
+        deletionVectorHandler.onDeletionVectorFound(
+            actionsConverter.extractDeletionVectorFile(snapshot, addFile));
       }
     }
   }
