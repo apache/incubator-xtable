@@ -280,9 +280,12 @@ public class ITConversionController {
   // the same unchanged schema to an existing table (expected to still succeed -- this guards
   // against a false positive in syncSchema()'s drift check, since it compares in Kernel's
   // StructType rather than InternalSchema specifically to avoid InternalSchema<->StructType
-  // round-trip asymmetry causing an unchanged schema to look "evolved"), then evolves the schema
-  // and syncs again, asserting the DELTA target's sync result is ERROR with the expected message,
-  // and that the target's data was left at its last-good state rather than partially written.
+  // round-trip asymmetry causing an unchanged schema to look "evolved"), then exercises upserts
+  // and deletes against the Kernel target with that same unchanged schema (since incorrect
+  // removal/update handling could otherwise leave deleted rows or stale values visible without
+  // failing this target's matrix), then evolves the schema and syncs again, asserting the DELTA
+  // target's sync result is ERROR with the expected message, and that the target's data was left
+  // at its last-good state rather than partially written.
   @ParameterizedTest
   @MethodSource("generateTestParametersForSyncModesAndPartitioning")
   public void testVariousOperationsDeltaKernelTarget(SyncMode syncMode, boolean isPartitioned) {
@@ -293,7 +296,7 @@ public class ITConversionController {
 
     try (GenericTable table =
         GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, HUDI, isPartitioned)) {
-      table.insertRows(100);
+      List<?> insertRecords = table.insertRows(100);
       ConversionConfig conversionConfig =
           getTableSyncConfig(
               HUDI, syncMode, tableName, table, targetTableFormats, partitionConfig, null, true);
@@ -312,6 +315,23 @@ public class ITConversionController {
           results.get(DELTA).getTableFormatSyncStatus().getStatusCode(),
           "An unchanged-schema resync of an existing table must not be flagged as schema drift");
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 150);
+
+      // Cover updates and deletes against the Kernel target before moving on to schema evolution
+      // below -- still with an unchanged schema, so this isolates removal/update handling from
+      // the schema-drift behavior exercised above and below.
+      table.upsertRows(insertRecords.subList(0, 20));
+      results = conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS, results.get(DELTA).getTableFormatSyncStatus().getStatusCode());
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 150);
+
+      table.deleteRows(insertRecords.subList(30, 50));
+      results = conversionController.sync(conversionConfig, conversionSourceProvider);
+      assertEquals(
+          SyncStatusCode.SUCCESS, results.get(DELTA).getTableFormatSyncStatus().getStatusCode());
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 130);
+      checkDatasetEquivalenceWithFilter(
+          HUDI, table, targetTableFormats, table.getFilterQuery(), Collections.emptyMap());
     }
 
     try (GenericTable tableWithUpdatedSchema =
@@ -338,11 +358,11 @@ public class ITConversionController {
               .getErrorMessage()
               .contains("https://github.com/delta-io/delta/issues/4305"));
 
-      // The target should be left exactly at its last successfully-synced state (150 rows, old
+      // The target should be left exactly at its last successfully-synced state (130 rows, old
       // schema), not partially written with some but not all of the new rows/columns.
       long targetRowCount =
           sparkSession.read().format("delta").load(tableWithUpdatedSchema.getDataPath()).count();
-      assertEquals(150, targetRowCount);
+      assertEquals(130, targetRowCount);
     }
   }
 
