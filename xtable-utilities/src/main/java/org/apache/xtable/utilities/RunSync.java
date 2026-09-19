@@ -60,7 +60,6 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceConfig;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
@@ -183,8 +182,6 @@ public class RunSync {
               .build();
       try {
         conversionController.sync(conversionConfig, conversionSourceProvider);
-      } catch (NotSupportedException e) {
-        throw e;
       } catch (Exception e) {
         log.error("Error running sync for {}", table.getTableBasePath(), e);
       }
