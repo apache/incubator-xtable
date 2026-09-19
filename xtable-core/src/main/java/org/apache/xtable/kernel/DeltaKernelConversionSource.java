@@ -177,6 +177,11 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       }
     }
 
+    // In Delta Lake if delete vector information is added for an existing data file, as a result of
+    // a delete operation, then a new RemoveFile action is added to the commit log to remove the old
+    // entry which is replaced by a new entry, AddFile with delete vector information. Since the
+    // same data file is removed and added, we need to remove it from the added and removed file
+    // maps which are used to track actual added and removed data files.
     for (String deletionVector : deletionVectors) {
       if (removedFiles.containsKey(deletionVector)) {
         addedFiles.remove(deletionVector);
