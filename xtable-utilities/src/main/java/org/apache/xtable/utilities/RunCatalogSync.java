@@ -62,7 +62,6 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceConfig;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
@@ -196,8 +195,6 @@ public class RunCatalogSync {
         conversionController.syncTableAcrossCatalogs(
             conversionConfig,
             getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
-      } catch (NotSupportedException e) {
-        throw e;
       } catch (Exception e) {
         log.error("Error running sync for {}", sourceTable.getBasePath(), e);
       }
