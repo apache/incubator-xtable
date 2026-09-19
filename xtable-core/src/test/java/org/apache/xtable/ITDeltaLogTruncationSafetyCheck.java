@@ -18,16 +18,24 @@
  
 package org.apache.xtable;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.net.URI;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.List;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.api.java.JavaSparkContext;
@@ -36,6 +44,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import io.delta.kernel.exceptions.KernelException;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
@@ -109,7 +119,7 @@ public class ITDeltaLogTruncationSafetyCheck {
     Path deltaLogDir = Paths.get(URI.create(basePath)).resolve("_delta_log");
     long checkpointVersion = findLatestCheckpointVersion(deltaLogDir);
     log.info("Latest checkpoint version found: {}", checkpointVersion);
-    org.junit.jupiter.api.Assertions.assertTrue(
+    assertTrue(
         checkpointVersion > 0,
         "Expected a checkpoint to have been created after "
             + NUM_COMMITS
@@ -142,9 +152,9 @@ public class ITDeltaLogTruncationSafetyCheck {
     // instantAfterV0 is before the checkpoint, and its backing commit file has been deleted,
     // while a valid checkpoint covering that deletion exists -- the realistic, protocol-compliant
     // version of the "log truncated past the requested instant" scenario in #779.
-    logSafetyCheckResult(
+    assertSafetyCheckDetectsUnsafe(
         "Standalone", new DeltaConversionSourceProvider(), sourceTable, instantAfterV0);
-    logSafetyCheckResult(
+    assertSafetyCheckDetectsUnsafe(
         "Kernel", new DeltaKernelConversionSourceProvider(), sourceTable, instantAfterV0);
   }
 
@@ -158,17 +168,65 @@ public class ITDeltaLogTruncationSafetyCheck {
   // the safety check BEFORE any deletion (so it should say "safe"), then delete the pre-checkpoint
   // commit files (simulating retention cleanup running concurrently, right after the check
   // passed), then attempt the actual incremental read the check just approved.
+  //
+  // The two implementations react differently once the race is hit, so each gets its own
+  // assertions on the observed behavior rather than a shared expectation:
+  //  - Kernel resolves the sync instant to a version eagerly and throws a KernelException once
+  //    that version's backing file is gone.
+  //  - Standalone does not throw; it silently narrows the backlog to only the commits at or
+  //    after the checkpoint, silently dropping the earlier commits it had just approved reading.
   @Test
   public void testSafetyCheckRaceWithConcurrentCleanup_Standalone() throws Exception {
-    raceCheckThenReadAfterConcurrentDeletion("Standalone", new DeltaConversionSourceProvider());
+    RaceOutcome outcome =
+        raceCheckThenReadAfterConcurrentDeletion("Standalone", new DeltaConversionSourceProvider());
+    assertTrue(
+        outcome.isSafeBeforeDeletion(),
+        "Standalone isIncrementalSyncSafeFrom should report safe before the concurrent cleanup"
+            + " runs");
+    assertNull(
+        outcome.getThrown(),
+        "Standalone's read is not expected to throw after the race; it is expected to instead"
+            + " silently narrow the backlog -- see the commitsToProcess assertion below. If this"
+            + " now throws, Standalone's behavior has changed and this test needs updating: "
+            + outcome.getThrown());
+    assertNotNull(outcome.getCommitsToProcess());
+    assertTrue(
+        outcome.getCommitsToProcess().stream().allMatch(c -> c > outcome.getCheckpointVersion()),
+        "Expected Standalone to silently drop every commit at or before the checkpoint version ("
+            + outcome.getCheckpointVersion()
+            + ") once their backing files were deleted mid-race, even though the safety check"
+            + " had approved syncing from before those commits; got "
+            + outcome.getCommitsToProcess());
   }
 
   @Test
   public void testSafetyCheckRaceWithConcurrentCleanup_Kernel() throws Exception {
-    raceCheckThenReadAfterConcurrentDeletion("Kernel", new DeltaKernelConversionSourceProvider());
+    RaceOutcome outcome =
+        raceCheckThenReadAfterConcurrentDeletion(
+            "Kernel", new DeltaKernelConversionSourceProvider());
+    assertTrue(
+        outcome.isSafeBeforeDeletion(),
+        "Kernel isIncrementalSyncSafeFrom should report safe before the concurrent cleanup runs");
+    assertNotNull(
+        outcome.getThrown(),
+        "Expected Kernel's read to throw once concurrent cleanup deletes the commit files"
+            + " backing the sync instant the safety check had just approved");
+    assertInstanceOf(
+        KernelException.class,
+        outcome.getThrown(),
+        "Expected a KernelException from Kernel's timestamp-to-version resolution, got: "
+            + outcome.getThrown());
   }
 
-  private void raceCheckThenReadAfterConcurrentDeletion(
+  @Value
+  private static class RaceOutcome {
+    boolean safeBeforeDeletion;
+    Exception thrown;
+    List<Long> commitsToProcess;
+    long checkpointVersion;
+  }
+
+  private RaceOutcome raceCheckThenReadAfterConcurrentDeletion(
       String label, ConversionSourceProvider<Long> provider) throws Exception {
     // Each implementation gets its own freshly-built table, so one implementation's deletion of
     // pre-checkpoint files can't contaminate the other's "before deletion" baseline.
@@ -191,7 +249,7 @@ public class ITDeltaLogTruncationSafetyCheck {
     Path deltaLogDir = Paths.get(URI.create(basePath)).resolve("_delta_log");
     long checkpointVersion = findLatestCheckpointVersion(deltaLogDir);
     log.info("[{}] Latest checkpoint version found: {}", label, checkpointVersion);
-    org.junit.jupiter.api.Assertions.assertTrue(checkpointVersion > 0, "Expected a checkpoint");
+    assertTrue(checkpointVersion > 0, "Expected a checkpoint");
 
     SourceTable sourceTable =
         SourceTable.builder()
@@ -221,43 +279,30 @@ public class ITDeltaLogTruncationSafetyCheck {
       }
       log.info("[{}] Deleted {} commit file(s) after the safety check ran", label, deletedCount);
 
-      if (safeBeforeDeletion) {
-        try {
-          CommitsBacklog<Long> backlog =
-              source.getCommitsBacklog(
-                  InstantsForIncrementalSync.builder().lastSyncInstant(instantAfterV0).build());
-          log.info(
-              "[{}] getCommitsBacklog after concurrent cleanup returned commitsToProcess={},"
-                  + " expected commits 1..{} (checkpoint covers 0..{}) if nothing was silently"
-                  + " skipped",
-              label,
-              backlog.getCommitsToProcess(),
-              NUM_COMMITS - 1,
-              checkpointVersion - 1);
-          for (Long commit : backlog.getCommitsToProcess()) {
-            source.getTableChangeForCommit(commit);
-            log.info("[{}] getTableChangeForCommit({}) succeeded", label, commit);
-          }
-          log.info(
-              "[{}] Read succeeded despite concurrent cleanup; commitsToProcess.size()={}"
-                  + " (a value less than {} means early commits were silently dropped, not read)",
-              label,
-              backlog.getCommitsToProcess().size(),
-              NUM_COMMITS - 1);
-        } catch (Exception e) {
-          log.error(
-              "[{}] RACE CONFIRMED: safety check said safe, but the read that followed threw"
-                  + " after concurrent cleanup: {}",
-              label,
-              e.toString());
+      List<Long> commitsToProcess = null;
+      Exception thrown = null;
+      try {
+        CommitsBacklog<Long> backlog =
+            source.getCommitsBacklog(
+                InstantsForIncrementalSync.builder().lastSyncInstant(instantAfterV0).build());
+        commitsToProcess = backlog.getCommitsToProcess();
+        log.info(
+            "[{}] getCommitsBacklog after concurrent cleanup returned commitsToProcess={},"
+                + " expected commits 1..{} (checkpoint covers 0..{}) if nothing was silently"
+                + " skipped",
+            label,
+            commitsToProcess,
+            NUM_COMMITS - 1,
+            checkpointVersion - 1);
+        for (Long commit : commitsToProcess) {
+          source.getTableChangeForCommit(commit);
+          log.info("[{}] getTableChangeForCommit({}) succeeded", label, commit);
         }
+      } catch (Exception e) {
+        thrown = e;
+        log.info("[{}] read after concurrent cleanup threw: {}", label, e.toString());
       }
-    } catch (Exception e) {
-      log.error(
-          "[{}] isIncrementalSyncSafeFrom({}) itself threw: {}",
-          label,
-          instantAfterV0,
-          e.toString());
+      return new RaceOutcome(safeBeforeDeletion, thrown, commitsToProcess, checkpointVersion);
     }
   }
 
@@ -276,41 +321,23 @@ public class ITDeltaLogTruncationSafetyCheck {
     return latest;
   }
 
-  private void logSafetyCheckResult(
+  private void assertSafetyCheckDetectsUnsafe(
       String label,
       ConversionSourceProvider<Long> provider,
       SourceTable sourceTable,
-      Instant instant) {
+      Instant instant)
+      throws Exception {
     provider.init(jsc.hadoopConfiguration());
     try (ConversionSource<Long> source = provider.getConversionSourceInstance(sourceTable)) {
       boolean safe = source.isIncrementalSyncSafeFrom(instant);
       log.info("[{}] isIncrementalSyncSafeFrom({}) = {}", label, instant, safe);
-      if (safe) {
-        // The safety check said it's fine to sync incrementally from this instant. Try to
-        // actually read the backlog from here, which is what would really happen next -- if
-        // this throws, the safety check produced a false positive.
-        try {
-          CommitsBacklog<Long> backlog =
-              source.getCommitsBacklog(
-                  InstantsForIncrementalSync.builder().lastSyncInstant(instant).build());
-          log.info(
-              "[{}] getCommitsBacklog({}) succeeded, commits to process: {}",
-              label,
-              instant,
-              backlog.getCommitsToProcess());
-          for (Long commit : backlog.getCommitsToProcess()) {
-            source.getTableChangeForCommit(commit);
-          }
-          log.info("[{}] getTableChangeForCommit succeeded for all commits in backlog", label);
-        } catch (Exception e) {
-          log.error(
-              "[{}] isIncrementalSyncSafeFrom returned true but reading the backlog threw: {}",
-              label,
-              e.toString());
-        }
-      }
-    } catch (Exception e) {
-      log.error("[{}] isIncrementalSyncSafeFrom({}) threw: {}", label, instant, e.toString());
+      assertFalse(
+          safe,
+          "["
+              + label
+              + "] isIncrementalSyncSafeFrom should report false once the commit files backing "
+              + instant
+              + " have been removed by protocol-compliant log retention cleanup");
     }
   }
 }
