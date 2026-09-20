@@ -66,6 +66,10 @@ public final class DeltaDeletionVectorHandler {
             + " is enabled. Target tables may contain rows that were deleted from the source.");
   }
 
+  public boolean isRejecting() {
+    return !allowUnsupportedDeletionVectors;
+  }
+
   /**
    * Removes same-path add/remove pairs that represent deletion vector metadata updates rather than
    * physical data file changes.
