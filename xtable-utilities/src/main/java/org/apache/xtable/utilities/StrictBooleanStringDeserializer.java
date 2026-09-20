@@ -45,6 +45,6 @@ public class StrictBooleanStringDeserializer extends StdDeserializer<String> {
       return value.toLowerCase(Locale.ROOT);
     }
     throw InvalidFormatException.from(
-        parser, "Expected true or false for allowUnsupportedDeletionVectors", value, String.class);
+        parser, "Expected true or false for " + parser.currentName(), value, String.class);
   }
 }
