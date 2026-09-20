@@ -19,15 +19,22 @@
 package org.apache.xtable.delta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 public class TestDeltaDeletionVectorHandler {
   private static final String DATA_FILE_PATH = "file:///table/part-0001.parquet";
@@ -57,5 +64,36 @@ public class TestDeltaDeletionVectorHandler {
     assertEquals(1, warnings.size());
     assertTrue(warnings.get(0).contains(DATA_FILE_PATH));
     assertTrue(warnings.get(0).contains("may contain rows that were deleted"));
+  }
+
+  @Test
+  public void removesMatchingDeletionVectorFileChanges() {
+    Map<String, InternalDataFile> addedFiles = new HashMap<>();
+    Map<String, InternalDataFile> removedFiles = new HashMap<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
+    addedFiles.put(DATA_FILE_PATH, mock(InternalDataFile.class));
+    removedFiles.put(DATA_FILE_PATH, mock(InternalDataFile.class));
+    dataFilesWithDeletionVectors.add(DATA_FILE_PATH);
+
+    DeltaDeletionVectorHandler.removeDeletionVectorFileChanges(
+        addedFiles, removedFiles, dataFilesWithDeletionVectors);
+
+    assertTrue(addedFiles.isEmpty());
+    assertTrue(removedFiles.isEmpty());
+  }
+
+  @Test
+  public void preservesUnmatchedDeletionVectorFileChanges() {
+    Map<String, InternalDataFile> addedFiles = new HashMap<>();
+    Map<String, InternalDataFile> removedFiles = new HashMap<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
+    addedFiles.put(DATA_FILE_PATH, mock(InternalDataFile.class));
+    dataFilesWithDeletionVectors.add(DATA_FILE_PATH);
+
+    DeltaDeletionVectorHandler.removeDeletionVectorFileChanges(
+        addedFiles, removedFiles, dataFilesWithDeletionVectors);
+
+    assertTrue(addedFiles.containsKey(DATA_FILE_PATH));
+    assertFalse(removedFiles.containsKey(DATA_FILE_PATH));
   }
 }

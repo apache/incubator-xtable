@@ -18,6 +18,8 @@
  
 package org.apache.xtable.delta;
 
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import lombok.extern.log4j.Log4j2;
@@ -25,6 +27,7 @@ import lombok.extern.log4j.Log4j2;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 @Log4j2
 public final class DeltaDeletionVectorHandler {
@@ -61,5 +64,29 @@ public final class DeltaDeletionVectorHandler {
             + " Continuing because "
             + DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS
             + " is enabled. Target tables may contain rows that were deleted from the source.");
+  }
+
+  /**
+   * Removes same-path add/remove pairs that represent deletion vector metadata updates rather than
+   * physical data file changes.
+   *
+   * @param addedFiles data files added by the commit, keyed by path
+   * @param removedFiles data files removed by the commit, keyed by path
+   * @param dataFilesWithDeletionVectors paths of added data files containing deletion vectors
+   */
+  public static void removeDeletionVectorFileChanges(
+      Map<String, InternalDataFile> addedFiles,
+      Map<String, InternalDataFile> removedFiles,
+      Set<String> dataFilesWithDeletionVectors) {
+    for (String dataFilePath : dataFilesWithDeletionVectors) {
+      if (removedFiles.containsKey(dataFilePath)) {
+        addedFiles.remove(dataFilePath);
+        removedFiles.remove(dataFilePath);
+      } else {
+        log.warn(
+            "No Remove action found for the data file for which deletion vector is added {}. This is unexpected.",
+            dataFilePath);
+      }
+    }
   }
 }
