@@ -249,7 +249,7 @@ public class ITDeltaDeleteVectorConvert {
   }
 
   private void assertRejectsDeletionVectors(
-      ConversionSource<Long> conversionSource, Long timestampBeforeDelete) {
+      ConversionSource<Long> conversionSource, Long lastSyncTimestamp) {
     NotSupportedException fullSyncException =
         assertThrows(NotSupportedException.class, conversionSource::getCurrentSnapshot);
     assertTrue(fullSyncException.getMessage().contains("contains a deletion vector"));
@@ -261,7 +261,7 @@ public class ITDeltaDeleteVectorConvert {
               CommitsBacklog<Long> commitsBacklog =
                   conversionSource.getCommitsBacklog(
                       InstantsForIncrementalSync.builder()
-                          .lastSyncInstant(Instant.ofEpochMilli(timestampBeforeDelete))
+                          .lastSyncInstant(Instant.ofEpochMilli(lastSyncTimestamp))
                           .build());
               for (Long version : commitsBacklog.getCommitsToProcess()) {
                 conversionSource.getTableChangeForCommit(version);
