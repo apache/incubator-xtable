@@ -45,6 +45,15 @@ public class DeltaDataFileExtractor {
   @Builder.Default
   private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
 
+  /**
+   * Initializes an iterator for active Delta Lake data files.
+   *
+   * @param deltaSnapshot snapshot containing the active data files
+   * @param schema internal schema used to convert the data files
+   * @param deletionVectorHandler handler invoked with the data file path when a deletion vector is
+   *     found
+   * @return Delta table file iterator
+   */
   public DataFileIterator iterator(
       Snapshot deltaSnapshot,
       InternalSchema schema,
