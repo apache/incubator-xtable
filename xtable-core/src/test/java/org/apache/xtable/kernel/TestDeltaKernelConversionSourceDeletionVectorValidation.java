@@ -43,6 +43,7 @@ class TestDeltaKernelConversionSourceDeletionVectorValidation {
     Table table = mock(Table.class);
     SnapshotImpl snapshot = mock(SnapshotImpl.class);
     Protocol protocol = mock(Protocol.class);
+    when(deletionVectorHandler.isRejecting()).thenReturn(true);
     when(snapshot.getProtocol()).thenReturn(protocol);
     when(protocol.supportsFeature(TableFeatures.DELETION_VECTORS_RW_FEATURE)).thenReturn(false);
 
@@ -66,6 +67,7 @@ class TestDeltaKernelConversionSourceDeletionVectorValidation {
     Table table = mock(Table.class);
     SnapshotImpl snapshot = mock(SnapshotImpl.class);
     Protocol protocol = mock(Protocol.class);
+    when(deletionVectorHandler.isRejecting()).thenReturn(true);
     when(snapshot.getProtocol()).thenReturn(protocol);
     when(protocol.supportsFeature(TableFeatures.DELETION_VECTORS_RW_FEATURE)).thenReturn(true);
 
@@ -78,6 +80,27 @@ class TestDeltaKernelConversionSourceDeletionVectorValidation {
     source.validateActiveDeletionVectors(snapshot, table);
 
     verify(dataFileExtractor)
+        .validateDeletionVectors(snapshot, table, engine, deletionVectorHandler);
+  }
+
+  @Test
+  void skipsActiveFileListingWhenDeletionVectorsAreAllowed() {
+    DeltaKernelDataFileExtractor dataFileExtractor = mock(DeltaKernelDataFileExtractor.class);
+    DeltaDeletionVectorHandler deletionVectorHandler = mock(DeltaDeletionVectorHandler.class);
+    Engine engine = mock(Engine.class);
+    Table table = mock(Table.class);
+    SnapshotImpl snapshot = mock(SnapshotImpl.class);
+    when(deletionVectorHandler.isRejecting()).thenReturn(false);
+
+    DeltaKernelConversionSource source =
+        DeltaKernelConversionSource.builder()
+            .dataFileExtractor(dataFileExtractor)
+            .deletionVectorHandler(deletionVectorHandler)
+            .engine(engine)
+            .build();
+    source.validateActiveDeletionVectors(snapshot, table);
+
+    verify(dataFileExtractor, never())
         .validateDeletionVectors(snapshot, table, engine, deletionVectorHandler);
   }
 }

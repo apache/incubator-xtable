@@ -221,6 +221,9 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @VisibleForTesting
   void validateActiveDeletionVectors(Snapshot latestSnapshot, Table table) {
+    if (!deletionVectorHandler.isRejecting()) {
+      return;
+    }
     if (((SnapshotImpl) latestSnapshot)
         .getProtocol()
         .supportsFeature(TableFeatures.DELETION_VECTORS_RW_FEATURE)) {

@@ -212,7 +212,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
 
   @VisibleForTesting
   void validateActiveDeletionVectors(Snapshot snapshot) {
-    if (!snapshot.deletionVectorsSupported()) {
+    if (!deletionVectorHandler.isRejecting() || !snapshot.deletionVectorsSupported()) {
       return;
     }
 

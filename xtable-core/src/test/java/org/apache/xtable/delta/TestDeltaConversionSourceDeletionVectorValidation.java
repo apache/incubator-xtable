@@ -36,9 +36,14 @@ class TestDeltaConversionSourceDeletionVectorValidation {
   @Test
   void skipsActiveFileListingWhenDeletionVectorsAreUnsupported() {
     Snapshot snapshot = mock(Snapshot.class);
+    DeltaDeletionVectorHandler deletionVectorHandler = mock(DeltaDeletionVectorHandler.class);
+    when(deletionVectorHandler.isRejecting()).thenReturn(true);
     when(snapshot.deletionVectorsSupported()).thenReturn(false);
 
-    DeltaConversionSource.builder().build().validateActiveDeletionVectors(snapshot);
+    DeltaConversionSource.builder()
+        .deletionVectorHandler(deletionVectorHandler)
+        .build()
+        .validateActiveDeletionVectors(snapshot);
 
     verify(snapshot, never()).allFiles();
   }
@@ -46,14 +51,33 @@ class TestDeltaConversionSourceDeletionVectorValidation {
   @Test
   void listsActiveFilesWhenDeletionVectorsAreSupported() {
     Snapshot snapshot = mock(Snapshot.class);
+    DeltaDeletionVectorHandler deletionVectorHandler = mock(DeltaDeletionVectorHandler.class);
     @SuppressWarnings("unchecked")
     Dataset<AddFile> activeFiles = mock(Dataset.class);
+    when(deletionVectorHandler.isRejecting()).thenReturn(true);
     when(snapshot.deletionVectorsSupported()).thenReturn(true);
     when(snapshot.allFiles()).thenReturn(activeFiles);
     when(activeFiles.toLocalIterator()).thenReturn(Collections.emptyIterator());
 
-    DeltaConversionSource.builder().build().validateActiveDeletionVectors(snapshot);
+    DeltaConversionSource.builder()
+        .deletionVectorHandler(deletionVectorHandler)
+        .build()
+        .validateActiveDeletionVectors(snapshot);
 
     verify(activeFiles).toLocalIterator();
+  }
+
+  @Test
+  void skipsActiveFileListingWhenDeletionVectorsAreAllowed() {
+    Snapshot snapshot = mock(Snapshot.class);
+    DeltaDeletionVectorHandler deletionVectorHandler = mock(DeltaDeletionVectorHandler.class);
+    when(deletionVectorHandler.isRejecting()).thenReturn(false);
+
+    DeltaConversionSource.builder()
+        .deletionVectorHandler(deletionVectorHandler)
+        .build()
+        .validateActiveDeletionVectors(snapshot);
+
+    verify(snapshot, never()).allFiles();
   }
 }

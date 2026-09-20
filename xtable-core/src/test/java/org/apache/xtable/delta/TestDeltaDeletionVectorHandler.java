@@ -43,6 +43,7 @@ public class TestDeltaDeletionVectorHandler {
   public void rejectsDeletionVectorsByDefault() {
     DeltaDeletionVectorHandler handler = new DeltaDeletionVectorHandler(false);
 
+    assertTrue(handler.isRejecting());
     NotSupportedException exception =
         assertThrows(
             NotSupportedException.class, () -> handler.onDeletionVectorFound(DATA_FILE_PATH));
@@ -59,6 +60,7 @@ public class TestDeltaDeletionVectorHandler {
     List<String> warnings = new ArrayList<>();
     DeltaDeletionVectorHandler handler = new DeltaDeletionVectorHandler(true, warnings::add);
 
+    assertFalse(handler.isRejecting());
     handler.onDeletionVectorFound(DATA_FILE_PATH);
 
     assertEquals(1, warnings.size());
