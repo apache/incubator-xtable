@@ -30,7 +30,45 @@ public class ConversionServiceConfig {
   @ConfigProperty(name = "xtable.hadoop-config-path", defaultValue = HADOOP_DEFAULTS_XML)
   private String hadoopConfigPath;
 
+  /**
+   * Whether the bundled web UI is served.
+   *
+   * <p>Off by default on purpose. The service ships with no authentication and no authorization
+   * (see the deployment notes in the module README), so an existing deployment must not gain a
+   * browser interface simply by upgrading.
+   */
+  @ConfigProperty(name = "xtable.ui.enabled", defaultValue = "false")
+  private boolean uiEnabled;
+
+  /** Number of conversion runs retained in memory before the oldest is evicted. */
+  @ConfigProperty(name = "xtable.run-history.capacity", defaultValue = "100")
+  private int runHistoryCapacity;
+
+  /** Progress events retained per run before the oldest is evicted. */
+  @ConfigProperty(name = "xtable.run-history.max-events-per-run", defaultValue = "500")
+  private int runMaxEvents;
+
+  /** Threads available to run asynchronous conversions. */
+  @ConfigProperty(name = "xtable.conversion.async-worker-threads", defaultValue = "2")
+  private int asyncWorkerThreads;
+
   public String getHadoopConfigPath() {
     return hadoopConfigPath;
+  }
+
+  public boolean isUiEnabled() {
+    return uiEnabled;
+  }
+
+  public int getRunHistoryCapacity() {
+    return runHistoryCapacity;
+  }
+
+  public int getRunMaxEvents() {
+    return runMaxEvents;
+  }
+
+  public int getAsyncWorkerThreads() {
+    return asyncWorkerThreads;
   }
 }
