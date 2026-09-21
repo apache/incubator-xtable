@@ -1183,30 +1183,16 @@ public class TestDeltaSchemaExtractor {
     Metadata mapMetadata =
         Metadata.fromJson(
             "{\"delta.columnMapping.id\": 1, \"delta.columnMapping.physicalName\": \"col-map\","
-                + " \"delta.columnMapping.nested.ids\": {\"col-map."
-                + InternalField.Constants.MAP_KEY_FIELD_NAME
-                + "\": 7, \"col-map."
-                + InternalField.Constants.MAP_VALUE_FIELD_NAME
-                + "\": 8}}");
+                + " \"delta.columnMapping.nested.ids\": {\"col-map.key\": 7, \"col-map.value\": 8}}");
     Metadata listMetadata =
         Metadata.fromJson(
             "{\"delta.columnMapping.id\": 2, \"delta.columnMapping.physicalName\": \"col-list\","
-                + " \"delta.columnMapping.nested.ids\": {\"col-list."
-                + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME
-                + "\": 9}}");
+                + " \"delta.columnMapping.nested.ids\": {\"col-list.element\": 9}}");
     Metadata nestedMapMetadata =
         Metadata.fromJson(
             "{\"delta.columnMapping.id\": 3, \"delta.columnMapping.physicalName\": \"col-nested-map\","
-                + " \"delta.columnMapping.nested.ids\": {\"col-nested-map."
-                + InternalField.Constants.MAP_KEY_FIELD_NAME
-                + "\": 40,"
-                + " \"col-nested-map."
-                + InternalField.Constants.MAP_VALUE_FIELD_NAME
-                + "\": 41, \"col-nested-map."
-                + InternalField.Constants.MAP_VALUE_FIELD_NAME
-                + "."
-                + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME
-                + "\": 42}}");
+                + " \"delta.columnMapping.nested.ids\": {\"col-nested-map.key\": 40,"
+                + " \"col-nested-map.value\": 41, \"col-nested-map.value.element\": 42}}");
     Metadata plainMetadata =
         Metadata.fromJson(
             "{\"delta.columnMapping.id\": 4, \"delta.columnMapping.physicalName\": \"col-plain\"}");
@@ -1268,10 +1254,6 @@ public class TestDeltaSchemaExtractor {
       current = found.getSchema();
     }
     return found;
-  }
-
-  private static Integer fieldId(InternalSchema schema, String fieldName, String... childNames) {
-    return field(schema, fieldName, childNames).getFieldId();
   }
 
   private static String storageName(InternalSchema schema, String fieldName) {

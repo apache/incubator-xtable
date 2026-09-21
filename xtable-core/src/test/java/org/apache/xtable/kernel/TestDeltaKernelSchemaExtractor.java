@@ -1183,22 +1183,19 @@ public class TestDeltaKernelSchemaExtractor {
   public void testNestedFieldIdsAndPhysicalNamesInDeltaSchema() {
     FieldMetadata mapNestedIds =
         FieldMetadata.builder()
-            .putLong("col-map." + InternalField.Constants.MAP_KEY_FIELD_NAME, 7)
-            .putLong("col-map." + InternalField.Constants.MAP_VALUE_FIELD_NAME, 8)
+            .putLong("col-map.key", 7)
+            .putLong("col-map.value", 8)
             .build();
     FieldMetadata listNestedIds =
         FieldMetadata.builder()
-            .putLong("col-list." + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, 9)
+            .putLong("col-list.element", 9)
             .build();
     FieldMetadata nestedMapNestedIds =
         FieldMetadata.builder()
-            .putLong("col-nested-map." + InternalField.Constants.MAP_KEY_FIELD_NAME, 40)
-            .putLong("col-nested-map." + InternalField.Constants.MAP_VALUE_FIELD_NAME, 41)
+            .putLong("col-nested-map.key", 40)
+            .putLong("col-nested-map.value", 41)
             .putLong(
-                "col-nested-map."
-                    + InternalField.Constants.MAP_VALUE_FIELD_NAME
-                    + "."
-                    + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME,
+                "col-nested-map.value.element",
                 42)
             .build();
 
@@ -1282,10 +1279,6 @@ public class TestDeltaKernelSchemaExtractor {
       current = found.getSchema();
     }
     return found;
-  }
-
-  private static Integer fieldId(InternalSchema schema, String fieldName, String... childNames) {
-    return field(schema, fieldName, childNames).getFieldId();
   }
 
   private static String storageName(InternalSchema schema, String fieldName) {

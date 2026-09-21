@@ -83,6 +83,15 @@ public class DeltaKernelSchemaExtractor {
     return nestedIds.getLong(path).intValue();
   }
 
+  private static Integer nestedFieldId(
+      FieldMetadata nestedIds, String nestedIdPath, String parquetChildName, String internalChildName) {
+    Integer fieldId = nestedFieldId(nestedIds, childIdPath(nestedIdPath, parquetChildName));
+    if (fieldId != null || parquetChildName.equals(internalChildName)) {
+      return fieldId;
+    }
+    return nestedFieldId(nestedIds, childIdPath(nestedIdPath, internalChildName));
+  }
+
   private InternalSchema toInternalSchema(
       DataType dataType,
       String parentPath,
@@ -193,7 +202,12 @@ public class DeltaKernelSchemaExtractor {
 
     } else if (dataType instanceof ArrayType) {
       ArrayType arrayType = (ArrayType) dataType;
-      String elementIdPath = childIdPath(nestedIdPath, PARQUET_LIST_ELEMENT_FIELD_NAME);
+      Integer elementId =
+          nestedFieldId(
+              nestedIds,
+              nestedIdPath,
+              PARQUET_LIST_ELEMENT_FIELD_NAME,
+              InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME);
       InternalSchema elementSchema =
           toInternalSchema(
               arrayType.getElementType(),
@@ -203,12 +217,12 @@ public class DeltaKernelSchemaExtractor {
               null,
               null,
               nestedIds,
-              elementIdPath);
+              childIdPath(nestedIdPath, PARQUET_LIST_ELEMENT_FIELD_NAME));
       InternalField elementField =
           InternalField.builder()
               .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
               .parentPath(parentPath)
-              .fieldId(nestedFieldId(nestedIds, elementIdPath))
+              .fieldId(elementId)
               .schema(elementSchema)
               .build();
       type = InternalType.LIST;
@@ -216,8 +230,18 @@ public class DeltaKernelSchemaExtractor {
       trimmedTypeName = "array";
     } else if (dataType instanceof MapType) {
       MapType mapType = (MapType) dataType;
-      String keyIdPath = childIdPath(nestedIdPath, PARQUET_MAP_KEY_FIELD_NAME);
-      String valueIdPath = childIdPath(nestedIdPath, PARQUET_MAP_VALUE_FIELD_NAME);
+      Integer keyId =
+          nestedFieldId(
+              nestedIds,
+              nestedIdPath,
+              PARQUET_MAP_KEY_FIELD_NAME,
+              InternalField.Constants.MAP_KEY_FIELD_NAME);
+      Integer valueId =
+          nestedFieldId(
+              nestedIds,
+              nestedIdPath,
+              PARQUET_MAP_VALUE_FIELD_NAME,
+              InternalField.Constants.MAP_VALUE_FIELD_NAME);
       InternalSchema keySchema =
           toInternalSchema(
               mapType.getKeyType(),
@@ -227,12 +251,12 @@ public class DeltaKernelSchemaExtractor {
               null,
               null,
               nestedIds,
-              keyIdPath);
+              childIdPath(nestedIdPath, PARQUET_MAP_KEY_FIELD_NAME));
       InternalField keyField =
           InternalField.builder()
               .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
               .parentPath(parentPath)
-              .fieldId(nestedFieldId(nestedIds, keyIdPath))
+              .fieldId(keyId)
               .schema(keySchema)
               .build();
       InternalSchema valueSchema =
@@ -244,12 +268,12 @@ public class DeltaKernelSchemaExtractor {
               null,
               null,
               nestedIds,
-              valueIdPath);
+              childIdPath(nestedIdPath, PARQUET_MAP_VALUE_FIELD_NAME));
       InternalField valueField =
           InternalField.builder()
               .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
               .parentPath(parentPath)
-              .fieldId(nestedFieldId(nestedIds, valueIdPath))
+              .fieldId(valueId)
               .schema(valueSchema)
               .build();
       type = InternalType.MAP;
