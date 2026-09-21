@@ -58,7 +58,6 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
 
 public class DeltaKernelSchemaExtractor {
-
   private static final DeltaKernelSchemaExtractor INSTANCE = new DeltaKernelSchemaExtractor();
   private static final Map<InternalSchema.MetadataKey, Object>
       DEFAULT_TIMESTAMP_PRECISION_METADATA =
@@ -140,8 +139,6 @@ public class DeltaKernelSchemaExtractor {
     } else if (dataType instanceof StructType) {
       // Handle StructType
       StructType structType = (StructType) dataType;
-      // your logic here
-
       fields =
           structType.fields().stream()
               .filter(field -> !field.getMetadata().contains(DELTA_GENERATION_EXPRESSION))
@@ -160,6 +157,10 @@ public class DeltaKernelSchemaExtractor {
                         field.getMetadata().contains("comment")
                             ? field.getMetadata().getString("comment")
                             : null;
+                    FieldMetadata childNestedIds =
+                        field.getMetadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                            ? field.getMetadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                            : null;
                     InternalSchema schema =
                         toInternalSchema(
                             field.getDataType(),
@@ -167,13 +168,12 @@ public class DeltaKernelSchemaExtractor {
                             field.isNullable(),
                             fieldComment,
                             field.getMetadata(),
-                            field.getMetadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
-                                ? field.getMetadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
-                                : null,
+                            childNestedIds,
                             storageName != null ? storageName : field.getName());
                     return InternalField.builder()
                         .name(field.getName())
                         .fieldId(fieldId)
+                        .storageName(storageName)
                         .parentPath(parentPath)
                         .schema(schema)
                         .defaultValue(

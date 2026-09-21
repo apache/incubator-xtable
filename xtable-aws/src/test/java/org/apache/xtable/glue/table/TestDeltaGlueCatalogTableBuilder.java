@@ -40,6 +40,12 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 
 @ExtendWith(MockitoExtension.class)
 public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
+  private static final String PARQUET_INPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
+  private static final String PARQUET_OUTPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat";
+  private static final String PARQUET_SERDE_CLASS =
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
 
   private static final String PARQUET_INPUT_FORMAT =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
@@ -222,5 +228,81 @@ public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
                     deltaGlueCatalogTableBuilder.getSerDeParameters(TEST_DELTA_INTERNAL_TABLE))
                 .build())
         .build();
+  }
+
+  @Test
+  void testGetUpdateTableInputPreservesExistingStorageSettings() {
+    setupCommonMocks();
+    List<String> additionalLocations = Collections.singletonList("s3://base-path/extra-location");
+    Map<String, String> existingSerdeParams =
+        new HashMap<>(deltaGlueCatalogTableBuilder.getSerDeParameters(TEST_DELTA_INTERNAL_TABLE));
+    existingSerdeParams.put("custom.serde.param", "custom-value");
+
+    StorageDescriptor existingStorageDescriptor =
+        StorageDescriptor.builder()
+            .columns(DELTA_GLUE_SCHEMA)
+            .location(TEST_BASE_PATH)
+            .additionalLocations(additionalLocations)
+            .inputFormat(PARQUET_INPUT_FORMAT)
+            .outputFormat(PARQUET_OUTPUT_FORMAT)
+            .serdeInfo(
+                SerDeInfo.builder()
+                    .serializationLibrary(PARQUET_SERDE_CLASS)
+                    .parameters(existingSerdeParams)
+                    .build())
+            .build();
+    Table glueTable =
+        Table.builder()
+            .parameters(deltaGlueCatalogTableBuilder.getTableParameters())
+            .storageDescriptor(existingStorageDescriptor)
+            .partitionKeys(PARTITION_KEYS)
+            .build();
+
+    StorageDescriptor output =
+        deltaGlueCatalogTableBuilder
+            .getUpdateTableRequest(
+                TEST_UPDATED_DELTA_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER)
+            .storageDescriptor();
+
+    assertEquals(additionalLocations, output.additionalLocations());
+    assertEquals(existingSerdeParams, output.serdeInfo().parameters());
+    assertEquals(PARQUET_INPUT_FORMAT, output.inputFormat());
+    assertEquals(PARQUET_OUTPUT_FORMAT, output.outputFormat());
+    assertEquals(PARQUET_SERDE_CLASS, output.serdeInfo().serializationLibrary());
+    assertEquals(UPDATED_DELTA_GLUE_SCHEMA, output.columns());
+  }
+
+  @Test
+  void testGetUpdateTableInputRepairsLegacyStorageDescriptor() {
+    setupCommonMocks();
+    Map<String, String> existingSerdeParams =
+        new HashMap<>(deltaGlueCatalogTableBuilder.getSerDeParameters(TEST_DELTA_INTERNAL_TABLE));
+    existingSerdeParams.put("custom.serde.param", "custom-value");
+
+    StorageDescriptor legacyStorageDescriptor =
+        StorageDescriptor.builder()
+            .columns(DELTA_GLUE_SCHEMA)
+            .location(TEST_BASE_PATH)
+            .serdeInfo(SerDeInfo.builder().parameters(existingSerdeParams).build())
+            .build();
+    Table glueTable =
+        Table.builder()
+            .parameters(deltaGlueCatalogTableBuilder.getTableParameters())
+            .storageDescriptor(legacyStorageDescriptor)
+            .partitionKeys(PARTITION_KEYS)
+            .build();
+
+    StorageDescriptor output =
+        deltaGlueCatalogTableBuilder
+            .getUpdateTableRequest(
+                TEST_UPDATED_DELTA_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER)
+            .storageDescriptor();
+
+    assertEquals(PARQUET_INPUT_FORMAT, output.inputFormat());
+    assertEquals(PARQUET_OUTPUT_FORMAT, output.outputFormat());
+    assertEquals(PARQUET_SERDE_CLASS, output.serdeInfo().serializationLibrary());
+    assertEquals(existingSerdeParams, output.serdeInfo().parameters());
+    assertEquals(UPDATED_DELTA_GLUE_SCHEMA, output.columns());
+    assertEquals(TEST_BASE_PATH, output.location());
   }
 }

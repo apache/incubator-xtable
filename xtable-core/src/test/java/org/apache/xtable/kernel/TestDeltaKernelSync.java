@@ -21,7 +21,6 @@ package org.apache.xtable.kernel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -45,7 +44,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -61,7 +59,6 @@ import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -345,8 +342,6 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled(
-      "Disabled due to tags not present in commitinfo - https://github.com/delta-io/delta/issues/6167")
   public void testSourceTargetIdMapping() throws Exception {
     InternalSchema baseSchema = getInternalSchema();
     InternalTable sourceTable =
@@ -377,6 +372,11 @@ public class TestDeltaKernelSync {
     assertTrue(mappedTargetId2.isPresent());
     assertEquals("1", mappedTargetId2.get());
 
+    Optional<String> remappedTargetId1 =
+        conversionTarget.getTargetCommitIdentifier(sourceSnapshot1.getSourceIdentifier());
+    assertTrue(remappedTargetId1.isPresent());
+    assertEquals("0", remappedTargetId1.get());
+
     Optional<String> unmappedTargetId = conversionTarget.getTargetCommitIdentifier("s3");
     assertFalse(unmappedTargetId.isPresent());
   }
@@ -400,15 +400,8 @@ public class TestDeltaKernelSync {
     conversionTarget.syncFilesForSnapshot(snapshot.getPartitionedDataFiles());
     conversionTarget.completeSync();
 
-    // getTargetCommitIdentifier is not supported in DeltaKernelConversionTarget
-    // because Delta Kernel 4.0.0 does not support commit tags
-    NotSupportedException exception =
-        assertThrows(
-            NotSupportedException.class, () -> conversionTarget.getTargetCommitIdentifier("0"));
-    assertTrue(
-        exception
-            .getMessage()
-            .contains("Source-to-target commit identifier mapping is not supported"));
+    Optional<String> unmappedTargetId = conversionTarget.getTargetCommitIdentifier("0");
+    assertFalse(unmappedTargetId.isPresent());
   }
 
   @Test

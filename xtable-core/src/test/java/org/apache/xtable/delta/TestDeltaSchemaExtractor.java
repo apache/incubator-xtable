@@ -1177,4 +1177,104 @@ public class TestDeltaSchemaExtractor {
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
+
+  @Test
+  public void testNestedFieldIdsAndPhysicalNamesInDeltaSchema() {
+    Metadata mapMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 1, \"delta.columnMapping.physicalName\": \"col-map\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-map."
+                + InternalField.Constants.MAP_KEY_FIELD_NAME
+                + "\": 7, \"col-map."
+                + InternalField.Constants.MAP_VALUE_FIELD_NAME
+                + "\": 8}}");
+    Metadata listMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 2, \"delta.columnMapping.physicalName\": \"col-list\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-list."
+                + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME
+                + "\": 9}}");
+    Metadata nestedMapMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 3, \"delta.columnMapping.physicalName\": \"col-nested-map\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-nested-map."
+                + InternalField.Constants.MAP_KEY_FIELD_NAME
+                + "\": 40,"
+                + " \"col-nested-map."
+                + InternalField.Constants.MAP_VALUE_FIELD_NAME
+                + "\": 41, \"col-nested-map."
+                + InternalField.Constants.MAP_VALUE_FIELD_NAME
+                + "."
+                + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME
+                + "\": 42}}");
+    Metadata plainMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 4, \"delta.columnMapping.physicalName\": \"col-plain\"}");
+
+    StructType structRepresentation =
+        new StructType()
+            .add(
+                "map_field",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                true,
+                mapMetadata)
+            .add("list_field", DataTypes.createArrayType(DataTypes.IntegerType), true, listMetadata)
+            .add(
+                "nested_map",
+                DataTypes.createMapType(
+                    DataTypes.StringType, DataTypes.createArrayType(DataTypes.IntegerType)),
+                true,
+                nestedMapMetadata)
+            .add("plain_field", DataTypes.StringType, true, plainMetadata);
+
+    InternalSchema internalSchema =
+        DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation);
+
+    Assertions.assertEquals(
+        7, fieldId(internalSchema, "map_field", InternalField.Constants.MAP_KEY_FIELD_NAME));
+    Assertions.assertEquals(
+        8, fieldId(internalSchema, "map_field", InternalField.Constants.MAP_VALUE_FIELD_NAME));
+    Assertions.assertEquals(
+        9, fieldId(internalSchema, "list_field", InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
+    Assertions.assertEquals(
+        40, fieldId(internalSchema, "nested_map", InternalField.Constants.MAP_KEY_FIELD_NAME));
+    Assertions.assertEquals(
+        41, fieldId(internalSchema, "nested_map", InternalField.Constants.MAP_VALUE_FIELD_NAME));
+    Assertions.assertEquals(
+        42,
+        fieldId(
+            internalSchema,
+            "nested_map",
+            InternalField.Constants.MAP_VALUE_FIELD_NAME,
+            InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
+    Assertions.assertEquals("col-map", storageName(internalSchema, "map_field"));
+    Assertions.assertEquals("col-list", storageName(internalSchema, "list_field"));
+    Assertions.assertEquals("col-plain", storageName(internalSchema, "plain_field"));
+  }
+
+  private static InternalField field(
+      InternalSchema schema, String fieldName, String... childNames) {
+    InternalSchema current = schema;
+    InternalField found = null;
+    List<String> path = new ArrayList<>(childNames.length + 1);
+    path.add(fieldName);
+    path.addAll(Arrays.asList(childNames));
+    for (String name : path) {
+      found =
+          current.getFields().stream()
+              .filter(field -> field.getName().equals(name))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("Missing field " + name));
+      current = found.getSchema();
+    }
+    return found;
+  }
+
+  private static Integer fieldId(InternalSchema schema, String fieldName, String... childNames) {
+    return field(schema, fieldName, childNames).getFieldId();
+  }
+
+  private static String storageName(InternalSchema schema, String fieldName) {
+    return field(schema, fieldName).getStorageName();
+  }
 }

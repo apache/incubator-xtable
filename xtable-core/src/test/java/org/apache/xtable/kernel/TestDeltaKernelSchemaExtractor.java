@@ -1179,6 +1179,119 @@ public class TestDeltaKernelSchemaExtractor {
         DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
 
+  @Test
+  public void testNestedFieldIdsAndPhysicalNamesInDeltaSchema() {
+    FieldMetadata mapNestedIds =
+        FieldMetadata.builder()
+            .putLong("col-map." + InternalField.Constants.MAP_KEY_FIELD_NAME, 7)
+            .putLong("col-map." + InternalField.Constants.MAP_VALUE_FIELD_NAME, 8)
+            .build();
+    FieldMetadata listNestedIds =
+        FieldMetadata.builder()
+            .putLong("col-list." + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, 9)
+            .build();
+    FieldMetadata nestedMapNestedIds =
+        FieldMetadata.builder()
+            .putLong("col-nested-map." + InternalField.Constants.MAP_KEY_FIELD_NAME, 40)
+            .putLong("col-nested-map." + InternalField.Constants.MAP_VALUE_FIELD_NAME, 41)
+            .putLong(
+                "col-nested-map."
+                    + InternalField.Constants.MAP_VALUE_FIELD_NAME
+                    + "."
+                    + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME,
+                42)
+            .build();
+
+    FieldMetadata mapMetadata =
+        FieldMetadata.builder()
+            .putLong("delta.columnMapping.id", 1)
+            .putString("delta.columnMapping.physicalName", "col-map")
+            .putFieldMetadata("delta.columnMapping.nested.ids", mapNestedIds)
+            .build();
+    FieldMetadata listMetadata =
+        FieldMetadata.builder()
+            .putLong("delta.columnMapping.id", 2)
+            .putString("delta.columnMapping.physicalName", "col-list")
+            .putFieldMetadata("delta.columnMapping.nested.ids", listNestedIds)
+            .build();
+    FieldMetadata nestedMapMetadata =
+        FieldMetadata.builder()
+            .putLong("delta.columnMapping.id", 3)
+            .putString("delta.columnMapping.physicalName", "col-nested-map")
+            .putFieldMetadata("delta.columnMapping.nested.ids", nestedMapNestedIds)
+            .build();
+    FieldMetadata plainMetadata =
+        FieldMetadata.builder()
+            .putLong("delta.columnMapping.id", 4)
+            .putString("delta.columnMapping.physicalName", "col-plain")
+            .build();
+
+    StructType structRepresentation =
+        new StructType()
+            .add(
+                "map_field",
+                new MapType(StringType.STRING, IntegerType.INTEGER, false),
+                true,
+                mapMetadata)
+            .add("list_field", new ArrayType(IntegerType.INTEGER, true), true, listMetadata)
+            .add(
+                "nested_map",
+                new MapType(StringType.STRING, new ArrayType(IntegerType.INTEGER, true), false),
+                true,
+                nestedMapMetadata)
+            .add("plain_field", StringType.STRING, true, plainMetadata);
+
+    InternalSchema internalSchema =
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation);
+
+    Assertions.assertEquals(
+        7, fieldId(internalSchema, "map_field", InternalField.Constants.MAP_KEY_FIELD_NAME));
+    Assertions.assertEquals(
+        8, fieldId(internalSchema, "map_field", InternalField.Constants.MAP_VALUE_FIELD_NAME));
+    Assertions.assertEquals(
+        9, fieldId(internalSchema, "list_field", InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
+    Assertions.assertEquals(
+        40, fieldId(internalSchema, "nested_map", InternalField.Constants.MAP_KEY_FIELD_NAME));
+    Assertions.assertEquals(
+        41, fieldId(internalSchema, "nested_map", InternalField.Constants.MAP_VALUE_FIELD_NAME));
+    Assertions.assertEquals(
+        42,
+        fieldId(
+            internalSchema,
+            "nested_map",
+            InternalField.Constants.MAP_VALUE_FIELD_NAME,
+            InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
+    Assertions.assertEquals("col-map", storageName(internalSchema, "map_field"));
+    Assertions.assertEquals("col-list", storageName(internalSchema, "list_field"));
+    Assertions.assertEquals("col-plain", storageName(internalSchema, "plain_field"));
+  }
+
+  private static InternalField field(
+      InternalSchema schema, String fieldName, String... childNames) {
+    InternalSchema current = schema;
+    InternalField found = null;
+    List<String> path = new ArrayList<>(childNames.length + 1);
+    path.add(fieldName);
+    path.addAll(Arrays.asList(childNames));
+    for (String name : path) {
+      found =
+          current.getFields().stream()
+              .filter(field -> field.getName().equals(name))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("Missing field " + name));
+      current = found.getSchema();
+    }
+    return found;
+  }
+
+  private static Integer fieldId(InternalSchema schema, String fieldName, String... childNames) {
+    return field(schema, fieldName, childNames).getFieldId();
+  }
+
+  private static String storageName(InternalSchema schema, String fieldName) {
+    return field(schema, fieldName).getStorageName();
+  }
+
   // ========== Tests for fromInternalSchema() ==========
 
   @Test

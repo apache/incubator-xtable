@@ -93,21 +93,6 @@ public class DeltaSchemaExtractor {
       String parentPath,
       boolean nullable,
       String comment,
-      Metadata originalMetadata) {
-    return toInternalSchema(dataType, parentPath, nullable, comment, originalMetadata, null, null);
-  }
-
-  /**
-   * @param nestedIds the {@code delta.columnMapping.nested.ids} metadata of the enclosing struct
-   *     field, or null when the field carries none
-   * @param nestedIdPath the path of the current type within that metadata, starting at the
-   *     enclosing field's physical name
-   */
-  private InternalSchema toInternalSchema(
-      DataType dataType,
-      String parentPath,
-      boolean nullable,
-      String comment,
       Metadata originalMetadata,
       Metadata nestedIds,
       String nestedIdPath) {
@@ -174,6 +159,10 @@ public class DeltaSchemaExtractor {
                               : null;
                       String fieldComment =
                           field.getComment().isDefined() ? field.getComment().get() : null;
+                      Metadata childNestedIds =
+                          field.metadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                              ? field.metadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                              : null;
                       InternalSchema schema =
                           toInternalSchema(
                               field.dataType(),
@@ -181,9 +170,7 @@ public class DeltaSchemaExtractor {
                               field.nullable(),
                               fieldComment,
                               field.metadata(),
-                              field.metadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
-                                  ? field.metadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
-                                  : null,
+                              childNestedIds,
                               storageName != null ? storageName : field.name());
                       return InternalField.builder()
                           .name(field.name())
