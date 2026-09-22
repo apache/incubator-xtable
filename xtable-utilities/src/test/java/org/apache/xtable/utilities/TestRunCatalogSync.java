@@ -30,6 +30,9 @@ import java.util.Optional;
 import lombok.SneakyThrows;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
@@ -77,74 +80,69 @@ class TestRunCatalogSync {
             .getProperty(DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS));
   }
 
-  @Test
-  void testAllowUnsupportedDeletionVectorsAcceptsBooleanLiterals() throws IOException {
-    String[][] configuredValues = {
-      {"true", "true"},
-      {"TRUE", "true"},
-      {"\"true\"", "true"},
-      {"false", "false"},
-      {"FALSE", "false"},
-      {"\"false\"", "false"}
-    };
+  @ParameterizedTest
+  @CsvSource({
+    "true, true",
+    "TRUE, true",
+    "'\"true\"', true",
+    "false, false",
+    "FALSE, false",
+    "'\"false\"', false"
+  })
+  void testAllowUnsupportedDeletionVectorsAcceptsBooleanLiterals(
+      String configuredValue, String expected) throws IOException {
+    RunCatalogSync.DatasetConfig config =
+        RunCatalogSync.YAML_MAPPER.readValue(
+            "datasets:\n"
+                + "  - sourceCatalogTableIdentifier:\n"
+                + "      allowUnsupportedDeletionVectors: "
+                + configuredValue,
+            RunCatalogSync.DatasetConfig.class);
 
-    for (String[] configuredValue : configuredValues) {
-      RunCatalogSync.DatasetConfig config =
-          RunCatalogSync.YAML_MAPPER.readValue(
-              "datasets:\n"
-                  + "  - sourceCatalogTableIdentifier:\n"
-                  + "      allowUnsupportedDeletionVectors: "
-                  + configuredValue[0],
-              RunCatalogSync.DatasetConfig.class);
-
-      assertEquals(
-          configuredValue[1],
-          config
-              .getDatasets()
-              .get(0)
-              .getSourceCatalogTableIdentifier()
-              .getAllowUnsupportedDeletionVectors());
-    }
+    assertEquals(
+        expected,
+        config
+            .getDatasets()
+            .get(0)
+            .getSourceCatalogTableIdentifier()
+            .getAllowUnsupportedDeletionVectors());
   }
 
-  @Test
-  void testAllowUnsupportedDeletionVectorsRejectsInvalidValues() {
-    String[] invalidValues = {"ture", "yes", "on", "1", "no", "off", "0"};
+  @ParameterizedTest
+  @ValueSource(strings = {"ture", "yes", "on", "1", "no", "off", "0"})
+  void testAllowUnsupportedDeletionVectorsRejectsInvalidValues(String invalidValue) {
+    InvalidFormatException exception =
+        assertThrows(
+            InvalidFormatException.class,
+            () ->
+                RunCatalogSync.YAML_MAPPER.readValue(
+                    "datasets:\n"
+                        + "  - sourceCatalogTableIdentifier:\n"
+                        + "      allowUnsupportedDeletionVectors: "
+                        + invalidValue,
+                    RunCatalogSync.DatasetConfig.class));
 
-    for (String invalidValue : invalidValues) {
-      InvalidFormatException exception =
-          assertThrows(
-              InvalidFormatException.class,
-              () ->
-                  RunCatalogSync.YAML_MAPPER.readValue(
-                      "datasets:\n"
-                          + "  - sourceCatalogTableIdentifier:\n"
-                          + "      allowUnsupportedDeletionVectors: "
-                          + invalidValue,
-                      RunCatalogSync.DatasetConfig.class));
-
-      assertTrue(exception.getPathReference().contains("allowUnsupportedDeletionVectors"));
-    }
+    assertTrue(exception.getPathReference().contains("allowUnsupportedDeletionVectors"));
   }
 
-  @Test
-  void testAllowUnsupportedDeletionVectorsAllowsMissingAndNullValues() throws IOException {
-    for (String yaml :
-        new String[] {
-          "datasets:\n  - sourceCatalogTableIdentifier: {}",
-          "datasets:\n"
-              + "  - sourceCatalogTableIdentifier:\n"
-              + "      allowUnsupportedDeletionVectors: null"
-        }) {
-      RunCatalogSync.DatasetConfig config =
-          RunCatalogSync.YAML_MAPPER.readValue(yaml, RunCatalogSync.DatasetConfig.class);
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "datasets:\n  - sourceCatalogTableIdentifier: {}",
+        "datasets:\n"
+            + "  - sourceCatalogTableIdentifier:\n"
+            + "      allowUnsupportedDeletionVectors: null"
+      })
+  void testAllowUnsupportedDeletionVectorsAllowsMissingAndNullValues(String yaml)
+      throws IOException {
+    RunCatalogSync.DatasetConfig config =
+        RunCatalogSync.YAML_MAPPER.readValue(yaml, RunCatalogSync.DatasetConfig.class);
 
-      assertNull(
-          config
-              .getDatasets()
-              .get(0)
-              .getSourceCatalogTableIdentifier()
-              .getAllowUnsupportedDeletionVectors());
-    }
+    assertNull(
+        config
+            .getDatasets()
+            .get(0)
+            .getSourceCatalogTableIdentifier()
+            .getAllowUnsupportedDeletionVectors());
   }
 }
