@@ -80,7 +80,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public InternalTable getTable(Long version) {
     try {
-      Table table = Table.forPath(engine, basePath);
+      Table table = Table.forPath(engine, getTablePath());
       Snapshot snapshot = table.getSnapshotAsOfVersion(engine, version);
       return tableExtractor.table(table, snapshot, engine, tableName, basePath);
     } catch (Exception e) {
@@ -90,14 +90,14 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalTable getCurrentTable() {
-    Table table = Table.forPath(engine, basePath);
+    Table table = Table.forPath(engine, getTablePath());
     Snapshot snapshot = table.getLatestSnapshot(engine);
     return getTable(snapshot.getVersion());
   }
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
-    Table table_snapshot = Table.forPath(engine, basePath);
+    Table table_snapshot = Table.forPath(engine, getTablePath());
     Snapshot snapshot = table_snapshot.getLatestSnapshot(engine);
     InternalTable table = getTable(snapshot.getVersion());
     return InternalSnapshot.builder()
@@ -110,7 +110,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
-    Table table = Table.forPath(engine, basePath);
+    Table table = Table.forPath(engine, getTablePath());
     Snapshot snapshot = table.getSnapshotAsOfVersion(engine, versionNumber);
     InternalTable tableAtVersion =
         tableExtractor.table(table, snapshot, engine, tableName, basePath);
@@ -174,7 +174,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    Table table = Table.forPath(engine, basePath);
+    Table table = Table.forPath(engine, getTablePath());
     Snapshot snapshot =
         table.getSnapshotAsOfTimestamp(
             engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
@@ -199,7 +199,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     try {
-      Table table = Table.forPath(engine, basePath);
+      Table table = Table.forPath(engine, getTablePath());
       Snapshot snapshot = table.getSnapshotAsOfTimestamp(engine, Timestamp.from(instant).getTime());
 
       // There is a chance earliest commit of the table is returned if the instant is before the
@@ -215,6 +215,10 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public String getCommitIdentifier(Long commit) {
     return String.valueOf(commit);
+  }
+
+  private String getTablePath() {
+    return DeltaKernelUtils.normalizeTablePath(basePath);
   }
 
   private void resetState(long versionToStartFrom, Engine engine, Table table) {
