@@ -18,9 +18,11 @@
  
 package org.apache.xtable.delta;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.spark.sql.types.DataTypes;
@@ -821,6 +823,180 @@ public class TestDeltaSchemaExtractor {
                 "comment");
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
+  public void testNestedFieldIdsInDeltaSchema() {
+    // Delta writes these ids for a collection's children when IcebergCompatV2 is enabled, keyed
+    // by the path the child takes in the parquet file.
+    Metadata mapMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 1, \"delta.columnMapping.physicalName\": \"col-map\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-map.key\": 7, \"col-map.value\": 8}}");
+    Metadata listMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 2, \"delta.columnMapping.physicalName\": \"col-list\","
+                + " \"delta.columnMapping.nested.ids\": {\"col-list.element\": 9}}");
+    Metadata plainMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 3, \"delta.columnMapping.physicalName\": \"col-plain\"}");
+    StructType structType =
+        new StructType()
+            .add(
+                "map_field",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                true,
+                mapMetadata)
+            .add("list_field", DataTypes.createArrayType(DataTypes.IntegerType), true, listMetadata)
+            .add(
+                "plain_map",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
+                true,
+                plainMetadata);
+
+    InternalSchema internalSchema = DeltaSchemaExtractor.getInstance().toInternalSchema(structType);
+
+    Assertions.assertEquals(7, fieldId(internalSchema, "map_field", "_one_field_key"));
+    Assertions.assertEquals(8, fieldId(internalSchema, "map_field", "_one_field_value"));
+    Assertions.assertEquals(9, fieldId(internalSchema, "list_field", "_one_field_element"));
+    // A field without the metadata leaves its children unassigned, as before.
+    Assertions.assertNull(fieldId(internalSchema, "plain_map", "_one_field_key"));
+    Assertions.assertNull(fieldId(internalSchema, "plain_map", "_one_field_value"));
+  }
+
+  @Test
+  public void testNestedFieldIdsForComplexCollectionChildren() {
+    // Delta keys the nested ids by the path the child takes in the parquet file, relative to the
+    // nearest parent struct field's physical name, so a collection nested in a collection adds to
+    // the same field's metadata while a collection nested in a struct gets metadata of its own.
+    Metadata structListMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 1, \"delta.columnMapping.physicalName\":"
+                + " \"col-struct-list\", \"delta.columnMapping.nested.ids\":"
+                + " {\"col-struct-list.element\": 20}}");
+    Metadata structMapMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 2, \"delta.columnMapping.physicalName\":"
+                + " \"col-struct-map\", \"delta.columnMapping.nested.ids\":"
+                + " {\"col-struct-map.key\": 30, \"col-struct-map.value\": 31}}");
+    Metadata nestedMapMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 3, \"delta.columnMapping.physicalName\":"
+                + " \"col-nested-map\", \"delta.columnMapping.nested.ids\":"
+                + " {\"col-nested-map.key\": 40, \"col-nested-map.value\": 41,"
+                + " \"col-nested-map.value.element\": 42}}");
+    Metadata memberListMetadata =
+        Metadata.fromJson(
+            "{\"delta.columnMapping.id\": 6, \"delta.columnMapping.physicalName\":"
+                + " \"col-member-list\", \"delta.columnMapping.nested.ids\":"
+                + " {\"col-member-list.element\": 60}}");
+    StructType structType =
+        new StructType()
+            // list of structs: the element position carries the id, the struct's members carry
+            // their own column mapping ids
+            .add(
+                "struct_list",
+                DataTypes.createArrayType(
+                    new StructType()
+                        .add(
+                            "name",
+                            DataTypes.StringType,
+                            true,
+                            Metadata.fromJson("{\"delta.columnMapping.id\": 21}"))
+                        .add(
+                            "quant",
+                            DataTypes.IntegerType,
+                            false,
+                            Metadata.fromJson("{\"delta.columnMapping.id\": 22}"))),
+                true,
+                structListMetadata)
+            // map with a struct value: the key and value positions carry ids, the value struct's
+            // members carry their own
+            .add(
+                "struct_map",
+                DataTypes.createMapType(
+                    DataTypes.StringType,
+                    new StructType()
+                        .add(
+                            "price",
+                            DataTypes.DoubleType,
+                            true,
+                            Metadata.fromJson("{\"delta.columnMapping.id\": 32}"))),
+                true,
+                structMapMetadata)
+            // map of lists: with no struct field in between, all positions stay keyed under the
+            // map field's own physical name
+            .add(
+                "nested_map",
+                DataTypes.createMapType(
+                    DataTypes.StringType, DataTypes.createArrayType(DataTypes.IntegerType)),
+                true,
+                nestedMapMetadata)
+            // map whose value struct holds a list: the list is a struct field of its own, so its
+            // element id comes from the list field's own metadata, not from the map's
+            .add(
+                "map_with_member_list",
+                DataTypes.createMapType(
+                    DataTypes.StringType,
+                    new StructType()
+                        .add(
+                            "tags",
+                            DataTypes.createArrayType(DataTypes.StringType),
+                            true,
+                            memberListMetadata)),
+                true,
+                Metadata.fromJson(
+                    "{\"delta.columnMapping.id\": 5, \"delta.columnMapping.physicalName\":"
+                        + " \"col-map-with-member-list\", \"delta.columnMapping.nested.ids\":"
+                        + " {\"col-map-with-member-list.key\": 50,"
+                        + " \"col-map-with-member-list.value\": 51}}"));
+
+    InternalSchema internalSchema = DeltaSchemaExtractor.getInstance().toInternalSchema(structType);
+
+    Assertions.assertEquals(20, fieldId(internalSchema, "struct_list", "_one_field_element"));
+    Assertions.assertEquals(
+        21, fieldId(internalSchema, "struct_list", "_one_field_element", "name"));
+    Assertions.assertEquals(
+        22, fieldId(internalSchema, "struct_list", "_one_field_element", "quant"));
+    Assertions.assertEquals(30, fieldId(internalSchema, "struct_map", "_one_field_key"));
+    Assertions.assertEquals(31, fieldId(internalSchema, "struct_map", "_one_field_value"));
+    Assertions.assertEquals(32, fieldId(internalSchema, "struct_map", "_one_field_value", "price"));
+    Assertions.assertEquals(40, fieldId(internalSchema, "nested_map", "_one_field_key"));
+    Assertions.assertEquals(41, fieldId(internalSchema, "nested_map", "_one_field_value"));
+    Assertions.assertEquals(
+        42, fieldId(internalSchema, "nested_map", "_one_field_value", "_one_field_element"));
+    Assertions.assertEquals(50, fieldId(internalSchema, "map_with_member_list", "_one_field_key"));
+    Assertions.assertEquals(
+        51, fieldId(internalSchema, "map_with_member_list", "_one_field_value"));
+    Assertions.assertEquals(
+        60,
+        fieldId(
+            internalSchema,
+            "map_with_member_list",
+            "_one_field_value",
+            "tags",
+            "_one_field_element"));
+  }
+
+  private static Integer fieldId(InternalSchema schema, String fieldName, String childName) {
+    return fieldId(schema, fieldName, new String[] {childName});
+  }
+
+  private static Integer fieldId(InternalSchema schema, String fieldName, String... childNames) {
+    InternalSchema current = schema;
+    InternalField found = null;
+    List<String> path = new ArrayList<>(childNames.length + 1);
+    path.add(fieldName);
+    path.addAll(Arrays.asList(childNames));
+    for (String name : path) {
+      found =
+          current.getFields().stream()
+              .filter(field -> name.equals(field.getName()))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("missing " + name));
+      current = found.getSchema();
+    }
+    return found.getFieldId();
   }
 
   @Test

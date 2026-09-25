@@ -180,6 +180,16 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
             engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
 
     long versionNumberAtLastSyncInstant = snapshot.getVersion();
+    long latestVersion = table.getLatestSnapshot(engine).getVersion();
+    if (versionNumberAtLastSyncInstant >= latestVersion) {
+      log.info(
+          "No new delta commits to sync: last sync instant {} corresponds to version {} and the "
+              + "latest version is {}. Nothing to sync.",
+          instantsForIncrementalSync.getLastSyncInstant(),
+          versionNumberAtLastSyncInstant,
+          latestVersion);
+      return CommitsBacklog.<Long>builder().commitsToProcess(Collections.emptyList()).build();
+    }
     resetState(versionNumberAtLastSyncInstant + 1, engine, table);
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())

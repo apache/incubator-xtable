@@ -448,17 +448,19 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- AWS -->
+            <!-- AWS. The BOM manages every SDK artifact except bundle, so modules name only what they use. -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>bundle</artifactId>
                 <version>${aws.version}</version>
                 <scope>runtime</scope>
-            </dependency>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>glue</artifactId>
-                <version>${aws.version}</version>
             </dependency>
 
             <!-- Protobuf -->
@@ -674,7 +676,27 @@
                                             <exclude>META-INF/*.DSA</exclude>
                                             <exclude>META-INF/*.RSA</exclude>
                                             <exclude>**/Log4j2Plugins.dat</exclude>
+                                            <!-- RocksDB natives for platforms we do not run on. -->
+                                            <exclude>librocksdbjni-linux-ppc64le*</exclude>
+                                            <exclude>librocksdbjni-linux-s390x*</exclude>
+                                            <exclude>librocksdbjni-linux32*</exclude>
                                         </excludes>
+                                    </filter>
+                                    <!-- hadoop-aws is compiled against the bundle, so its STS endpoint and
+                                         SSL channel code links to the relocated Apache HTTP client. Take
+                                         that client, the SDK adapter bound to it and the relocated logging
+                                         and codec classes they call; every other SDK class comes from the
+                                         standalone artifact of the same version. -->
+                                    <filter>
+                                        <artifact>software.amazon.awssdk:bundle</artifact>
+                                        <includes>
+                                            <include>software/amazon/awssdk/http/apache/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/apache/http/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/apache/commons/codec/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/apache/commons/logging/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/slf4j/**</include>
+                                            <include>META-INF/services/software.amazon.awssdk.http.SdkHttpService</include>
+                                        </includes>
                                     </filter>
                                 </filters>
                                 <shadedArtifactAttached>true</shadedArtifactAttached>

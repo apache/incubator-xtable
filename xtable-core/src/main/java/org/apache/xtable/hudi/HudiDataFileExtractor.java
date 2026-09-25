@@ -347,6 +347,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<String> partitionPaths, InternalTable table) {
 
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    // Batch-load all partitions in a single metadata table lookup before fanning out per
+    // partition below. Without this, the parallel stream below triggers one metadata table
+    // scan (and one S3 connection) per partition, which for tables with thousands of
+    // partitions causes S3 connection pool exhaustion and lock contention on the shared
+    // file system view.
+    fsView.loadPartitions(partitionPaths);
     Stream<InternalDataFile> filesWithoutStats =
         partitionPaths.stream()
             .parallel()
