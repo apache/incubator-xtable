@@ -18,14 +18,11 @@
  
 package org.apache.xtable.delta;
 
-import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-
-import org.apache.hadoop.fs.Path;
 
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.AddFile;
@@ -83,7 +80,7 @@ public class DeltaActionsConverter {
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.path()))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.size())
         .lastModified(addFile.modificationTime())
@@ -111,7 +108,7 @@ public class DeltaActionsConverter {
       List<InternalPartitionField> partitionFields,
       DeltaPartitionExtractor partitionExtractor) {
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, removeFile.path()))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, removeFile.path()))
         .fileFormat(fileFormat)
         .partitionValues(
             partitionExtractor.partitionValueExtraction(
@@ -130,24 +127,7 @@ public class DeltaActionsConverter {
   }
 
   static String getFullPathToFile(Snapshot snapshot, String dataFilePath) {
-    return getFullPathToFile(tableBasePath(snapshot), dataFilePath);
-  }
-
-  static String getFullPathToFile(String tableBasePath, String dataFilePath) {
-    // Delta allows the path of AddFile/RemoveFile actions to be relative or absolute (see
-    // PROTOCOL.md). An absolute path (one with a URI scheme, e.g. s3://, hdfs://, file://, or
-    // starting with the separator) must be used as-is: concatenating it onto the table base
-    // path would point at a non-existent location and silently drop records from the
-    // converted table.
-    if (isAbsolutePath(dataFilePath)) {
-      return dataFilePath;
-    }
-    return tableBasePath + Path.SEPARATOR + dataFilePath;
-  }
-
-  private static boolean isAbsolutePath(String dataFilePath) {
-    URI uri = new Path(dataFilePath).toUri();
-    return uri.getScheme() != null || dataFilePath.startsWith(Path.SEPARATOR);
+    return DeltaPathUtils.getFullPathToFile(tableBasePath(snapshot), dataFilePath);
   }
 
   private static String tableBasePath(Snapshot snapshot) {
@@ -175,6 +155,6 @@ public class DeltaActionsConverter {
     }
 
     String dataFilePath = addFile.path();
-    return getFullPathToFile(tableBasePath, dataFilePath);
+    return DeltaPathUtils.getFullPathToFile(tableBasePath, dataFilePath);
   }
 }
