@@ -200,6 +200,12 @@
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-parquet</artifactId>
         </dependency>
+        <!-- GlueCatalog and S3FileIO for icebergCatalogConfig. The AWS SDK clients it needs are
+             already bundled below. -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-aws</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-core_${scala.binary.version}</artifactId>
@@ -437,6 +443,7 @@
                             <include>commons-logging:commons-logging</include>
                             <include>commons-net:commons-net</include>
                             <include>commons-pool:commons-pool</include>
+                            <include>dev.failsafe:failsafe</include>
                             <include>dnsjava:dnsjava</include>
                             <include>io.airlift:aircompressor</include>
                             <include>io.delta:delta-core_${scala.binary.version}</include>
@@ -633,10 +640,10 @@
                             <include>org.apache.hudi:hudi-java-client</include>
                             <include>org.apache.hudi:hudi-timeline-service</include>
                             <include>org.apache.iceberg:iceberg-api</include>
+                            <include>org.apache.iceberg:iceberg-aws</include>
                             <include>org.apache.iceberg:iceberg-bundled-guava</include>
                             <include>org.apache.iceberg:iceberg-common</include>
                             <include>org.apache.iceberg:iceberg-core</include>
-                            <include>org.apache.iceberg:iceberg-hive-runtime</include>
                             <include>org.apache.iceberg:iceberg-parquet</include>
                             <include>org.apache.ivy:ivy</include>
                             <include>org.apache.kerby:kerb-core</include>

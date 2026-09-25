@@ -116,6 +116,7 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
+The bundled jar includes Iceberg's `org.apache.iceberg.aws.glue.GlueCatalog` and `org.apache.iceberg.aws.s3.S3FileIO`. Other catalog implementations must be added to the classpath, which means running with `java -cp xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar:my-catalog.jar org.apache.xtable.utilities.RunSync ...` instead of `java -jar`.
 5. Run with `java -jar xtable-utilities/target/xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
 can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/xtable-utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
