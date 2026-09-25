@@ -537,10 +537,22 @@ public class ITParquetConversionSource {
     assertNotNull(result.getReadSchema());
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
     assertNotNull(snapshot);
+    // record counts come from the parquet footers: 4 initial rows plus 3 appended rows
+    assertEquals(
+        data.size() + futureDataToSync.size(),
+        snapshot.getPartitionedDataFiles().stream()
+            .flatMap(group -> group.getDataFiles().stream())
+            .mapToLong(InternalDataFile::getRecordCount)
+            .sum());
     TableChange changes = conversionSource.getTableChangeForCommit(testTime);
     assertNotNull(changes);
     assertFalse(changes.getFilesDiff().dataFilesAdded().isEmpty(), "Should have found added files");
     assertEquals(expectedAddedFiles, changes.getFilesDiff().dataFilesAdded());
+    assertEquals(
+        futureDataToSync.size(),
+        changes.getFilesDiff().dataFilesAdded().stream()
+            .mapToLong(InternalDataFile::getRecordCount)
+            .sum());
     // The committed source identifier must be the most-recent modification time from the same
     // listing used to compute filesAdded, otherwise a file could be marked synced without being
     // included in the changes.
