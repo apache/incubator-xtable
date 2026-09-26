@@ -24,12 +24,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
@@ -38,8 +42,11 @@ import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
+import io.delta.kernel.internal.tablefeatures.TableFeatures;
 import io.delta.kernel.internal.util.VectorUtils;
 
+import org.apache.xtable.delta.DeltaDeletionVectorHandler;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -69,6 +76,10 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private final String basePath;
   private final String tableName;
   private final Engine engine;
+
+  @Builder.Default
+  private final DeltaDeletionVectorHandler deletionVectorHandler =
+      new DeltaDeletionVectorHandler(false);
 
   @Builder.Default
   private final DeltaKernelTableExtractor tableExtractor =
@@ -116,6 +127,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         tableExtractor.table(table, snapshot, engine, tableName, basePath);
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
     Map<String, InternalDataFile> removedFiles = new HashMap<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
     String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
     FileFormat fileFormat = actionsConverter.convertToFileFormat(provider);
 
@@ -127,6 +139,12 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     for (RowBackedAction action : actionsForVersion) {
       if (action instanceof AddFile) {
         AddFile addFile = (AddFile) action;
+        if (addFile.getDeletionVector().isPresent()) {
+          String dataFilePath =
+              DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath);
+          deletionVectorHandler.onDeletionVectorFound(dataFilePath);
+          dataFilesWithDeletionVectors.add(dataFilePath);
+        }
         Map<String, String> partitionValues = VectorUtils.toJavaMap(addFile.getPartitionValues());
         InternalDataFile dataFile =
             actionsConverter.convertAddActionToInternalDataFile(
@@ -159,6 +177,9 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       }
     }
 
+    DeltaDeletionVectorHandler.removeDeletionVectorFileChanges(
+        addedFiles, removedFiles, dataFilesWithDeletionVectors);
+
     InternalFilesDiff internalFilesDiff =
         InternalFilesDiff.builder()
             .filesAdded(addedFiles.values())
@@ -175,12 +196,14 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Table table = Table.forPath(engine, basePath);
+    Snapshot latestSnapshot = table.getLatestSnapshot(engine);
+    validateActiveDeletionVectors(latestSnapshot, table);
     Snapshot snapshot =
         table.getSnapshotAsOfTimestamp(
             engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
 
     long versionNumberAtLastSyncInstant = snapshot.getVersion();
-    long latestVersion = table.getLatestSnapshot(engine).getVersion();
+    long latestVersion = latestSnapshot.getVersion();
     if (versionNumberAtLastSyncInstant >= latestVersion) {
       log.info(
           "No new delta commits to sync: last sync instant {} corresponds to version {} and the "
@@ -194,6 +217,19 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
+  }
+
+  @VisibleForTesting
+  void validateActiveDeletionVectors(Snapshot latestSnapshot, Table table) {
+    if (!deletionVectorHandler.isRejecting()) {
+      return;
+    }
+    if (((SnapshotImpl) latestSnapshot)
+        .getProtocol()
+        .supportsFeature(TableFeatures.DELETION_VECTORS_RW_FEATURE)) {
+      dataFileExtractor.validateDeletionVectors(
+          latestSnapshot, table, engine, deletionVectorHandler);
+    }
   }
 
   @Override
@@ -231,11 +267,13 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private List<PartitionFileGroup> getInternalDataFiles(
       Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {
     try (DataFileIterator fileIterator =
-        dataFileExtractor.iterator(snapshot, table, engine, schema)) {
+        dataFileExtractor.iterator(snapshot, table, engine, schema, deletionVectorHandler)) {
 
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       return PartitionFileGroup.fromFiles(dataFiles);
+    } catch (NotSupportedException e) {
+      throw e;
     } catch (Exception e) {
       throw new ReadException("Failed to iterate through Delta data files", e);
     }
