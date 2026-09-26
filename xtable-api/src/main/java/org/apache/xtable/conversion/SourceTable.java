@@ -18,12 +18,16 @@
  
 package org.apache.xtable.conversion;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Properties;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
+
+import org.apache.hadoop.conf.Configuration;
 
 @EqualsAndHashCode(callSuper = true)
 @Getter
@@ -39,8 +43,41 @@ public class SourceTable extends ExternalTable {
       String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+      Properties additionalProperties,
+      Configuration hadoopConf) {
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties, hadoopConf);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
+  }
+
+  public static SourceTable withDetectedFormat(
+      String name,
+      String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Properties additionalProperties,
+      Configuration hadoopConf) {
+
+    Configuration resolvedConf = hadoopConf != null ? hadoopConf : new Configuration();
+    String detectedFormat = resolveFormatOrThrow(basePath, resolvedConf);
+
+    return SourceTable.builder()
+        .name(name)
+        .formatName(detectedFormat)
+        .basePath(basePath)
+        .dataPath(dataPath)
+        .namespace(namespace)
+        .catalogConfig(catalogConfig)
+        .additionalProperties(additionalProperties)
+        .hadoopConf(resolvedConf)
+        .build();
+  }
+
+  private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {
+    try {
+      return SourceTableFormatDetector.detectFormat(basePath, hadoopConf);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to auto-detect source table format", e);
+    }
   }
 }

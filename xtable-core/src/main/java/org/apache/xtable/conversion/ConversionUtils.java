@@ -28,6 +28,7 @@ public class ConversionUtils {
         table.getBasePath(),
         table.getNamespace(),
         table.getCatalogConfig(),
-        table.getAdditionalProperties());
+        table.getAdditionalProperties(),
+        table.hadoopConf);
   }
 }
