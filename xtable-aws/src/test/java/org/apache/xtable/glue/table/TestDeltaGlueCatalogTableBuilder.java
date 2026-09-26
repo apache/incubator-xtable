@@ -40,7 +40,6 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 
 @ExtendWith(MockitoExtension.class)
 public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
-
   private static final String PARQUET_INPUT_FORMAT =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
   private static final String PARQUET_OUTPUT_FORMAT =
@@ -223,4 +222,5 @@ public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
                 .build())
         .build();
   }
+
 }

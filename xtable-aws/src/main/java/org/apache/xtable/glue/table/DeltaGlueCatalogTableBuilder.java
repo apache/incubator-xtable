@@ -48,14 +48,6 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 
 /** Delta specific table operations for Glue catalog sync */
 public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableInput, Table> {
-
-  // Standard Hive-compatible Parquet classes (Delta's on-disk file format).
-  // A generic Hive-Metastore-compatible reader (e.g. a UC Glue Federation
-  // foreign catalog) validates every table's StorageDescriptor when listing a
-  // database and throws InvalidObjectException for the whole database on the
-  // first table with a null SerDe/format -- these must be set even though
-  // Athena's own Delta reader (which keys off the table_type/
-  // spark.sql.sources.provider parameters instead) tolerates them being null.
   private static final String PARQUET_INPUT_FORMAT =
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat";
   private static final String PARQUET_OUTPUT_FORMAT =
