@@ -177,7 +177,7 @@ public class HudiFileStatsExtractor {
     }
     if (!filesWithoutStats.isEmpty()) {
       log.warn(
-          "{} file(s) had no column stats in the metadata table for table {}; falling back to parquet footers",
+          "{} file(s) had missing or unusable column stats in the metadata table for table {}; falling back to parquet footers",
           filesWithoutStats.size(),
           metaClient.getBasePath());
       withStats.addAll(
@@ -201,16 +201,14 @@ public class HudiFileStatsExtractor {
         fileStats.stream()
             .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
             .collect(CustomCollectors.toList(fileStats.size()));
-    Optional<Long> recordCount = getMaxFromColumnStats(columnStats);
-    if (!recordCount.isPresent()) {
-      // The metadata table has an entry for this file, but every column's value count is
-      // absent or non-positive (observed for files written before column-stats indexing was
-      // enabled). Treat this the same as "no stats" instead of emitting recordCount=0, so the
-      // caller falls back to reading the authoritative row count from the Parquet footer.
-      return Optional.empty();
-    }
-    return Optional.of(
-        file.toBuilder().columnStats(columnStats).recordCount(recordCount.get()).build());
+    // If every column's value count is absent or non-positive (observed for files written
+    // before column-stats indexing was enabled), getMaxFromColumnStats returns empty and this
+    // is treated the same as "no stats" instead of emitting recordCount=0, so the caller falls
+    // back to reading the authoritative row count from the Parquet footer.
+    return getMaxFromColumnStats(columnStats)
+        .map(
+            recordCount ->
+                file.toBuilder().columnStats(columnStats).recordCount(recordCount).build());
   }
 
   private Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {

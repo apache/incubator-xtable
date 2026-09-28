@@ -388,7 +388,18 @@ public class TestHudiFileStatsExtractor {
     // Must have fallen back to the parquet footer (real row count), not the degenerate
     // metadata-table stats (which would previously have produced recordCount=0).
     assertEquals(2, result.getRecordCount());
-    assertFalse(result.getColumnStats().isEmpty());
+    // Assert an actual footer-derived column stat, not just non-emptiness -- the degenerate
+    // metadata-table stats (valueCount=0 for every column) would also pass an isEmpty() check
+    // if they leaked through, since the list itself would be non-empty.
+    ColumnStat longColumnStat =
+        result.getColumnStats().stream()
+            .filter(stat -> stat.getField().equals(longField))
+            .findFirst()
+            .get();
+    assertEquals(2, longColumnStat.getNumValues());
+    assertEquals(1, longColumnStat.getNumNulls());
+    assertEquals(-25L, (Long) longColumnStat.getRange().getMinValue());
+    assertEquals(-25L, (Long) longColumnStat.getRange().getMaxValue());
     verify(mockMetaClient, times(1)).getStorage();
   }
 
