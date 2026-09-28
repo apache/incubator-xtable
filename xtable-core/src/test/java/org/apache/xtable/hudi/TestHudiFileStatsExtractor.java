@@ -332,6 +332,77 @@ public class TestHudiFileStatsExtractor {
     verify(mockMetaClient, times(1)).getStorage();
   }
 
+  @Test
+  void columnStatsWithMetadataTableZeroValueCountFallsBackToParquetFooters(@TempDir Path tempDir) {
+    // Reproduces a real-world case: the metadata table has an entry for the file (so it isn't
+    // "missing"), but every column's value count is 0 -- e.g. for files written before
+    // column-stats indexing was enabled for the table. Previously this was accepted as a
+    // successful enrichment with recordCount=0 (silently wrong for a non-empty file); it should
+    // instead be treated like "no stats" and fall back to the parquet footer.
+    List<InternalDataFile> inputFiles = generateInputFiles(tempDir, 1);
+    InternalDataFile file = inputFiles.get(0);
+    Pair<String, String> filePair =
+        Pair.of("", new org.apache.hadoop.fs.Path(file.getPhysicalPath()).getName());
+
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
+        .thenReturn(true);
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
+
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    doReturn(storageConf).when(mockMetaClient).getStorageConf();
+    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
+        .when(mockMetaClient)
+        .getStorage();
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+
+    HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
+    when(mockMetadataTable.getColumnStats(any(), anyString()))
+        .thenAnswer(
+            invocation -> {
+              String fieldName = invocation.getArgument(1);
+              Map<Pair<String, String>, HoodieMetadataColumnStats> statsMap = new HashMap<>();
+              statsMap.put(
+                  filePair,
+                  HoodieMetadataColumnStats.newBuilder()
+                      .setFileName(filePair.getRight())
+                      .setColumnName(fieldName)
+                      .setValueCount(0L)
+                      .setNullCount(0L)
+                      .setTotalSize(0L)
+                      .setIsDeleted(false)
+                      .build());
+              return statsMap;
+            });
+
+    HudiFileStatsExtractor extractor = new HudiFileStatsExtractor(mockMetaClient);
+    List<InternalDataFile> output =
+        extractor
+            .addStatsToFiles(mockMetadataTable, inputFiles.stream(), schema)
+            .collect(Collectors.toList());
+
+    assertEquals(1, output.size());
+    InternalDataFile result = output.get(0);
+    // Must have fallen back to the parquet footer (real row count), not the degenerate
+    // metadata-table stats (which would previously have produced recordCount=0).
+    assertEquals(2, result.getRecordCount());
+    // Assert an actual footer-derived column stat, not just non-emptiness -- the degenerate
+    // metadata-table stats (valueCount=0 for every column) would also pass an isEmpty() check
+    // if they leaked through, since the list itself would be non-empty.
+    ColumnStat longColumnStat =
+        result.getColumnStats().stream()
+            .filter(stat -> stat.getField().equals(longField))
+            .findFirst()
+            .get();
+    assertEquals(2, longColumnStat.getNumValues());
+    assertEquals(1, longColumnStat.getNumNulls());
+    assertEquals(-25L, (Long) longColumnStat.getRange().getMinValue());
+    assertEquals(-25L, (Long) longColumnStat.getRange().getMaxValue());
+    verify(mockMetaClient, times(1)).getStorage();
+  }
+
   private List<InternalDataFile> generateInputFiles(Path tempDir, int numFiles) {
     GenericData genericData = GenericData.get();
     genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
