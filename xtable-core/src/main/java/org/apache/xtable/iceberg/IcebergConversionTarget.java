@@ -18,9 +18,10 @@
  
 package org.apache.xtable.iceberg;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -61,6 +63,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 @Log4j2
 public class IcebergConversionTarget implements ConversionTarget {
   private static final String METADATA_DIR_PATH = "/metadata/";
+  private static final String PUFFIN_SUFFIX = ".puffin";
   private IcebergSchemaExtractor schemaExtractor;
   private IcebergSchemaSync schemaSync;
   private IcebergPartitionSpecExtractor partitionSpecExtractor;
@@ -71,11 +74,12 @@ public class IcebergConversionTarget implements ConversionTarget {
   private TableIdentifier tableIdentifier;
   private IcebergCatalogConfig catalogConfig;
   private Configuration configuration;
-  private int snapshotRetentionInHours;
+  private Duration metadataRetention;
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
   private TableSyncMetadata tableSyncMetadata;
+  private Map<String, List<Long>> pendingPositionDeletes = Collections.emptyMap();
 
   public IcebergConversionTarget() {}
 
@@ -116,7 +120,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     String tableName = targetTable.getName();
     this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    this.metadataRetention = targetTable.getMetadataRetention();
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
@@ -276,33 +280,56 @@ public class IcebergConversionTarget implements ConversionTarget {
         tableSyncMetadata);
   }
 
+  /**
+   * Stages positional deletes to include in the next files sync. When set, the next {@link
+   * #syncFilesForDiff} commits a single row delta carrying the added data files and one deletion
+   * vector per referenced data file, instead of an overwrite.
+   */
+  public void stagePositionDeletes(Map<String, List<Long>> positionsByDataFile) {
+    this.pendingPositionDeletes = positionsByDataFile;
+  }
+
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
-    dataFileUpdatesExtractor.applyDiff(
-        transaction,
-        internalFilesDiff,
-        transaction.table().schema(),
-        transaction.table().spec(),
-        tableSyncMetadata);
+    if (!pendingPositionDeletes.isEmpty()) {
+      dataFileUpdatesExtractor.applyRowDelta(
+          table,
+          transaction,
+          internalFilesDiff,
+          pendingPositionDeletes,
+          transaction.table().schema(),
+          transaction.table().spec(),
+          tableSyncMetadata);
+    } else {
+      dataFileUpdatesExtractor.applyDiff(
+          transaction,
+          internalFilesDiff,
+          transaction.table().schema(),
+          transaction.table().spec(),
+          tableSyncMetadata);
+    }
   }
 
   @Override
   public void completeSync() {
-    transaction
-        .expireSnapshots()
-        .expireOlderThan(
-            Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
-        .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
-        .cleanExpiredFiles(true)
-        .commit();
+    if (!metadataRetention.isNegative()) {
+      transaction
+          .expireSnapshots()
+          .expireOlderThan(Instant.now().minus(metadataRetention).toEpochMilli())
+          .deleteWith(this::safeDelete)
+          .cleanExpiredFiles(true)
+          .commit();
+    }
     transaction.commitTransaction();
-    transaction = null;
-    internalTableState = null;
-    tableSyncMetadata = null;
+    resetTransactionState();
   }
 
+  /**
+   * Deletes only the files this target owns: metadata files, and Puffin deletion-vector files it
+   * wrote itself. Data files belong to the source table and are never deleted here.
+   */
   private void safeDelete(String file) {
-    if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH)) {
+    if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH) || file.endsWith(PUFFIN_SUFFIX)) {
       table.io().deleteFile(file);
     }
   }
@@ -345,6 +372,46 @@ public class IcebergConversionTarget implements ConversionTarget {
       }
     }
     return Optional.empty();
+  }
+
+  /**
+   * Expires the given snapshots and ends the sync. Requires {@link #beginSync} to have run. Passing
+   * an empty list is a no-op rather than an empty metadata commit, since callers driven by Hudi
+   * archival reach this on every round.
+   *
+   * @param snapshotIds snapshots to expire
+   */
+  public void expireSnapshotIds(List<Long> snapshotIds) {
+    if (snapshotIds.isEmpty()) {
+      // Nothing to expire, so end the sync without writing a metadata version that changes nothing.
+      resetTransactionState();
+      return;
+    }
+    ExpireSnapshots expireSnapshots = transaction.expireSnapshots().deleteWith(this::safeDelete);
+    for (Long snapshotId : snapshotIds) {
+      expireSnapshots.expireSnapshotId(snapshotId);
+    }
+    expireSnapshots.commit();
+    transaction.commitTransaction();
+    resetTransactionState();
+  }
+
+  /**
+   * Makes the given snapshot current and ends the sync. Requires {@link #beginSync} to have run.
+   *
+   * @param snapshotId the snapshot to roll back to, which must be an ancestor of the current one
+   */
+  public void rollbackToSnapshotId(long snapshotId) {
+    table.manageSnapshots().rollbackTo(snapshotId).commit();
+    transaction.commitTransaction();
+    resetTransactionState();
+  }
+
+  private void resetTransactionState() {
+    transaction = null;
+    internalTableState = null;
+    tableSyncMetadata = null;
+    pendingPositionDeletes = Collections.emptyMap();
   }
 
   private void rollbackCorruptCommits() {
