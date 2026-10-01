@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.avro.Schema;
@@ -40,6 +41,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.StructLike;
+import org.apache.iceberg.spark.SparkSchemaUtil;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -59,6 +61,10 @@ public class TestIcebergPartitionConverter {
         Arguments.of(Types.BooleanType.get(), true, true),
         Arguments.of(Types.DoubleType.get(), 3.14, 3.14),
         Arguments.of(Types.FloatType.get(), 2.5f, 2.5f),
+        Arguments.of(
+            Types.UUIDType.get(),
+            UUID.fromString("f79c3e09-677c-4bbd-a479-3f349cb785e7"),
+            UTF8String.fromString("f79c3e09-677c-4bbd-a479-3f349cb785e7")),
         Arguments.of(Types.StringType.get(), null, null));
   }
 
@@ -147,6 +153,32 @@ public class TestIcebergPartitionConverter {
         IcebergPartitionConverter.convertPartitionToInternalRow("", spec.partitionType(), spec));
     assertNull(
         IcebergPartitionConverter.convertPartitionToInternalRow(null, spec.partitionType(), spec));
+  }
+
+  @Test
+  void convertsTypeLikeIcebergSparkReader() {
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.NestedField.optional(1, "boolean", Types.BooleanType.get()),
+            Types.NestedField.optional(2, "int", Types.IntegerType.get()),
+            Types.NestedField.optional(3, "long", Types.LongType.get()),
+            Types.NestedField.optional(4, "float", Types.FloatType.get()),
+            Types.NestedField.optional(5, "double", Types.DoubleType.get()),
+            Types.NestedField.optional(6, "date", Types.DateType.get()),
+            Types.NestedField.optional(7, "timestamp", Types.TimestampType.withZone()),
+            Types.NestedField.optional(8, "timestamp_ntz", Types.TimestampType.withoutZone()),
+            Types.NestedField.optional(9, "string", Types.StringType.get()),
+            Types.NestedField.optional(10, "uuid", Types.UUIDType.get()),
+            Types.NestedField.optional(11, "fixed", Types.FixedType.ofLength(3)),
+            Types.NestedField.optional(12, "binary", Types.BinaryType.get()),
+            Types.NestedField.required(13, "decimal", Types.DecimalType.of(10, 2)),
+            Types.NestedField.optional(
+                14,
+                "struct",
+                Types.StructType.of(
+                    Types.NestedField.optional(15, "nested", Types.LongType.get()))));
+    assertEquals(
+        SparkSchemaUtil.convert(structType), IcebergPartitionConverter.toSparkType(structType));
   }
 
   private static class TestStructLike implements StructLike {

@@ -19,24 +19,34 @@
 package org.apache.xtable.index;
 
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX_PREFIX;
+import static org.apache.spark.sql.functions.col;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.rdd.RDD;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.CatalystTypeConverters;
 import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.data.HoodieData;
 import org.apache.hudi.common.data.HoodiePairData;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
+import org.apache.hudi.data.HoodieJavaPairRDD;
 import org.apache.hudi.data.HoodieJavaRDD;
 import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieTableMetadataUtil;
@@ -47,6 +57,9 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Partitioning;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.types.Types;
+
+import scala.Function1;
+import scala.Tuple2;
 
 import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ConversionConfig;
@@ -69,6 +82,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   private final String tableLocation;
   private final String dataPath;
   private final Properties targetTableProperties;
+  private final SparkSession sparkSession;
   private final JavaSparkContext javaSparkContext;
   private final HoodieSparkEngineContext engineContext;
 
@@ -85,6 +99,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
         TableFormatUtils.getTableDataLocation(
             TableFormat.ICEBERG, tableLocation, icebergTable.properties());
     this.targetTableProperties = targetTableProperties;
+    this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     this.engineContext = new HoodieSparkEngineContext(javaSparkContext);
   }
@@ -135,9 +150,22 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   }
 
   @Override
-  public RDD<IndexLookupResult> lookup(Table icebergTable, RDD<String> keys, String columnName) {
+  public Dataset<Row> lookup(Table icebergTable, Dataset<Row> keys, String columnName) {
     Types.StructType partitionType = Partitioning.partitionType(icebergTable);
     PartitionSpec spec = icebergTable.spec();
+    StructType partitionSparkType = IcebergPartitionConverter.toSparkType(partitionType);
+    StructType resultSchema =
+        new StructType()
+            .add(columnName, DataTypes.StringType, false)
+            .add(FILE_COLUMN, DataTypes.StringType, false)
+            .add(POSITION_COLUMN, DataTypes.LongType, false)
+            .add(PARTITION_COLUMN, partitionSparkType, true);
+    // the secondary index stores the values of the indexed column as strings
+    JavaRDD<String> secondaryKeys =
+        keys.where(col(columnName).isNotNull())
+            .select(col(columnName).cast(DataTypes.StringType))
+            .as(Encoders.STRING())
+            .toJavaRDD();
     HoodieStorage storage =
         new HoodieHadoopStorage(dataPath, javaSparkContext.hadoopConfiguration());
     HoodieTableMetaClient metaClient =
@@ -152,29 +180,41 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
                 .create(engineContext, storage, metadataConfig, dataPath)) {
       HoodiePairData<String, String> recordKeysBySecondaryKey =
           tableMetadata.readSecondaryIndexDataTableRecordKeysWithKeys(
-              HoodieJavaRDD.of(keys.toJavaRDD()),
-              PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
+              HoodieJavaRDD.of(secondaryKeys), PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
       // capture the field so the closure does not serialize the index instance
       String dataPath = this.dataPath;
-      HoodieData<IndexLookupResult> lookupResults =
-          recordKeysBySecondaryKey.map(
-              recordKeyBySecondaryKey ->
-                  toLookupResult(
-                      dataPath,
-                      recordKeyBySecondaryKey.getKey(),
-                      recordKeyBySecondaryKey.getValue(),
-                      partitionType,
-                      spec));
-      return HoodieJavaRDD.getJavaRDD(lookupResults).rdd();
+      JavaRDD<Row> lookupResults =
+          HoodieJavaPairRDD.getJavaPairRDD(recordKeysBySecondaryKey)
+              .mapPartitions(
+                  recordKeysBySecondaryKeyIterator -> {
+                    Function1<Object, Object> toPartitionRow =
+                        CatalystTypeConverters.createToScalaConverter(partitionSparkType);
+                    List<Row> rows = new ArrayList<>();
+                    while (recordKeysBySecondaryKeyIterator.hasNext()) {
+                      Tuple2<String, String> recordKeyBySecondaryKey =
+                          recordKeysBySecondaryKeyIterator.next();
+                      rows.add(
+                          toLookupResult(
+                              dataPath,
+                              recordKeyBySecondaryKey._1(),
+                              recordKeyBySecondaryKey._2(),
+                              partitionType,
+                              spec,
+                              toPartitionRow));
+                    }
+                    return rows.iterator();
+                  });
+      return sparkSession.createDataFrame(lookupResults, resultSchema);
     }
   }
 
-  private static IndexLookupResult toLookupResult(
+  private static Row toLookupResult(
       String dataPath,
       String secondaryKey,
       String recordKey,
       Types.StructType partitionType,
-      PartitionSpec spec) {
+      PartitionSpec spec,
+      Function1<Object, Object> toPartitionRow) {
     // record keys generated by Hudi for files without record keys are "<relative path>_<row
     // position>"
     int positionSeparator = recordKey.lastIndexOf('_');
@@ -188,14 +228,10 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
         partitionSeparator == -1 ? "" : relativeFilePath.substring(0, partitionSeparator);
     InternalRow partitionRow =
         IcebergPartitionConverter.convertPartitionToInternalRow(partitionPath, partitionType, spec);
-    return IndexLookupResult.builder()
-        .key(secondaryKey)
-        .file(
-            dataPath.endsWith("/")
-                ? dataPath + relativeFilePath
-                : dataPath + "/" + relativeFilePath)
-        .position(Long.parseLong(recordKey.substring(positionSeparator + 1)))
-        .partition(partitionRow)
-        .build();
+    return RowFactory.create(
+        secondaryKey,
+        dataPath.endsWith("/") ? dataPath + relativeFilePath : dataPath + "/" + relativeFilePath,
+        Long.parseLong(recordKey.substring(positionSeparator + 1)),
+        partitionRow == null ? null : toPartitionRow.apply(partitionRow));
   }
 }

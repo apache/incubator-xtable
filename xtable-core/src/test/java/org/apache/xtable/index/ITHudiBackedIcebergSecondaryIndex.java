@@ -38,6 +38,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -147,19 +150,22 @@ public class ITHudiBackedIcebergSecondaryIndex {
       boolean partitioned,
       List<String> keysThatMustNotResolve) {
     Map<String, Pair<String, Long>> expectedLocations = new HashMap<>();
-    Map<String, String> expectedPartitions = new HashMap<>();
-    sparkSession
-        .read()
-        .format("iceberg")
-        .load(table.getBasePath())
-        .selectExpr(INDEXED_COLUMN, "_file", "_pos", PARTITION_COLUMN)
+    Map<String, Row> expectedPartitions = new HashMap<>();
+    Dataset<Row> icebergRows =
+        sparkSession
+            .read()
+            .format("iceberg")
+            .load(table.getBasePath())
+            .selectExpr(
+                INDEXED_COLUMN, Index.FILE_COLUMN, Index.POSITION_COLUMN, Index.PARTITION_COLUMN);
+    icebergRows
         .collectAsList()
         .forEach(
             row -> {
               expectedLocations.put(
                   row.getString(0),
                   Pair.of(new Path(row.getString(1)).toUri().getPath(), row.getLong(2)));
-              expectedPartitions.put(row.getString(0), row.getString(3));
+              expectedPartitions.put(row.getString(0), row.getStruct(3));
             });
 
     List<String> keys = new ArrayList<>(expectedLocations.keySet());
@@ -167,28 +173,38 @@ public class ITHudiBackedIcebergSecondaryIndex {
     keys.add("missing-key-1");
     keys.add("missing-key-2");
     keys.addAll(keysThatMustNotResolve);
-    List<IndexLookupResult> lookupResults =
-        index
-            .lookup(table.getIcebergTable(), jsc.parallelize(keys, 2).rdd(), INDEXED_COLUMN)
-            .toJavaRDD()
-            .collect();
-    assertEquals(expectedLocations.size(), lookupResults.size());
+    Dataset<Row> keysToLookUp =
+        sparkSession.createDataset(keys, Encoders.STRING()).toDF(INDEXED_COLUMN).repartition(2);
+    Dataset<Row> lookupResults =
+        index.lookup(table.getIcebergTable(), keysToLookUp, INDEXED_COLUMN);
+    if (partitioned) {
+      // the partition column must have the type Iceberg's own _partition column has
+      assertEquals(
+          icebergRows.schema().apply(Index.PARTITION_COLUMN).dataType().catalogString(),
+          lookupResults.schema().apply(Index.PARTITION_COLUMN).dataType().catalogString());
+    }
+    List<Row> lookupRows = lookupResults.collectAsList();
+    assertEquals(expectedLocations.size(), lookupRows.size());
 
     Set<String> resolvedKeys =
-        lookupResults.stream().map(IndexLookupResult::getKey).collect(Collectors.toSet());
+        lookupRows.stream()
+            .map(row -> row.<String>getAs(INDEXED_COLUMN))
+            .collect(Collectors.toSet());
     keysThatMustNotResolve.forEach(key -> assertFalse(resolvedKeys.contains(key)));
 
-    for (IndexLookupResult lookupResult : lookupResults) {
-      Pair<String, Long> expected = expectedLocations.get(lookupResult.getKey());
+    for (Row lookupRow : lookupRows) {
+      String key = lookupRow.getAs(INDEXED_COLUMN);
+      Pair<String, Long> expected = expectedLocations.get(key);
       assertNotNull(expected, "index returned a key that is not in the table");
-      assertEquals(expected.getLeft(), new Path(lookupResult.getFile()).toUri().getPath());
-      assertEquals(expected.getRight(), lookupResult.getPosition());
+      assertEquals(
+          expected.getLeft(),
+          new Path(lookupRow.<String>getAs(Index.FILE_COLUMN)).toUri().getPath());
+      assertEquals(expected.getRight(), lookupRow.<Long>getAs(Index.POSITION_COLUMN));
+      Row partition = lookupRow.getAs(Index.PARTITION_COLUMN);
       if (partitioned) {
-        assertEquals(
-            expectedPartitions.get(lookupResult.getKey()),
-            lookupResult.getPartition().getUTF8String(0).toString());
+        assertEquals(expectedPartitions.get(key), partition);
       } else {
-        assertNull(lookupResult.getPartition());
+        assertNull(partition);
       }
     }
   }

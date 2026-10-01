@@ -29,7 +29,10 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.util.Utf8;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Decimal;
+import org.apache.spark.sql.types.StructField;
 import org.apache.spark.unsafe.types.UTF8String;
 
 import org.apache.iceberg.DataFiles;
@@ -72,6 +75,56 @@ public final class IcebergPartitionConverter {
     return new GenericInternalRow(values);
   }
 
+  /**
+   * Converts an Iceberg struct type to the Spark type Iceberg's Spark reader uses for it, so the
+   * rows built by {@link #convertStructLikeToInternalRow} can be read with this schema.
+   */
+  public static org.apache.spark.sql.types.StructType toSparkType(Types.StructType structType) {
+    List<Types.NestedField> fields = structType.fields();
+    StructField[] sparkFields = new StructField[fields.size()];
+    for (int index = 0; index < fields.size(); index++) {
+      Types.NestedField field = fields.get(index);
+      sparkFields[index] =
+          DataTypes.createStructField(field.name(), toSparkType(field.type()), field.isOptional());
+    }
+    return DataTypes.createStructType(sparkFields);
+  }
+
+  private static DataType toSparkType(Type type) {
+    switch (type.typeId()) {
+      case BOOLEAN:
+        return DataTypes.BooleanType;
+      case INTEGER:
+        return DataTypes.IntegerType;
+      case LONG:
+        return DataTypes.LongType;
+      case FLOAT:
+        return DataTypes.FloatType;
+      case DOUBLE:
+        return DataTypes.DoubleType;
+      case DATE:
+        return DataTypes.DateType;
+      case TIMESTAMP:
+        return ((Types.TimestampType) type).shouldAdjustToUTC()
+            ? DataTypes.TimestampType
+            : DataTypes.TimestampNTZType;
+      case STRING:
+      case UUID:
+        return DataTypes.StringType;
+      case FIXED:
+      case BINARY:
+        return DataTypes.BinaryType;
+      case DECIMAL:
+        Types.DecimalType decimalType = (Types.DecimalType) type;
+        return DataTypes.createDecimalType(decimalType.precision(), decimalType.scale());
+      case STRUCT:
+        return toSparkType((Types.StructType) type);
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot convert Iceberg partition type " + type + " to a Spark type");
+    }
+  }
+
   private static Object convertValue(Type type, Object value) {
     if (value == null) {
       return null;
@@ -79,6 +132,8 @@ public final class IcebergPartitionConverter {
     switch (type.typeId()) {
       case DECIMAL:
         return Decimal.apply((BigDecimal) value);
+      case UUID:
+        return UTF8String.fromString(value.toString());
       case STRING:
         if (value instanceof Utf8) {
           Utf8 utf8 = (Utf8) value;

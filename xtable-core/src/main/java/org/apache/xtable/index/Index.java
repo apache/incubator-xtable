@@ -18,7 +18,8 @@
  
 package org.apache.xtable.index;
 
-import org.apache.spark.rdd.RDD;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 
 /**
  * A secondary index over a table in another format, backed by XTable's Hudi conversion. It maps the
@@ -28,6 +29,17 @@ import org.apache.spark.rdd.RDD;
  * @param <T> The table type of the source format (for example an Iceberg {@code Table})
  */
 public interface Index<T> {
+  /** Result column with the full path of the data file that holds the row. */
+  String FILE_COLUMN = "_file";
+
+  /** Result column with the zero based position of the row within the file. */
+  String POSITION_COLUMN = "_pos";
+
+  /**
+   * Result column with the partition values of the row in the table's partition type, or null for
+   * unpartitioned tables.
+   */
+  String PARTITION_COLUMN = "_partition";
 
   /**
    * Checks whether a secondary index exists for the given column.
@@ -49,9 +61,11 @@ public interface Index<T> {
    * Looks up the given keys in the secondary index of a column.
    *
    * @param table The table the index belongs to
-   * @param keys The values of the indexed column to look up
+   * @param keys The values to look up, in the column named {@code columnName}
    * @param columnName The indexed column
-   * @return one {@link IndexLookupResult} for every key present in the index
+   * @return one row for every key present in the index, with the key in the column named {@code
+   *     columnName} and its location in {@link #FILE_COLUMN}, {@link #POSITION_COLUMN} and {@link
+   *     #PARTITION_COLUMN}
    */
-  RDD<IndexLookupResult> lookup(T table, RDD<String> keys, String columnName);
+  Dataset<Row> lookup(T table, Dataset<Row> keys, String columnName);
 }
