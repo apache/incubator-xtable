@@ -224,14 +224,14 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testMakeExistingColumnRequired() {
+  public void testExistingOptionalColumnStaysOptional() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 
     schemaSync.sync(SCHEMA, updateFieldRequired(2), mockTransaction);
 
-    verify(mockUpdateSchema).requireColumn("date_field");
-    verify(mockUpdateSchema).commit();
+    // Iceberg cannot tighten an optional column to required, so the sync leaves it alone
+    verify(mockUpdateSchema, never()).requireColumn("date_field");
   }
 
   @Test

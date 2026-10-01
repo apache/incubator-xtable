@@ -296,27 +296,26 @@ public class BaseFileUpdatesExtractor {
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
       String fileName, List<ColumnStat> columnStatMap, HoodieIndexVersion indexVersion) {
-    return columnStatMap.stream()
-        .filter(
-            entry ->
-                !InternalType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
-        .map(
-            columnStat -> {
-              ValueMetadata valueMetadata =
-                  XTableValueMetadata.getValueMetadata(columnStat, indexVersion);
-              return HoodieColumnRangeMetadata.<Comparable>create(
-                  fileName,
-                  convertFromXTablePath(columnStat.getField().getPath()),
-                  valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMinValue()),
-                  valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMaxValue()),
-                  columnStat.getNumNulls(),
-                  columnStat.getNumValues(),
-                  columnStat.getTotalSize(),
-                  -1L,
-                  valueMetadata);
-            })
-        .collect(
-            Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, columnStat -> columnStat));
+    Map<String, HoodieColumnRangeMetadata<Comparable>> columnRanges = new HashMap<>();
+    for (ColumnStat columnStat : columnStatMap) {
+      if (InternalType.NON_SCALAR_TYPES.contains(columnStat.getField().getSchema().getDataType())) {
+        continue;
+      }
+      ValueMetadata valueMetadata = XTableValueMetadata.getValueMetadata(columnStat, indexVersion);
+      HoodieColumnRangeMetadata<Comparable> rangeMetadata =
+          HoodieColumnRangeMetadata.<Comparable>create(
+              fileName,
+              convertFromXTablePath(columnStat.getField().getPath()),
+              valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMinValue()),
+              valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMaxValue()),
+              columnStat.getNumNulls(),
+              columnStat.getNumValues(),
+              columnStat.getTotalSize(),
+              -1L,
+              valueMetadata);
+      columnRanges.put(rangeMetadata.getColumnName(), rangeMetadata);
+    }
+    return columnRanges;
   }
 
   /** Holds the information needed to create a "replace" commit in the Hudi table. */
