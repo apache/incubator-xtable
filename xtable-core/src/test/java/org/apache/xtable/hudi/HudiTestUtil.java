@@ -53,15 +53,19 @@ import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
 
-  @SneakyThrows
   public static HoodieTableMetaClient initTableAndGetMetaClient(
       String tableBasePath, String partitionFields) {
+    // Table version 6 matches the conversion target's default version.
+    return initTableAndGetMetaClient(tableBasePath, partitionFields, HoodieTableVersion.SIX);
+  }
+
+  @SneakyThrows
+  public static HoodieTableMetaClient initTableAndGetMetaClient(
+      String tableBasePath, String partitionFields, HoodieTableVersion tableVersion) {
     return HoodieTableMetaClient.newTableBuilder()
         .setCommitTimezone(HoodieTimelineTimeZone.UTC)
         .setTableType(HoodieTableType.COPY_ON_WRITE)
-        // Pin test tables to table version 6 to match the conversion target. Table version 9
-        // support will be added in a follow-up PR.
-        .setTableVersion(HoodieTableVersion.SIX)
+        .setTableVersion(tableVersion)
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
         .setPartitionFields(partitionFields)
@@ -77,10 +81,9 @@ public class HudiTestUtil {
     Properties properties = new Properties();
     properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
     return HoodieWriteConfig.newBuilder()
-        // Pin writes to table version 6 and disable auto-upgrade so the write client does not
-        // upgrade the test table to version 9. Table version 9 support will be added in a
-        // follow-up PR.
-        .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+        // Write at the table's own version and disable auto-upgrade so the write client does not
+        // upgrade the test table, mirroring HudiConversionTarget.
+        .withWriteTableVersion(metaClient.getTableConfig().getTableVersion().versionCode())
         .withAutoUpgradeVersion(false)
         .withSchema(schema == null ? "" : schema.toString())
         .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
@@ -90,8 +93,9 @@ public class HudiTestUtil {
             HoodieMetadataConfig.newBuilder()
                 .withMaxNumDeltaCommitsBeforeCompaction(2)
                 .enable(true)
-                // Mirror HudiConversionTarget: col-stats index only for un-partitioned tables.
-                .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
+                // Mirror HudiConversionTarget: col stats for all tables, partition stats off.
+                .withMetadataIndexColumnStats(true)
+                .withMetadataIndexPartitionStats(false)
                 .withProperties(properties)
                 .build())
         .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(1, 2).build())

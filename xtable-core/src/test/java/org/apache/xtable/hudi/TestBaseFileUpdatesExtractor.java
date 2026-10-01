@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -56,6 +57,7 @@ import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
+import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
@@ -164,6 +166,72 @@ public class TestBaseFileUpdatesExtractor {
                 partitionPath2,
                 getExpectedColumnStats(fileName2, HoodieIndexVersion.V1)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
+  }
+
+  @Test
+  void convertDiffWithPartitionSubdirectory() {
+    String tableBasePath = "file://base";
+    // a Paimon-style file in a partition and in an unpartitioned table
+    InternalDataFile partitionedFile =
+        createFile(tableBasePath + "/partition1/bucket-0/file1.parquet", Collections.emptyList())
+            .toBuilder()
+            .partitionSubdirectory(Optional.of("bucket-0"))
+            .build();
+    InternalDataFile unpartitionedFile =
+        createFile(tableBasePath + "/bucket-1/file2.parquet", Collections.emptyList()).toBuilder()
+            .partitionSubdirectory(Optional.of("bucket-1"))
+            .build();
+    InternalDataFile removedFile =
+        createFile(tableBasePath + "/partition1/bucket-0/file3.parquet", Collections.emptyList())
+            .toBuilder()
+            .partitionSubdirectory(Optional.of("bucket-0"))
+            .build();
+    // without a prefix, a bucket-N directory is a partition value
+    InternalDataFile bucketPartitionFile =
+        createFile(tableBasePath + "/bucket-3/file4.parquet", Collections.emptyList());
+
+    InternalFilesDiff diff =
+        InternalFilesDiff.builder()
+            .filesAdded(Arrays.asList(partitionedFile, unpartitionedFile, bucketPartitionFile))
+            .filesRemoved(Collections.singletonList(removedFile))
+            .build();
+    BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath))
+            .convertDiff(diff, COMMIT_TIME, HoodieIndexVersion.V1);
+
+    assertEquals(
+        Collections.singletonMap("partition1", Collections.singletonList("bucket-0/file3.parquet")),
+        replaceMetadata.getPartitionToReplacedFileIds());
+    Map<String, HoodieDeltaWriteStat> statsByFileId =
+        replaceMetadata.getWriteStatuses().stream()
+            .collect(
+                Collectors.toMap(
+                    WriteStatus::getFileId, status -> (HoodieDeltaWriteStat) status.getStat()));
+    assertEquals(3, statsByFileId.size());
+    assertWriteStat(
+        statsByFileId.get("bucket-0/file1.parquet"),
+        "partition1",
+        "partition1/bucket-0/"
+            + ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                "file1.parquet", COMMIT_TIME, "bucket-0"));
+    assertWriteStat(
+        statsByFileId.get("bucket-1/file2.parquet"),
+        "",
+        "bucket-1/"
+            + ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                "file2.parquet", COMMIT_TIME, "bucket-1"));
+    assertWriteStat(
+        statsByFileId.get("file4.parquet"),
+        "bucket-3",
+        ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+            "bucket-3/file4.parquet", COMMIT_TIME));
+  }
+
+  private static void assertWriteStat(
+      HoodieDeltaWriteStat writeStat, String expectedPartitionPath, String expectedPath) {
+    assertNotNull(writeStat);
+    assertEquals(expectedPartitionPath, writeStat.getPartitionPath());
+    assertEquals(expectedPath, writeStat.getPath());
   }
 
   private void assertEqualsIgnoreOrder(
