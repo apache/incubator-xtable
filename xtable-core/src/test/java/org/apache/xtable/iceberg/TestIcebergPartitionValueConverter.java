@@ -21,12 +21,14 @@ package org.apache.xtable.iceberg;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import org.apache.avro.generic.IndexedRecord;
 import org.junit.jupiter.api.Test;
 
+import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.StructLike;
@@ -90,6 +92,37 @@ public class TestIcebergPartitionValueConverter {
             partitionSpec);
     assertEquals(1, partitionValues.size());
     assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  public void testToXTablePartitionData() {
+    PartitionSpec partitionSpec =
+        PartitionSpec.builderFor(SCHEMA).identity("name").year("birthDate").build();
+    PartitionData partitionData = new PartitionData(partitionSpec.partitionType());
+    partitionData.set(0, "abc");
+    partitionData.set(1, 51);
+    List<PartitionValue> partitionValues =
+        partitionValueConverter.toXTable(
+            InternalTable.builder()
+                .readSchema(ONE_SCHEMA)
+                .partitioningFields(
+                    Arrays.asList(
+                        getPartitionField("name", PartitionTransformType.VALUE),
+                        getPartitionField("birthDate", PartitionTransformType.YEAR)))
+                .build(),
+            partitionData,
+            partitionSpec);
+    assertEquals(
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(getPartitionField("name", PartitionTransformType.VALUE))
+                .range(Range.scalar("abc"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(getPartitionField("birthDate", PartitionTransformType.YEAR))
+                .range(Range.scalar(1609459200000L))
+                .build()),
+        partitionValues);
   }
 
   @Test
