@@ -113,13 +113,10 @@ public class HudiTargetConfig {
     HoodieTableVersion tableVersion = DEFAULT_TABLE_VERSION;
     String configured = properties.getProperty(HUDI_TABLE_VERSION);
     if (configured != null && !configured.trim().isEmpty()) {
-      tableVersion = HoodieTableVersion.fromVersionCode(Integer.parseInt(configured.trim()));
+      tableVersion = parseTableVersion(configured.trim());
     }
     if (tableVersion != HoodieTableVersion.SIX && tableVersion != HoodieTableVersion.NINE) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Unsupported Hudi target table version %s. Only table versions 6 and 9 are supported via %s.",
-              tableVersion.versionCode(), HUDI_TABLE_VERSION));
+      throw unsupportedTableVersion(String.valueOf(tableVersion.versionCode()), null);
     }
     return tableVersion;
   }
@@ -149,5 +146,22 @@ public class HudiTargetConfig {
           String.format("%s must be a positive integer but was %s.", key, configured));
     }
     return Optional.of(value);
+  }
+
+  private static HoodieTableVersion parseTableVersion(String configured) {
+    try {
+      return HoodieTableVersion.fromVersionCode(Integer.parseInt(configured));
+    } catch (RuntimeException e) {
+      // A non-numeric value, or a version code that Hudi does not know.
+      throw unsupportedTableVersion(configured, e);
+    }
+  }
+
+  private static IllegalArgumentException unsupportedTableVersion(String value, Throwable cause) {
+    return new IllegalArgumentException(
+        String.format(
+            "Unsupported Hudi target table version %s. Only table versions 6 and 9 are supported via %s.",
+            value, HUDI_TABLE_VERSION),
+        cause);
   }
 }

@@ -124,7 +124,7 @@ public class HudiTableManager {
           .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           // Table format version (6 = legacy 0.x layout, 9 = Hudi 1.x layout) is selected via the
-          // xtable.hudi.target.table_version config and defaults to 9. See
+          // xtable.hudi.target.table_version config and defaults to 6. See
           // https://github.com/apache/incubator-xtable/issues/834.
           .setTableVersion(tableVersion)
           .setTableName(table.getName())

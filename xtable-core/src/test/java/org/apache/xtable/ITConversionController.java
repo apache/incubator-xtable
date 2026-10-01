@@ -150,6 +150,15 @@ public class ITConversionController {
     return addBasicPartitionCases(testCasesWithSyncModes());
   }
 
+  /** Crosses the partitioning and sync mode cases with both Hudi source table versions. */
+  private static Stream<Arguments> testCasesWithPartitioningSyncModesAndSourceVersions() {
+    return testCasesWithPartitioningAndSyncModes()
+        .flatMap(
+            arguments ->
+                Stream.of(HoodieTableVersion.SIX, HoodieTableVersion.NINE)
+                    .map(version -> Arguments.of(arguments.get()[0], arguments.get()[1], version)));
+  }
+
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
     for (String sourceFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PAIMON)) {
@@ -377,15 +386,19 @@ public class ITConversionController {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndSyncModes")
+  @MethodSource("testCasesWithPartitioningSyncModesAndSourceVersions")
   public void testConcurrentInsertWritesInSource(
-      SyncMode syncMode, PartitionConfig partitionConfig) {
+      SyncMode syncMode, PartitionConfig partitionConfig, HoodieTableVersion sourceVersion) {
     String tableName = getTableName();
     ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
     List<String> targetTableFormats = getOtherFormats(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE,
+            sourceVersion)) {
       // commit time 1 starts first but ends 2nd.
       // commit time 2 starts second but ends 1st.
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -410,6 +423,92 @@ public class ITConversionController {
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
+    }
+  }
+
+  /**
+   * A commit that is still inflight during an incremental sync must reach the targets once it
+   * completes, also when a later commit completed first.
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  public void testConcurrentInsertWritesInSourceDuringIncrementalSync(
+      HoodieTableVersion sourceVersion) {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    List<String> targetTableFormats = getOtherFormats(HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, sourceVersion)) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI, SyncMode.INCREMENTAL, tableName, table, targetTableFormats, null, null);
+      table.insertRecords(50, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 50);
+
+      // commit 1 starts first but ends 2nd, and commit 2 starts second but ends 1st.
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(50);
+      String commitInstant1 = table.startCommit();
+      String commitInstant2 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+      // incremental sync while commit 1 is inflight
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
+
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 150);
+    }
+  }
+
+  /**
+   * An up-to-date target must not apply a commit again when a lagging target makes the sync replay
+   * commits that completed in a different order than they were requested.
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  public void testLaggingTargetWithOutOfOrderCompletedCommits(HoodieTableVersion sourceVersion) {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, sourceVersion)) {
+      ConversionConfig singleTableConfig =
+          getTableSyncConfig(
+              HUDI, SyncMode.INCREMENTAL, tableName, table, ImmutableList.of(ICEBERG), null, null);
+      ConversionConfig dualTableConfig =
+          getTableSyncConfig(
+              HUDI,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Arrays.asList(ICEBERG, DELTA),
+              null,
+              null);
+      table.insertRecords(50, true);
+      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 50);
+
+      // commit 1 starts first but ends 2nd, and commit 2 starts second but ends 1st.
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(50);
+      String commitInstant1 = table.startCommit();
+      String commitInstant2 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+
+      // iceberg syncs both commits, and delta lags behind
+      conversionController.sync(singleTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 150);
+      // delta replays both commits, and iceberg must skip them
+      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 150);
     }
   }
 

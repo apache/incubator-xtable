@@ -56,6 +56,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
@@ -320,12 +321,13 @@ public class ITHudiConversionSource {
 
       HudiConversionSource hudiClient = getHudiSourceClient(CONFIGURATION, table.getBasePath(), "");
 
-      // Resume from the later-requested commit's instant time. Under requested-time selection the
-      // earlier-requested straggler (earlyRequestedInstant < lateRequestedInstant) would be
-      // dropped; completion-time selection must still return it.
+      // Resume from the checkpoint a sync of the later-requested commit writes, which is its
+      // completion time on table version 9. Under requested-time selection the earlier-requested
+      // straggler (earlyRequestedInstant < lateRequestedInstant) would be dropped; completion-time
+      // selection must still return it.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
-              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(lateRequestedInstant))
+              .lastSyncInstant(getCompletionInstant(table.getMetaClient(), lateRequestedInstant))
               .build();
       CommitsBacklog<HoodieInstant> backlog =
           hudiClient.getCommitsBacklog(instantsForIncrementalSync);
@@ -339,11 +341,12 @@ public class ITHudiConversionSource {
           backlogInstants,
           "Out-of-order completed commit must be included in the incremental backlog");
 
-      // The current snapshot must reflect the most-recently-completed commit (the straggler).
+      // The current snapshot must reflect the most-recently-completed commit (the straggler), and
+      // its commit time is the straggler's completion time.
       InternalSnapshot snapshot = hudiClient.getCurrentSnapshot();
       assertEquals(
-          earlyRequestedInstant,
-          HudiInstantUtils.convertInstantToCommit(snapshot.getTable().getLatestCommitTime()));
+          getCompletionInstant(table.getMetaClient(), earlyRequestedInstant),
+          snapshot.getTable().getLatestCommitTime());
     }
   }
 
@@ -378,14 +381,17 @@ public class ITHudiConversionSource {
     }
   }
 
-  @Test
-  public void testOnlyUpsertsAfterInserts() {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  public void testOnlyUpsertsAfterInserts(HoodieTableVersion tableVersion) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -426,14 +432,17 @@ public class ITHudiConversionSource {
     }
   }
 
-  @Test
-  public void testForIncrementalSyncSafetyCheck() {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  public void testForIncrementalSyncSafetyCheck(HoodieTableVersion tableVersion) {
     HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
     HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
     String tableName = GenericTable.getTableName();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       String commitInstant1 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
@@ -459,6 +468,15 @@ public class ITHudiConversionSource {
       assertTrue(
           hudiClient.isIncrementalSyncSafeFrom(
               HudiInstantUtils.parseFromInstantTime(commitInstant2)));
+      if (tableVersion == HoodieTableVersion.NINE) {
+        // On table version 9 the sync checkpoint is the completion time of the synced commit.
+        assertFalse(
+            hudiClient.isIncrementalSyncSafeFrom(
+                getCompletionInstant(table.getMetaClient(), commitInstant1)));
+        assertTrue(
+            hudiClient.isIncrementalSyncSafeFrom(
+                getCompletionInstant(table.getMetaClient(), commitInstant2)));
+      }
       // commit older by an hour is not present in table, hence not safe for incremental sync.
       Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
       assertFalse(hudiClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
@@ -820,6 +838,15 @@ public class ITHudiConversionSource {
         }
       }
     }
+  }
+
+  private static Instant getCompletionInstant(
+      HoodieTableMetaClient metaClient, String requestedInstant) {
+    return metaClient.reloadActiveTimeline().filterCompletedInstants().getInstants().stream()
+        .filter(instant -> instant.requestedTime().equals(requestedInstant))
+        .map(instant -> HudiInstantUtils.parseFromInstantTime(instant.getCompletionTime()))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No completed instant " + requestedInstant));
   }
 
   private static Stream<Arguments> testsForAllTableTypes() {

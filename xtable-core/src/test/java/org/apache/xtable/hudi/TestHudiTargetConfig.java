@@ -126,4 +126,16 @@ public class TestHudiTargetConfig {
     props.setProperty(key, value);
     assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
   }
+
+  @Test
+  void rejectsNonNumericAndUnknownVersions() {
+    for (String value : new String[] {"abc", "42"}) {
+      Properties props = new Properties();
+      props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, value);
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+      assertTrue(exception.getMessage().contains(HudiTargetConfig.HUDI_TABLE_VERSION));
+    }
+  }
 }

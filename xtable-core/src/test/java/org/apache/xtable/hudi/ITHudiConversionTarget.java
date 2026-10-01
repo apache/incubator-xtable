@@ -161,7 +161,8 @@ public class ITHudiConversionTarget {
     String commitTime = "20231003013807542";
     String existingFileName1 = "existing_file_1.parquet";
     HoodieTableMetaClient setupMetaClient =
-        initTableAndGetMetaClient(tableBasePath, partitioned ? PARTITION_FIELD_NAME : "");
+        initTableAndGetMetaClient(
+            tableBasePath, partitioned ? PARTITION_FIELD_NAME : "", tableVersion);
     // initialize the table with only 2 of the 3 fields
     Schema initialSchema =
         SchemaBuilder.record(TEST_SCHEMA_NAME)
@@ -241,6 +242,8 @@ public class ITHudiConversionTarget {
     }
     // include meta fields since the table was created with meta fields enabled
     assertSchema(metaClient, true);
+    // the sync must keep the existing table at its version
+    assertEquals(tableVersion, metaClient.getTableConfig().getTableVersion());
   }
 
   @ParameterizedTest

@@ -30,6 +30,9 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 
 import org.apache.xtable.model.exception.ParseException;
@@ -73,6 +76,30 @@ class HudiInstantUtils {
   static String convertInstantToCommit(Instant instant) {
     LocalDateTime instantTime = instant.atZone(ZONE_ID).toLocalDateTime();
     return HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(instantTime);
+  }
+
+  /**
+   * Table version 8+ (Hudi 1.x, timeline layout V2) makes a commit visible at its completion time
+   * rather than its requested (instant) time, so incremental selection and ordering must be based
+   * on completion time. Table version 6 keeps the legacy requested-time ordering.
+   */
+  static boolean usesCompletionTimeOrdering(HoodieTableMetaClient metaClient) {
+    return metaClient
+        .getTableConfig()
+        .getTableVersion()
+        .greaterThanOrEquals(HoodieTableVersion.EIGHT);
+  }
+
+  /**
+   * Returns the time that identifies a source commit in the sync checkpoint. It is the completion
+   * time on table version 8+, so the checkpoints move forward in the same order that the commits
+   * are synced, and the requested time on older versions.
+   */
+  static Instant getSyncInstant(HoodieTableMetaClient metaClient, HoodieInstant commit) {
+    if (usesCompletionTimeOrdering(metaClient) && commit.getCompletionTime() != null) {
+      return parseFromInstantTime(commit.getCompletionTime());
+    }
+    return parseFromInstantTime(commit.requestedTime());
   }
 
   private static boolean isSecondGranularity(String instant) {
