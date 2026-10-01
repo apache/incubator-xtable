@@ -57,6 +57,7 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.MetadataPartitionType;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 import org.apache.hudi.stats.ValueMetadata;
 import org.apache.hudi.stats.XTableValueMetadata;
@@ -141,6 +142,14 @@ public class BaseFileUpdatesExtractor {
       HoodieTableMetaClient metaClient,
       HoodieMetadataConfig metadataConfig) {
     boolean isTableInitialized = metaClient.isTimelineNonEmpty();
+    // Hudi builds the column-stats index for existing files from the metadata table's file listing,
+    // which skips externally created files. When the index is missing, register every snapshot file
+    // again, so the index gets the stats of all files from this commit's write stats.
+    boolean reregisterExistingFiles =
+        isTableInitialized
+            && !metaClient
+                .getTableConfig()
+                .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
     // Track the partitions that are not present in the snapshot, so the files for those partitions
     // can be dropped
     HoodieIndexVersion indexVersion =
@@ -169,18 +178,15 @@ public class BaseFileUpdatesExtractor {
                           : Collections.emptyList();
                   Set<String> existingPaths =
                       baseFiles.stream().map(HoodieBaseFile::getPath).collect(Collectors.toSet());
-                  // Mark fileIds for removal if the file paths are no longer present in the
-                  // snapshot
-                  List<String> fileIdsToRemove =
-                      baseFiles.stream()
-                          .filter(baseFile -> !physicalPathToFile.containsKey(baseFile.getPath()))
-                          .map(HoodieBaseFile::getFileId)
-                          .collect(Collectors.toList());
                   // for any entries in the map that are not in the set of existing paths, create a
-                  // write status to add them to the Hudi table
+                  // write status to add them to the Hudi table; an existing file gets a new file
+                  // slice in its file group when it is registered again
                   List<WriteStatus> writeStatuses =
                       physicalPathToFile.entrySet().stream()
-                          .filter(entry -> !existingPaths.contains(entry.getKey()))
+                          .filter(
+                              entry ->
+                                  reregisterExistingFiles
+                                      || !existingPaths.contains(entry.getKey()))
                           .map(Map.Entry::getValue)
                           .map(
                               snapshotFile ->
@@ -190,6 +196,19 @@ public class BaseFileUpdatesExtractor {
                                       snapshotFile,
                                       Optional.of(partitionPath),
                                       indexVersion))
+                          .collect(Collectors.toList());
+                  // Mark fileIds for removal if the file paths are no longer present in the
+                  // snapshot. A fileId that this commit writes is never replaced, because Hudi
+                  // hides every file slice of a replaced file group.
+                  Set<String> writtenFileIds =
+                      writeStatuses.stream()
+                          .map(WriteStatus::getFileId)
+                          .collect(Collectors.toSet());
+                  List<String> fileIdsToRemove =
+                      baseFiles.stream()
+                          .filter(baseFile -> !physicalPathToFile.containsKey(baseFile.getPath()))
+                          .map(HoodieBaseFile::getFileId)
+                          .filter(fileId -> !writtenFileIds.contains(fileId))
                           .collect(Collectors.toList());
                   return ReplaceMetadata.of(
                       fileIdsToRemove.isEmpty()
