@@ -169,22 +169,22 @@ public class TestBaseFileUpdatesExtractor {
   }
 
   @Test
-  void convertDiffWithFileGroupPrefix() {
+  void convertDiffWithPartitionSubdirectory() {
     String tableBasePath = "file://base";
     // a Paimon-style file in a partition and in an unpartitioned table
     InternalDataFile partitionedFile =
         createFile(tableBasePath + "/partition1/bucket-0/file1.parquet", Collections.emptyList())
             .toBuilder()
-            .fileGroupPrefix(Optional.of("bucket-0"))
+            .partitionSubdirectory(Optional.of("bucket-0"))
             .build();
     InternalDataFile unpartitionedFile =
         createFile(tableBasePath + "/bucket-1/file2.parquet", Collections.emptyList()).toBuilder()
-            .fileGroupPrefix(Optional.of("bucket-1"))
+            .partitionSubdirectory(Optional.of("bucket-1"))
             .build();
     InternalDataFile removedFile =
         createFile(tableBasePath + "/partition1/bucket-0/file3.parquet", Collections.emptyList())
             .toBuilder()
-            .fileGroupPrefix(Optional.of("bucket-0"))
+            .partitionSubdirectory(Optional.of("bucket-0"))
             .build();
     // without a prefix, a bucket-N directory is a partition value
     InternalDataFile bucketPartitionFile =

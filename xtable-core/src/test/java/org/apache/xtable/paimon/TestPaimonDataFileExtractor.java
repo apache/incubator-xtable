@@ -155,10 +155,10 @@ public class TestPaimonDataFileExtractor {
       String path = dataFile.getPhysicalPath();
       assertTrue(path.contains("bucket-"));
       assertTrue(path.endsWith(".orc") || path.endsWith(".parquet"));
-      // the bucket directory is the file-group prefix
+      // the bucket directory is the partition subdirectory
       String parentPath = path.substring(0, path.lastIndexOf('/'));
       String bucketDirectory = parentPath.substring(parentPath.lastIndexOf('/') + 1);
-      assertEquals(Optional.of(bucketDirectory), dataFile.getFileGroupPrefix());
+      assertEquals(Optional.of(bucketDirectory), dataFile.getPartitionSubdirectory());
     }
   }
 
@@ -214,7 +214,7 @@ public class TestPaimonDataFileExtractor {
 
     for (InternalDataFile file : filesDiff.dataFilesAdded()) {
       assertNotNull(file.getPartitionValues());
-      assertTrue(file.getFileGroupPrefix().orElse("").startsWith("bucket-"));
+      assertTrue(file.getPartitionSubdirectory().orElse("").startsWith("bucket-"));
     }
   }
 

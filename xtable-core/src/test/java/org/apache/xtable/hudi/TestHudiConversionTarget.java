@@ -257,7 +257,7 @@ public class TestHudiConversionTarget {
             .fileAdded(
                 InternalDataFile.builder()
                     .physicalPath(BASE_PATH + "/partition/bucket-0/file.parquet")
-                    .fileGroupPrefix(Optional.of("bucket-0"))
+                    .partitionSubdirectory(Optional.of("bucket-0"))
                     .build())
             .build();
 
@@ -303,7 +303,7 @@ public class TestHudiConversionTarget {
             .fileAdded(
                 InternalDataFile.builder()
                     .physicalPath(BASE_PATH + "/partition/bucket-0/file.parquet")
-                    .fileGroupPrefix(Optional.of("bucket-0"))
+                    .partitionSubdirectory(Optional.of("bucket-0"))
                     .build())
             .build();
 

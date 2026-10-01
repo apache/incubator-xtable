@@ -172,17 +172,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    HoodieInstant commitAtInstant = getCommitAtInstant(instant);
-    if (commitAtInstant == null) {
-      return false;
-    }
-    // On table version 8+ the checkpoint is a completion time, but the cleaner retains commits by
-    // requested time, so check the cleaner against the requested time of the synced commit.
-    Instant cleanerCheckInstant =
-        usesCompletionTimeOrdering()
-            ? HudiInstantUtils.parseFromInstantTime(commitAtInstant.requestedTime())
-            : instant;
-    return !isAffectedByCleanupProcess(cleanerCheckInstant);
+    return doesCommitExistsAsOfInstant(instant) && !isAffectedByCleanupProcess(instant);
   }
 
   @Override
@@ -190,8 +180,19 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     return commit.requestedTime();
   }
 
+  private boolean doesCommitExistsAsOfInstant(Instant instant) {
+    HoodieInstant hoodieInstant = getCommitAtInstant(instant);
+    return hoodieInstant != null;
+  }
+
   @SneakyThrows
   private boolean isAffectedByCleanupProcess(Instant instant) {
+    // On table version 8+ the checkpoint is a completion time, but the cleaner retains commits by
+    // requested time, so check the cleaner against the requested time of the synced commit.
+    Instant cleanerCheckInstant =
+        usesCompletionTimeOrdering()
+            ? HudiInstantUtils.parseFromInstantTime(getCommitAtInstant(instant).requestedTime())
+            : instant;
     Option<HoodieInstant> lastCleanInstant =
         metaClient.getActiveTimeline().getCleanerTimeline().filterCompletedInstants().lastInstant();
     if (!lastCleanInstant.isPresent()) {
@@ -201,11 +202,11 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
         metaClient.getActiveTimeline().readCleanMetadata(lastCleanInstant.get());
     String earliestCommitToRetain = cleanMetadata.getEarliestCommitToRetain();
     if (Strings.isNullOrEmpty(earliestCommitToRetain)) {
-      return cleanInstantsOccurredSinceLastSyncedInstant(instant);
+      return cleanInstantsOccurredSinceLastSyncedInstant(cleanerCheckInstant);
     }
     Instant earliestCommitToRetainInstant =
         HudiInstantUtils.parseFromInstantTime(earliestCommitToRetain);
-    return earliestCommitToRetainInstant.isAfter(instant);
+    return earliestCommitToRetainInstant.isAfter(cleanerCheckInstant);
   }
 
   // When clean instants have empty earliestCommitToRetain, trigger full snapshot sync if any

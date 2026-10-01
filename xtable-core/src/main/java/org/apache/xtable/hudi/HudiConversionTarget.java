@@ -316,7 +316,7 @@ public class HudiConversionTarget implements ConversionTarget {
       throw new IllegalStateException("Meta client is not initialized");
     }
     boolean fileGroupPrefixLayout = lastCommitHasFileGroupPrefixLayout(metaClient.get());
-    if (!fileGroupPrefixLayout && hasFileGroupPrefix(internalFilesDiff)) {
+    if (!fileGroupPrefixLayout && hasPartitionSubdirectory(internalFilesDiff)) {
       throw new NotSupportedException(
           String.format(
               "Hudi target table at %s was written from a Paimon source by an XTable version earlier"
@@ -335,11 +335,11 @@ public class HudiConversionTarget implements ConversionTarget {
     commitState.setFileGroupPrefixLayout(fileGroupPrefixLayout);
   }
 
-  private static boolean hasFileGroupPrefix(InternalFilesDiff internalFilesDiff) {
+  private static boolean hasPartitionSubdirectory(InternalFilesDiff internalFilesDiff) {
     return Stream.concat(
             internalFilesDiff.dataFilesAdded().stream(),
             internalFilesDiff.dataFilesRemoved().stream())
-        .anyMatch(file -> file.getFileGroupPrefix().isPresent());
+        .anyMatch(file -> file.getPartitionSubdirectory().isPresent());
   }
 
   /**
@@ -690,7 +690,6 @@ public class HudiConversionTarget implements ConversionTarget {
       // trigger archiver manually, selecting the archiver implementation that matches the table's
       // timeline layout (V1 for table version 6, V2/LSM for table version 9).
       try {
-        @SuppressWarnings({"unchecked", "rawtypes"})
         HoodieTimelineArchiver archiver =
             TimelineArchivers.getInstance(
                 table.getMetaClient().getTimelineLayoutVersion(), config, (HoodieTable) table);

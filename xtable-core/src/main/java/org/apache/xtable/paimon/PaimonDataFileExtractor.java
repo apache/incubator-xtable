@@ -78,7 +78,7 @@ public class PaimonDataFileExtractor {
       FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
-        .fileGroupPrefix(Optional.of(bucketPath(entry)))
+        .partitionSubdirectory(Optional.of(bucketPath(entry)))
         .fileSizeBytes(entry.file().fileSize())
         .lastModified(entry.file().creationTimeEpochMillis())
         .recordCount(entry.file().rowCount())

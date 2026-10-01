@@ -233,7 +233,7 @@ public class BaseFileUpdatesExtractor {
         internalFilesDiff.dataFilesRemoved().stream()
             .collect(
                 Collectors.groupingBy(
-                    file -> truePartitionPath(tableBasePath, file),
+                    file -> getHudiPartitionPath(tableBasePath, file),
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
@@ -249,20 +249,20 @@ public class BaseFileUpdatesExtractor {
     if (isFileCreatedByHudiWriter(fileName)) {
       return FSUtils.getFileId(fileName);
     }
-    // Files under a file-group prefix keep the prefix as part of the fileId so the prefix can be
+    // Files under a partition subdirectory keep it as part of the fileId so the subdirectory can be
     // recovered when Hudi resolves the physical path of the externally created file.
-    return file.getFileGroupPrefix().map(prefix -> prefix + "/" + fileName).orElse(fileName);
+    return file.getPartitionSubdirectory().map(prefix -> prefix + "/" + fileName).orElse(fileName);
   }
 
   /**
-   * Resolves the Hudi partition path for a file. A file-group prefix directory (e.g. Paimon's
-   * {@code bucket-N}) is a file group within the partition (see Hudi PR #17788), so it is stripped
-   * from the partition path.
+   * Resolves the Hudi partition path for a file. A partition subdirectory (e.g. Paimon's {@code
+   * bucket-N}) is a file group within the partition (see Hudi PR #17788), so it is stripped from
+   * the partition path.
    */
-  private String truePartitionPath(Path tableBasePath, InternalDataFile file) {
+  private String getHudiPartitionPath(Path tableBasePath, InternalDataFile file) {
     String partitionPath =
         HudiPathUtils.getPartitionPath(tableBasePath, new CachingPath(file.getPhysicalPath()));
-    return file.getFileGroupPrefix()
+    return file.getPartitionSubdirectory()
         .map(
             prefix ->
                 prefix.equals(partitionPath)
@@ -291,18 +291,19 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
-        partitionPathOptional.orElseGet(() -> truePartitionPath(tableBasePath, file));
+        partitionPathOptional.orElseGet(() -> getHudiPartitionPath(tableBasePath, file));
     String fileId = getFileId(file);
     String filePath =
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
-    Optional<String> fileGroupPrefix = file.getFileGroupPrefix();
-    // For files under a file-group prefix encode the file-group prefix in the marker and keep the
+    Optional<String> partitionSubdirectory = file.getPartitionSubdirectory();
+    // For files under a partition subdirectory encode it as the file-group prefix in the marker and
+    // keep the
     // file name
     // (not the bucket-relative path) as the marked name; otherwise fall back to the plain marker on
     // the full relative path. In both cases the directory portion is preserved as-is.
     String markedPath =
-        fileGroupPrefix
+        partitionSubdirectory
             .map(
                 prefix ->
                     filePath.substring(0, filePath.length() - fileName.length())
@@ -372,6 +373,6 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
-    return truePartitionPath(tableBasePath, files.get(0));
+    return getHudiPartitionPath(tableBasePath, files.get(0));
   }
 }

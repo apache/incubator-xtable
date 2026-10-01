@@ -55,5 +55,5 @@ public class InternalDataFile extends InternalFile {
   long lastModified;
   // directory between the partition path and the file name that groups files within a partition,
   // for example Paimon's bucket-N; empty when the file sits directly under its partition
-  @Builder.Default @NonNull Optional<String> fileGroupPrefix = Optional.empty();
+  @Builder.Default @NonNull Optional<String> partitionSubdirectory = Optional.empty();
 }
