@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -154,6 +155,10 @@ public class TestPaimonDataFileExtractor {
       String path = dataFile.getPhysicalPath();
       assertTrue(path.contains("bucket-"));
       assertTrue(path.endsWith(".orc") || path.endsWith(".parquet"));
+      // the bucket directory is the file-group prefix
+      String parentPath = path.substring(0, path.lastIndexOf('/'));
+      String bucketDirectory = parentPath.substring(parentPath.lastIndexOf('/') + 1);
+      assertEquals(Optional.of(bucketDirectory), dataFile.getFileGroupPrefix());
     }
   }
 
@@ -209,6 +214,7 @@ public class TestPaimonDataFileExtractor {
 
     for (InternalDataFile file : filesDiff.dataFilesAdded()) {
       assertNotNull(file.getPartitionValues());
+      assertTrue(file.getFileGroupPrefix().orElse("").startsWith("bucket-"));
     }
   }
 

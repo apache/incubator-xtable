@@ -78,6 +78,7 @@ public class PaimonDataFileExtractor {
       FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
+        .fileGroupPrefix(Optional.of(bucketPath(entry)))
         .fileSizeBytes(entry.file().fileSize())
         .lastModified(entry.file().creationTimeEpochMillis())
         .recordCount(entry.file().rowCount())
@@ -89,7 +90,7 @@ public class PaimonDataFileExtractor {
 
   private String toFullPhysicalPath(FileStoreTable table, ManifestEntry entry) {
     String basePath = table.location().toString();
-    String bucketPath = "bucket-" + entry.bucket();
+    String bucketPath = bucketPath(entry);
     String filePath = entry.file().fileName();
 
     Optional<String> partitionPath = partitionExtractor.toPartitionPath(table, entry.partition());
@@ -98,6 +99,10 @@ public class PaimonDataFileExtractor {
     } else {
       return String.join("/", basePath, bucketPath, filePath);
     }
+  }
+
+  private static String bucketPath(ManifestEntry entry) {
+    return "bucket-" + entry.bucket();
   }
 
   /**

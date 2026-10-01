@@ -49,7 +49,6 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -290,100 +289,6 @@ public class ITHudiConversionTarget {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
     }
     assertSchema(metaClient, false);
-  }
-
-  /**
-   * XTable 0.4.0 registered Paimon files under the {@code <partition>/bucket-N} partition. The
-   * target must require one snapshot sync, which registers the files under {@code <partition>}, and
-   * then allow incremental syncs again.
-   */
-  @ParameterizedTest
-  @EnumSource(
-      value = HoodieTableVersion.class,
-      names = {"SIX", "NINE"})
-  void snapshotSyncReplacesFileGroupsInBucketPartitions(HoodieTableVersion tableVersion) {
-    String partitionPath = "partition_path";
-    String fileName = "file_1.parquet";
-    List<PartitionFileGroup> snapshot =
-        Collections.singletonList(
-            PartitionFileGroup.builder()
-                .files(
-                    Collections.singletonList(getTestFile(partitionPath + "/bucket-0", fileName)))
-                .partitionValues(
-                    Collections.singletonList(
-                        PartitionValue.builder()
-                            .partitionField(PARTITION_FIELD)
-                            .range(Range.scalar("partitionPath"))
-                            .build()))
-                .build());
-    // A non-Paimon source table format keeps bucket-0 in the partition path, as 0.4.0 did for
-    // Paimon.
-    InternalTable oldLayoutState = getState(Instant.now(), true);
-    syncSnapshotWithSourceFormat(tableVersion, oldLayoutState, snapshot, TableFormat.PAIMON);
-    assertEquals(
-        Collections.singletonList(partitionPath + "/bucket-0"), getPartitionsWithFileGroups());
-    assertFalse(getTargetClient(tableVersion).isIncrementalSyncSafe());
-
-    InternalTable paimonState =
-        getState(Instant.now(), true).toBuilder().tableFormat(TableFormat.PAIMON).build();
-    syncSnapshotWithSourceFormat(tableVersion, paimonState, snapshot, TableFormat.PAIMON);
-    assertEquals(Collections.singletonList(partitionPath), getPartitionsWithFileGroups());
-    assertTrue(getTargetClient(tableVersion).isIncrementalSyncSafe());
-  }
-
-  /** A bucket-N partition from a source that is not Paimon is a real partition value. */
-  @Test
-  void bucketPartitionFromNonPaimonSourceIsIncrementalSyncSafe() {
-    HoodieTableVersion tableVersion = HoodieTableVersion.NINE;
-    List<PartitionFileGroup> snapshot =
-        Collections.singletonList(
-            PartitionFileGroup.builder()
-                .files(Collections.singletonList(getTestFile("bucket-3", "file_1.parquet")))
-                .partitionValues(
-                    Collections.singletonList(
-                        PartitionValue.builder()
-                            .partitionField(PARTITION_FIELD)
-                            .range(Range.scalar("bucket-3"))
-                            .build()))
-                .build());
-    InternalTable state = getState(Instant.now(), true);
-    syncSnapshotWithSourceFormat(tableVersion, state, snapshot, TableFormat.ICEBERG);
-    assertEquals(Collections.singletonList("bucket-3"), getPartitionsWithFileGroups());
-    assertTrue(getTargetClient(tableVersion).isIncrementalSyncSafe());
-  }
-
-  private void syncSnapshotWithSourceFormat(
-      HoodieTableVersion tableVersion,
-      InternalTable state,
-      List<PartitionFileGroup> snapshot,
-      String sourceTableFormat) {
-    HudiConversionTarget targetClient = getTargetClient(tableVersion);
-    targetClient.beginSync(state);
-    targetClient.syncFilesForSnapshot(snapshot);
-    targetClient.syncSchema(state.getReadSchema());
-    targetClient.syncMetadata(
-        TableSyncMetadata.of(
-            state.getLatestCommitTime(), Collections.emptyList(), sourceTableFormat, "0"));
-    targetClient.completeSync();
-  }
-
-  private List<String> getPartitionsWithFileGroups() {
-    HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
-    try (HoodieTableFileSystemView fsView =
-        new HoodieTableFileSystemView(
-            new HoodieBackedTableMetadata(
-                CONTEXT,
-                metaClient.getStorage(),
-                getHoodieWriteConfig(metaClient).getMetadataConfig(),
-                tableBasePath,
-                true),
-            metaClient,
-            metaClient.reloadActiveTimeline())) {
-      return Stream.of("partition_path", "partition_path/bucket-0", "bucket-3")
-          .filter(partition -> fsView.getLatestBaseFiles(partition).findAny().isPresent())
-          .collect(Collectors.toList());
-    }
   }
 
   @ParameterizedTest

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +35,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -102,6 +104,10 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 
 @Log4j2
 public class HudiConversionTarget implements ConversionTarget {
+  // Commit extra-metadata key that marks a table whose file groups use the file-group prefix
+  // layout,
+  // where a file such as Paimon's <partition>/bucket-N/<file> is registered under <partition>.
+  static final String FILE_GROUP_PREFIX_LAYOUT = "XTABLE_HUDI_FILE_GROUP_PREFIX_LAYOUT";
   private BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private AvroSchemaConverter avroSchemaConverter;
   private HudiTableManager hudiTableManager;
@@ -116,9 +122,6 @@ public class HudiConversionTarget implements ConversionTarget {
   // Hudi table format version to write (6 = legacy 0.x layout, 9 = Hudi 1.x layout), resolved from
   // the xtable.hudi.target.table_version config; defaults to version 6.
   private HoodieTableVersion tableVersion = HudiTargetConfig.DEFAULT_TABLE_VERSION;
-  // Paimon lays files out as <partition>/bucket-N/<file>, so the bucket directory is a file-group
-  // prefix only when the source is Paimon. Set on each beginSync from the source table format.
-  private boolean useExternalFileGroupPrefix;
 
   public HudiConversionTarget() {}
 
@@ -301,11 +304,10 @@ public class HudiConversionTarget implements ConversionTarget {
   public void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.extractSnapshotChanges(
-            partitionedDataFiles,
-            getMetaClient(),
-            commitState.getInstantTime(),
-            useExternalFileGroupPrefix);
+            partitionedDataFiles, getMetaClient(), commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
+    // A snapshot sync replaces every file group, so the table uses the file-group prefix layout.
+    commitState.setFileGroupPrefixLayout(true);
   }
 
   @Override
@@ -313,20 +315,61 @@ public class HudiConversionTarget implements ConversionTarget {
     if (!metaClient.isPresent()) {
       throw new IllegalStateException("Meta client is not initialized");
     }
+    boolean fileGroupPrefixLayout = lastCommitHasFileGroupPrefixLayout(metaClient.get());
+    if (!fileGroupPrefixLayout && hasFileGroupPrefix(internalFilesDiff)) {
+      throw new NotSupportedException(
+          String.format(
+              "Hudi target table at %s was written from a Paimon source by an XTable version earlier"
+                  + " than 0.5.0. That version registered the files under <partition>/bucket-N"
+                  + " partitions, and an incremental sync cannot update this layout. Run one sync"
+                  + " with syncMode FULL, and incremental sync then resumes.",
+              tableDataPath));
+    }
     HoodieIndexVersion indexVersion =
         existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, metaClient.get());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.convertDiff(
-            internalFilesDiff,
-            commitState.getInstantTime(),
-            indexVersion,
-            useExternalFileGroupPrefix);
+            internalFilesDiff, commitState.getInstantTime(), indexVersion);
     commitState.setReplaceMetadata(replaceMetadata);
+    // An incremental sync keeps the file groups in place, so it carries the layout forward.
+    commitState.setFileGroupPrefixLayout(fileGroupPrefixLayout);
+  }
+
+  private static boolean hasFileGroupPrefix(InternalFilesDiff internalFilesDiff) {
+    return Stream.concat(
+            internalFilesDiff.dataFilesAdded().stream(),
+            internalFilesDiff.dataFilesRemoved().stream())
+        .anyMatch(file -> file.getFileGroupPrefix().isPresent());
+  }
+
+  /**
+   * XTable 0.4.0 registered Paimon files under {@code <partition>/bucket-N} partitions and did not
+   * write {@link #FILE_GROUP_PREFIX_LAYOUT}. A table without completed commits has no file groups,
+   * so it uses the new layout.
+   */
+  private static boolean lastCommitHasFileGroupPrefixLayout(HoodieTableMetaClient client) {
+    return client
+        .getActiveTimeline()
+        .getCommitsTimeline()
+        .filterCompletedInstants()
+        .lastInstant()
+        .toJavaOptional()
+        .map(
+            instant -> {
+              try {
+                return Boolean.parseBoolean(
+                    TimelineUtils.getCommitMetadata(instant, client.getActiveTimeline())
+                        .getExtraMetadata()
+                        .get(FILE_GROUP_PREFIX_LAYOUT));
+              } catch (IOException ex) {
+                throw new ReadException("Unable to read commit metadata for " + instant, ex);
+              }
+            })
+        .orElse(true);
   }
 
   @Override
   public void beginSync(InternalTable table) {
-    useExternalFileGroupPrefix = TableFormat.PAIMON.equals(table.getTableFormat());
     if (!metaClient.isPresent()) {
       metaClient =
           Optional.of(
@@ -359,32 +402,6 @@ public class HudiConversionTarget implements ConversionTarget {
                 .lastInstant()
                 .toJavaOptional()
                 .flatMap(instant -> getMetadata(instant, client)));
-  }
-
-  /**
-   * XTable 0.4.0 registered Paimon files under the {@code <partition>/bucket-N} partition. The
-   * incremental sync now keys those files by {@code <partition>}, so its file removals would not
-   * match the old file groups. A snapshot sync replaces the old file groups once.
-   */
-  @Override
-  public boolean isIncrementalSyncSafe() {
-    if (!metaClient.isPresent()) {
-      return true;
-    }
-    boolean isPaimonSource =
-        getTableMetadata()
-            .map(TableSyncMetadata::getSourceTableFormat)
-            .filter(TableFormat.PAIMON::equals)
-            .isPresent();
-    if (isPaimonSource
-        && baseFileUpdatesExtractor.hasFileGroupsInExternalFileGroupPrefixPartitions(
-            metaClient.get())) {
-      log.info(
-          "Hudi target table at {} has file groups under bucket-N partitions written by an older XTable version.",
-          tableDataPath);
-      return false;
-    }
-    return true;
   }
 
   @Override
@@ -450,6 +467,7 @@ public class HudiConversionTarget implements ConversionTarget {
     private List<WriteStatus> writeStatuses;
     @Setter private Schema schema;
     @Setter private TableSyncMetadata tableSyncMetadata;
+    @Setter private boolean fileGroupPrefixLayout;
     private Map<String, List<String>> partitionToReplacedFileIds;
 
     private CommitState(
@@ -683,8 +701,11 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
-      Map<String, String> extraMetadata =
-          Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      Map<String, String> extraMetadata = new HashMap<>();
+      extraMetadata.put(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      if (fileGroupPrefixLayout) {
+        extraMetadata.put(FILE_GROUP_PREFIX_LAYOUT, Boolean.TRUE.toString());
+      }
       return Option.of(extraMetadata);
     }
 
@@ -723,14 +744,12 @@ public class HudiConversionTarget implements ConversionTarget {
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
                   .withProperties(properties)
-                  // Build the column-stats index for all tables. The partition-stats index is
-                  // disabled independently: its generation path rebuilds a file-system view over
-                  // the committed external parquet files and groups them by fileId, but XTable's
+                  // Build the column-stats index for all tables, but not the partition-stats
+                  // index. Its generation path rebuilds a file-system view over the committed
+                  // external parquet files and groups them by fileId, but XTable's
                   // externally-registered files have non-Hudi names whose fileId cannot be parsed
                   // once the "_hudiext" marker is stripped, which leads to failures on partitioned
-                  // tables. Disabling partition stats (while keeping column stats) requires the
-                  // independent toggle added in https://github.com/apache/hudi/pull/19111. Tracked
-                  // in https://github.com/apache/incubator-xtable/issues/832.
+                  // tables.
                   .withMetadataIndexColumnStats(true)
                   .withMetadataIndexPartitionStats(false)
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)

@@ -21,10 +21,13 @@ package org.apache.xtable.hudi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,9 +41,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 
@@ -53,6 +60,7 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
@@ -227,12 +235,102 @@ public class TestHudiConversionTarget {
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.current());
-    when(mockBaseFileUpdatesExtractor.convertDiff(input, instant, HoodieIndexVersion.V2, false))
+    when(mockBaseFileUpdatesExtractor.convertDiff(input, instant, HoodieIndexVersion.V2))
         .thenReturn(output);
+    mockLastCommit(mockMetaClient, null);
 
     targetClient.syncFilesForDiff(input);
     // validate that replace metadata is set in commitState
     verify(mockCommitState).setReplaceMetadata(output);
+    // a table without completed commits uses the file-group prefix layout
+    verify(mockCommitState).setFileGroupPrefixLayout(true);
+  }
+
+  @Test
+  void syncFilesForDiffRejectsFileGroupPrefixOnOldLayout() {
+    HudiConversionTarget targetClient = getTargetClient(null);
+    HoodieTableMetaClient mockMetaClient = initMocksForBeginSync(targetClient).getRight();
+    // a commit written by XTable 0.4.0 has no file-group prefix layout marker
+    mockLastCommit(mockMetaClient, new HoodieReplaceCommitMetadata());
+    InternalFilesDiff input =
+        InternalFilesDiff.builder()
+            .fileAdded(
+                InternalDataFile.builder()
+                    .physicalPath(BASE_PATH + "/partition/bucket-0/file.parquet")
+                    .fileGroupPrefix(Optional.of("bucket-0"))
+                    .build())
+            .build();
+
+    NotSupportedException exception =
+        assertThrows(NotSupportedException.class, () -> targetClient.syncFilesForDiff(input));
+    assertTrue(exception.getMessage().contains("syncMode FULL"));
+  }
+
+  @Test
+  void syncFilesForDiffCarriesOldLayoutForward() {
+    HudiConversionTarget targetClient = getTargetClient(null);
+    Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> mocks =
+        initMocksForBeginSync(targetClient);
+    HudiConversionTarget.CommitState mockCommitState = mocks.getLeft();
+    HoodieTableMetaClient mockMetaClient = mocks.getRight();
+    when(mockCommitState.getInstantTime()).thenReturn("commit");
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getTableConfig().getTableVersion())
+        .thenReturn(HoodieTableVersion.current());
+    mockLastCommit(mockMetaClient, new HoodieReplaceCommitMetadata());
+
+    // a diff without file-group prefixes is safe on the old layout, but must not mark the new one
+    targetClient.syncFilesForDiff(InternalFilesDiff.builder().build());
+    verify(mockCommitState).setFileGroupPrefixLayout(false);
+  }
+
+  @Test
+  void syncFilesForDiffAcceptsFileGroupPrefixOnNewLayout() {
+    HudiConversionTarget targetClient = getTargetClient(null);
+    Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> mocks =
+        initMocksForBeginSync(targetClient);
+    HudiConversionTarget.CommitState mockCommitState = mocks.getLeft();
+    HoodieTableMetaClient mockMetaClient = mocks.getRight();
+    when(mockCommitState.getInstantTime()).thenReturn("commit");
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getTableConfig().getTableVersion())
+        .thenReturn(HoodieTableVersion.current());
+    HoodieReplaceCommitMetadata commitMetadata = new HoodieReplaceCommitMetadata();
+    commitMetadata.addMetadata(HudiConversionTarget.FILE_GROUP_PREFIX_LAYOUT, "true");
+    mockLastCommit(mockMetaClient, commitMetadata);
+    InternalFilesDiff input =
+        InternalFilesDiff.builder()
+            .fileAdded(
+                InternalDataFile.builder()
+                    .physicalPath(BASE_PATH + "/partition/bucket-0/file.parquet")
+                    .fileGroupPrefix(Optional.of("bucket-0"))
+                    .build())
+            .build();
+
+    targetClient.syncFilesForDiff(input);
+    verify(mockCommitState).setFileGroupPrefixLayout(true);
+  }
+
+  /** Stubs the last completed commit; a null commit metadata means the timeline is empty. */
+  private static void mockLastCommit(
+      HoodieTableMetaClient mockMetaClient, HoodieReplaceCommitMetadata commitMetadata) {
+    HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
+    HoodieTimeline mockCommitsTimeline = mock(HoodieTimeline.class);
+    when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
+    when(mockActiveTimeline.getCommitsTimeline()).thenReturn(mockCommitsTimeline);
+    when(mockCommitsTimeline.filterCompletedInstants()).thenReturn(mockCommitsTimeline);
+    if (commitMetadata == null) {
+      when(mockCommitsTimeline.lastInstant()).thenReturn(Option.empty());
+      return;
+    }
+    HoodieInstant mockInstant = mock(HoodieInstant.class);
+    when(mockInstant.getAction()).thenReturn(HoodieTimeline.REPLACE_COMMIT_ACTION);
+    when(mockCommitsTimeline.lastInstant()).thenReturn(Option.of(mockInstant));
+    try {
+      when(mockActiveTimeline.readReplaceCommitMetadata(mockInstant)).thenReturn(commitMetadata);
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
   }
 
   @Test
@@ -248,12 +346,13 @@ public class TestHudiConversionTarget {
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());
     when(mockCommitState.getInstantTime()).thenReturn(instant);
-    when(mockBaseFileUpdatesExtractor.extractSnapshotChanges(input, mockMetaClient, instant, false))
+    when(mockBaseFileUpdatesExtractor.extractSnapshotChanges(input, mockMetaClient, instant))
         .thenReturn(output);
 
     targetClient.syncFilesForSnapshot(input);
     // validate that replace metadata is set in commitState
     verify(mockCommitState).setReplaceMetadata(output);
+    verify(mockCommitState).setFileGroupPrefixLayout(true);
   }
 
   @Test

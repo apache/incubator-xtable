@@ -75,14 +75,6 @@ public class BaseFileUpdatesExtractor {
   private static final Pattern HUDI_BASE_FILE_PATTERN =
       Pattern.compile(
           "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]_[0-9a-fA-F-]+_[0-9]+\\.");
-  // Paimon lays files out as {@code <partition>/bucket-N/<file>}. Hudi treats the trailing {@code
-  // bucket-N} directory as a file-group prefix within the partition rather than as part of the
-  // partition path (see Hudi PR #17788). Detecting such a directory lets us register the file under
-  // its true partition with the prefix encoded into the external-file marker, so an unpartitioned
-  // Paimon table is not mistakenly read as partitioned by "bucket-N". Other sources can have a
-  // partition value that matches this pattern, so callers enable it only for a Paimon source.
-  private static final Pattern EXTERNAL_FILE_GROUP_PREFIX_PATTERN =
-      Pattern.compile("bucket-[0-9]+");
   private final HoodieEngineContext engineContext;
   private final Path tableBasePath;
 
@@ -92,62 +84,12 @@ public class BaseFileUpdatesExtractor {
    * @param partitionedDataFiles files grouped by partition to sync
    * @param metaClient the meta client for the Hudi table with the latest timeline state loaded
    * @param commit The current commit started by the Hudi client
-   * @param useExternalFileGroupPrefix whether a trailing {@code bucket-N} directory is a file-group
-   *     prefix (true only for a Paimon source)
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata extractSnapshotChanges(
       List<PartitionFileGroup> partitionedDataFiles,
       HoodieTableMetaClient metaClient,
-      String commit,
-      boolean useExternalFileGroupPrefix) {
-    return withFileSystemView(
-        metaClient,
-        (fsView, metadataConfig) ->
-            extractFromFsView(
-                partitionedDataFiles,
-                commit,
-                fsView,
-                metaClient,
-                metadataConfig,
-                useExternalFileGroupPrefix));
-  }
-
-  /**
-   * Returns true when the table still has live file groups under a {@code bucket-N} partition.
-   * XTable 0.4.0 registered Paimon files under {@code <partition>/bucket-N}, and the incremental
-   * sync now keys the same files by {@code <partition>}, so a snapshot sync must replace those file
-   * groups first. The replaced file groups are no longer live, so the check is false after that
-   * sync.
-   *
-   * @param metaClient the meta client for the Hudi table with the latest timeline state loaded
-   * @return true if a file group exists under a partition path that ends in {@code bucket-N}
-   */
-  boolean hasFileGroupsInExternalFileGroupPrefixPartitions(HoodieTableMetaClient metaClient) {
-    if (!metaClient.isTimelineNonEmpty()) {
-      return false;
-    }
-    return withFileSystemView(
-        metaClient,
-        (fsView, metadataConfig) ->
-            FSUtils.getAllPartitionPaths(engineContext, metaClient, metadataConfig).stream()
-                .filter(
-                    partitionPath ->
-                        EXTERNAL_FILE_GROUP_PREFIX_PATTERN
-                            .matcher(partitionPath.substring(partitionPath.lastIndexOf('/') + 1))
-                            .matches())
-                .anyMatch(
-                    partitionPath ->
-                        fsView.getLatestBaseFiles(partitionPath).findAny().isPresent()));
-  }
-
-  @FunctionalInterface
-  private interface FileSystemViewFunction<T> {
-    T apply(SyncableFileSystemView fsView, HoodieMetadataConfig metadataConfig);
-  }
-
-  private <T> T withFileSystemView(
-      HoodieTableMetaClient metaClient, FileSystemViewFunction<T> function) {
+      String commit) {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())
@@ -173,9 +115,10 @@ public class BaseFileUpdatesExtractor {
             HoodieCommonConfig.newBuilder().build(),
             meta -> tableMetadata);
     try (SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient)) {
-      return function.apply(fsView, metadataConfig);
+      return extractFromFsView(partitionedDataFiles, commit, fsView, metaClient, metadataConfig);
     } catch (Exception ex) {
-      throw new ReadException("Failed to read file groups for Hudi table at " + tableBasePath, ex);
+      throw new ReadException(
+          "Failed to extract snapshot changes for Hudi table at " + tableBasePath, ex);
     } finally {
       try {
         fileSystemViewManager.close();
@@ -194,8 +137,7 @@ public class BaseFileUpdatesExtractor {
       String commit,
       SyncableFileSystemView fsView,
       HoodieTableMetaClient metaClient,
-      HoodieMetadataConfig metadataConfig,
-      boolean useExternalFileGroupPrefix) {
+      HoodieMetadataConfig metadataConfig) {
     boolean isTableInitialized = metaClient.isTimelineNonEmpty();
     // Track the partitions that are not present in the snapshot, so the files for those partitions
     // can be dropped
@@ -208,8 +150,7 @@ public class BaseFileUpdatesExtractor {
             .map(
                 partitionFileGroup -> {
                   List<InternalDataFile> dataFiles = partitionFileGroup.getDataFiles();
-                  String partitionPath =
-                      getPartitionPath(tableBasePath, dataFiles, useExternalFileGroupPrefix);
+                  String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot
                   partitionPathsToDrop.remove(partitionPath);
@@ -246,8 +187,7 @@ public class BaseFileUpdatesExtractor {
                                       commit,
                                       snapshotFile,
                                       Optional.of(partitionPath),
-                                      indexVersion,
-                                      useExternalFileGroupPrefix))
+                                      indexVersion))
                           .collect(Collectors.toList());
                   return ReplaceMetadata.of(
                       fileIdsToRemove.isEmpty()
@@ -282,87 +222,53 @@ public class BaseFileUpdatesExtractor {
    * @param internalFilesDiff the diff to apply to the Hudi table
    * @param commit The current commit started by the Hudi client
    * @param indexVersion the Hudi index version
-   * @param useExternalFileGroupPrefix whether a trailing {@code bucket-N} directory is a file-group
-   *     prefix (true only for a Paimon source)
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata convertDiff(
       @NonNull InternalFilesDiff internalFilesDiff,
       @NonNull String commit,
-      @NonNull HoodieIndexVersion indexVersion,
-      boolean useExternalFileGroupPrefix) {
+      @NonNull HoodieIndexVersion indexVersion) {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         internalFilesDiff.dataFilesRemoved().stream()
-            .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
-                    path -> truePartitionPath(tableBasePath, path, useExternalFileGroupPrefix),
-                    Collectors.mapping(
-                        path -> getFileId(path, useExternalFileGroupPrefix), Collectors.toList())));
+                    file -> truePartitionPath(tableBasePath, file),
+                    Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
         internalFilesDiff.dataFilesAdded().stream()
-            .map(
-                file ->
-                    toWriteStatus(
-                        tableBasePath,
-                        commit,
-                        file,
-                        Optional.empty(),
-                        indexVersion,
-                        useExternalFileGroupPrefix))
+            .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty(), indexVersion))
             .collect(CustomCollectors.toList(internalFilesDiff.dataFilesAdded().size()));
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 
-  private String getFileId(Path filePath, boolean useExternalFileGroupPrefix) {
-    String fileName = filePath.getName();
+  private String getFileId(InternalDataFile file) {
+    String fileName = new CachingPath(file.getPhysicalPath()).getName();
     // if file was created by Hudi use original fileId, otherwise use the file name as IDs
     if (isFileCreatedByHudiWriter(fileName)) {
       return FSUtils.getFileId(fileName);
     }
-    // External bucketed files keep their file-group prefix as part of the fileId so the prefix can
-    // be recovered when Hudi resolves the physical path of the externally created file.
-    return externalFileGroupPrefix(filePath, useExternalFileGroupPrefix)
-        .map(prefix -> prefix + "/" + fileName)
-        .orElse(fileName);
+    // Files under a file-group prefix keep the prefix as part of the fileId so the prefix can be
+    // recovered when Hudi resolves the physical path of the externally created file.
+    return file.getFileGroupPrefix().map(prefix -> prefix + "/" + fileName).orElse(fileName);
   }
 
   /**
-   * Returns the external file-group prefix (e.g. Paimon's {@code bucket-N}) when the file's
-   * immediate parent directory denotes a file group within the partition rather than a partition
-   * segment, otherwise empty. Always empty when {@code useExternalFileGroupPrefix} is false.
+   * Resolves the Hudi partition path for a file. A file-group prefix directory (e.g. Paimon's
+   * {@code bucket-N}) is a file group within the partition (see Hudi PR #17788), so it is stripped
+   * from the partition path.
    */
-  private Optional<String> externalFileGroupPrefix(
-      Path filePath, boolean useExternalFileGroupPrefix) {
-    if (!useExternalFileGroupPrefix) {
-      return Optional.empty();
-    }
-    Path parent = filePath.getParent();
-    if (parent == null) {
-      return Optional.empty();
-    }
-    String parentName = parent.getName();
-    return EXTERNAL_FILE_GROUP_PREFIX_PATTERN.matcher(parentName).matches()
-        ? Optional.of(parentName)
-        : Optional.empty();
-  }
-
-  /**
-   * Resolves the true Hudi partition path for a file, stripping any trailing external file-group
-   * prefix directory (e.g. {@code bucket-N}) so it is not treated as part of the partition.
-   */
-  private String truePartitionPath(
-      Path tableBasePath, Path filePath, boolean useExternalFileGroupPrefix) {
-    String partitionPath = HudiPathUtils.getPartitionPath(tableBasePath, filePath);
-    Optional<String> prefix = externalFileGroupPrefix(filePath, useExternalFileGroupPrefix);
-    if (!prefix.isPresent()) {
-      return partitionPath;
-    }
-    return partitionPath.equals(prefix.get())
-        ? ""
-        : partitionPath.substring(0, partitionPath.length() - prefix.get().length() - 1);
+  private String truePartitionPath(Path tableBasePath, InternalDataFile file) {
+    String partitionPath =
+        HudiPathUtils.getPartitionPath(tableBasePath, new CachingPath(file.getPhysicalPath()));
+    return file.getFileGroupPrefix()
+        .map(
+            prefix ->
+                prefix.equals(partitionPath)
+                    ? ""
+                    : partitionPath.substring(0, partitionPath.length() - prefix.length() - 1))
+        .orElse(partitionPath);
   }
 
   /**
@@ -381,19 +287,18 @@ public class BaseFileUpdatesExtractor {
       String commitTime,
       InternalDataFile file,
       Optional<String> partitionPathOptional,
-      HoodieIndexVersion indexVersion,
-      boolean useExternalFileGroupPrefix) {
+      HoodieIndexVersion indexVersion) {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
-        partitionPathOptional.orElseGet(
-            () -> truePartitionPath(tableBasePath, path, useExternalFileGroupPrefix));
-    String fileId = getFileId(path, useExternalFileGroupPrefix);
+        partitionPathOptional.orElseGet(() -> truePartitionPath(tableBasePath, file));
+    String fileId = getFileId(file);
     String filePath =
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
-    Optional<String> fileGroupPrefix = externalFileGroupPrefix(path, useExternalFileGroupPrefix);
-    // For external bucketed files encode the file-group prefix in the marker and keep the file name
+    Optional<String> fileGroupPrefix = file.getFileGroupPrefix();
+    // For files under a file-group prefix encode the file-group prefix in the marker and keep the
+    // file name
     // (not the bucket-relative path) as the marked name; otherwise fall back to the plain marker on
     // the full relative path. In both cases the directory portion is preserved as-is.
     String markedPath =
@@ -466,9 +371,7 @@ public class BaseFileUpdatesExtractor {
     }
   }
 
-  private String getPartitionPath(
-      Path tableBasePath, List<InternalDataFile> files, boolean useExternalFileGroupPrefix) {
-    return truePartitionPath(
-        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()), useExternalFileGroupPrefix);
+  private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
+    return truePartitionPath(tableBasePath, files.get(0));
   }
 }

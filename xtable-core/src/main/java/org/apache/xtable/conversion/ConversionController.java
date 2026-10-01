@@ -263,12 +263,6 @@ public class ConversionController {
     return conversionTargetByFormat.entrySet().stream()
         .filter(
             entry -> {
-              if (!entry.getValue().isIncrementalSyncSafe()) {
-                log.info(
-                    "Incremental sync is not safe for target {}. Falling back to snapshot sync.",
-                    entry.getKey());
-                return false;
-              }
               Optional<Instant> lastSyncInstant =
                   lastSyncMetadataByFormat
                       .get(entry.getKey())

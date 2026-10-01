@@ -87,18 +87,6 @@ public interface ConversionTarget {
   /** Returns the xtable metadata persisted in the target */
   Optional<TableSyncMetadata> getTableMetadata();
 
-  /**
-   * Checks if an incremental sync can bring the target table up to date. The source decides this
-   * with {@link org.apache.xtable.spi.extractor.ConversionSource#isIncrementalSyncSafeFrom}; this
-   * method lets the target also require a snapshot sync, for example when the table layout is one
-   * that an incremental sync cannot repair.
-   *
-   * @return true if incremental sync is safe for the target table, false otherwise
-   */
-  default boolean isIncrementalSyncSafe() {
-    return true;
-  }
-
   /** Returns the TableFormat name the client syncs to */
   String getTableFormat();
 

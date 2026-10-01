@@ -21,7 +21,6 @@ package org.apache.xtable.hudi;
 import static org.apache.hudi.common.table.timeline.InstantComparison.LESSER_THAN_OR_EQUALS;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -29,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,8 +46,6 @@ import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.util.Option;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.Iterators;
-import com.google.common.collect.PeekingIterator;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.ReadException;
@@ -155,17 +153,17 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     CommitsPair lastPendingHoodieInstantsCommitsPair =
         getCompletedAndPendingCommitsForInstants(lastPendingInstants);
     List<HoodieInstant> commitsToProcessNext =
-        usesCompletionTimeOrdering()
-            ? orderByCompletionTimeAndDedup(
-                lastPendingHoodieInstantsCommitsPair.getCompletedCommits(),
-                commitsPair.getCompletedCommits())
-            : mergeAndDedupLists(
-                lastPendingHoodieInstantsCommitsPair.getCompletedCommits(),
-                commitsPair.getCompletedCommits());
+        mergeAndDedupLists(
+            lastPendingHoodieInstantsCommitsPair.getCompletedCommits(),
+            commitsPair.getCompletedCommits(),
+            hoodieInstant -> hoodieInstant.requestedTime() + "_" + hoodieInstant.getAction(),
+            instantOrdering());
     List<Instant> pendingInstantsToProcessNext =
         mergeAndDedupLists(
             lastPendingHoodieInstantsCommitsPair.getPendingCommits(),
-            commitsPair.getPendingCommits());
+            commitsPair.getPendingCommits(),
+            Function.identity(),
+            Comparator.naturalOrder());
     return CommitsBacklog.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
         .inFlightInstants(pendingInstantsToProcessNext)
@@ -258,15 +256,11 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   private HoodieInstant getLatestCompletedInstant(HoodieTimeline completedTimeline) {
-    Option<HoodieInstant> latestCommit =
-        usesCompletionTimeOrdering()
-            ? Option.fromJavaOptional(
-                completedTimeline
-                    .getInstantsOrderedByCompletionTime()
-                    .reduce((first, second) -> second))
-            : completedTimeline.lastInstant();
-    return latestCommit.orElseThrow(
-        () -> new ReadException("Unable to read latest commit from Hudi source table"));
+    return completedTimeline
+        .getInstantsAsStream()
+        .max(instantOrdering())
+        .orElseThrow(
+            () -> new ReadException("Unable to read latest commit from Hudi source table"));
   }
 
   /**
@@ -297,26 +291,6 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
         .completedCommits(completedInstants)
         .pendingCommits(pendingInstants)
         .build();
-  }
-
-  /**
-   * Merges two completed-commit lists, dedupes by requested time and action, and orders by
-   * completion time. The action is part of the dedup key because distinct actions can legally share
-   * a requested time: a savepoint instant reuses the requested time of the commit it pins, and
-   * keying on requested time alone would drop it from the backlog.
-   */
-  private List<HoodieInstant> orderByCompletionTimeAndDedup(
-      List<HoodieInstant> list1, List<HoodieInstant> list2) {
-    Map<String, HoodieInstant> dedupedByRequestedTimeAndAction = new LinkedHashMap<>();
-    Stream.concat(list1.stream(), list2.stream())
-        .forEach(
-            hoodieInstant ->
-                dedupedByRequestedTimeAndAction.putIfAbsent(
-                    hoodieInstant.requestedTime() + "_" + hoodieInstant.getAction(),
-                    hoodieInstant));
-    return dedupedByRequestedTimeAndAction.values().stream()
-        .sorted(Comparator.comparing(HoodieInstant::getCompletionTime))
-        .collect(Collectors.toList());
   }
 
   private CommitsPair getCompletedAndPendingCommitsAfterInstant(HoodieInstant commitInstant) {
@@ -432,39 +406,24 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   /**
-   * Merges commits from two lists and returns new list of sorted commits by eliminating duplicates.
-   *
-   * @param list1 First sorted input list of commits
-   * @param list2 Second sorted input list of commits.
-   * @return merged list of commits in sorted order.
+   * Merges two lists, keeps the first element for each key, and sorts the result. Commits are
+   * sorted with the timeline layout's ordering, which is the requested time on table version 6 and
+   * the completion time on version 9. Commits are keyed by requested time and action, because a
+   * savepoint instant reuses the requested time of the commit it pins.
    */
-  private <T extends Comparable<T>> List<T> mergeAndDedupLists(
-      @NonNull List<T> list1, @NonNull List<T> list2) {
-    List<T> mergedList = new ArrayList<>();
-    PeekingIterator<T> itr1 = Iterators.peekingIterator(list1.iterator());
-    PeekingIterator<T> itr2 = Iterators.peekingIterator(list2.iterator());
-    while (itr1.hasNext() || itr2.hasNext()) {
-      if (!itr2.hasNext()) {
-        mergedList.add(itr1.next());
-      } else if (!itr1.hasNext()) {
-        mergedList.add(itr2.next());
-      } else {
-        T element1 = itr1.peek();
-        T element2 = itr2.peek();
-        if (element1.compareTo(element2) < 0) {
-          mergedList.add(element1);
-          itr1.next();
-        } else if (element1.compareTo(element2) > 0) {
-          mergedList.add(element2);
-          itr2.next();
-        } else {
-          mergedList.add(element1);
-          itr1.next();
-          itr2.next();
-        }
-      }
-    }
-    return mergedList;
+  private <T, K> List<T> mergeAndDedupLists(
+      @NonNull List<T> list1,
+      @NonNull List<T> list2,
+      Function<T, K> keyExtractor,
+      Comparator<T> ordering) {
+    Map<K, T> dedupedByKey = new LinkedHashMap<>();
+    Stream.concat(list1.stream(), list2.stream())
+        .forEach(element -> dedupedByKey.putIfAbsent(keyExtractor.apply(element), element));
+    return dedupedByKey.values().stream().sorted(ordering).collect(Collectors.toList());
+  }
+
+  private Comparator<HoodieInstant> instantOrdering() {
+    return metaClient.getTimelineLayout().getInstantComparator().orderingComparator();
   }
 
   @Override
