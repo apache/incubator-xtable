@@ -19,6 +19,7 @@
 package org.apache.xtable.spark;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -33,12 +34,16 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.paimon.PaimonConversionSourceProvider;
+import org.apache.xtable.parquet.ParquetConversionSourceProvider;
 
 /**
  * Builds a {@link ConversionConfig} from a {@link TableSyncSpec} and runs an incremental {@link
@@ -75,16 +80,25 @@ public class XTableSyncService {
             .additionalProperties(sourceProperties)
             .build();
 
+    // In Kernel mode, set the property ConversionTargetFactory reads to pick the Delta Kernel
+    // writer (ignored for non-Delta targets).
     List<TargetTable> targetTables =
         spec.getTargets().stream()
             .map(
-                targetFormat ->
-                    TargetTable.builder()
-                        .name(spec.getKey())
-                        .basePath(dataPath)
-                        .namespace(spec.getNamespace())
-                        .formatName(targetFormat)
-                        .build())
+                targetFormat -> {
+                  Properties targetProperties = new Properties();
+                  if (spec.isUseDeltaKernel()) {
+                    targetProperties.setProperty(
+                        DeltaConversionTargetConfig.USE_KERNEL, Boolean.TRUE.toString());
+                  }
+                  return TargetTable.builder()
+                      .name(spec.getKey())
+                      .basePath(dataPath)
+                      .namespace(spec.getNamespace())
+                      .formatName(targetFormat)
+                      .additionalProperties(targetProperties)
+                      .build();
+                })
             .collect(Collectors.toList());
 
     ConversionConfig conversionConfig =
@@ -94,7 +108,8 @@ public class XTableSyncService {
             .syncMode(SyncMode.INCREMENTAL)
             .build();
 
-    ConversionSourceProvider<?> sourceProvider = sourceProviderFor(spec.getSourceFormat());
+    ConversionSourceProvider<?> sourceProvider =
+        sourceProviderFor(spec.getSourceFormat(), spec.isUseDeltaKernel());
     sourceProvider.init(hadoopConf);
 
     log.info(
@@ -106,14 +121,22 @@ public class XTableSyncService {
     return new ConversionController(hadoopConf).sync(conversionConfig, sourceProvider);
   }
 
-  private static ConversionSourceProvider<?> sourceProviderFor(String sourceFormat) {
-    switch (sourceFormat.toUpperCase()) {
+  private static ConversionSourceProvider<?> sourceProviderFor(
+      String sourceFormat, boolean useDeltaKernel) {
+    switch (sourceFormat.toUpperCase(Locale.ROOT)) {
       case TableFormat.HUDI:
         return new HudiConversionSourceProvider();
       case TableFormat.DELTA:
-        return new DeltaConversionSourceProvider();
+        // The default delta-core reader is Spark-3.4-only; the Kernel reader is Spark-free.
+        return useDeltaKernel
+            ? new DeltaKernelConversionSourceProvider()
+            : new DeltaConversionSourceProvider();
       case TableFormat.ICEBERG:
         return new IcebergConversionSourceProvider();
+      case TableFormat.PAIMON:
+        return new PaimonConversionSourceProvider();
+      case TableFormat.PARQUET:
+        return new ParquetConversionSourceProvider();
       default:
         throw new UnsupportedOperationException(
             "Unsupported source format for spark-runtime sync: " + sourceFormat);

@@ -55,4 +55,7 @@ public class TableSyncSpec {
 
   /** The target formats to sync to, e.g. {@code [ICEBERG, DELTA]}. */
   @NonNull List<String> targets;
+
+  /** Use the Spark-free Delta Kernel implementation for the Delta source and/or target. */
+  boolean useDeltaKernel;
 }
