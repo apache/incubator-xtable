@@ -15,10 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.iceberg;
 
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
+
 import lombok.extern.log4j.Log4j2;
+
 import org.apache.iceberg.GenericManifestFile;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.Schema;
@@ -29,32 +35,18 @@ import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.util.Tasks;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 
 @Log4j2
 abstract class IcebergMetadataCleanupStrategy {
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergMetadataCleanupStrategy.class);
-
   protected final FileIO fileIO;
-  protected final ExecutorService planExecutorService;
   private final Consumer<String> deleteFunc;
-  private final ExecutorService deleteExecutorService;
+  protected final ExecutorService cleanExecutorService;
 
   protected IcebergMetadataCleanupStrategy(
-      FileIO fileIO,
-      ExecutorService deleteExecutorService,
-      ExecutorService planExecutorService,
-      Consumer<String> deleteFunc) {
+      FileIO fileIO, ExecutorService cleanExecutorService, Consumer<String> deleteFunc) {
     this.fileIO = fileIO;
-    this.deleteExecutorService = deleteExecutorService;
-    this.planExecutorService = planExecutorService;
     this.deleteFunc = deleteFunc;
+    this.cleanExecutorService = cleanExecutorService;
   }
 
   public abstract void cleanFiles(Table table, List<Snapshot> removedSnapshots);
@@ -69,26 +61,25 @@ abstract class IcebergMetadataCleanupStrategy {
               "deleted_data_files_count");
 
   protected CloseableIterable<ManifestFile> readManifests(Snapshot snapshot) {
-    if (snapshot.manifestListLocation() != null) {
-      return Avro.read(fileIO.newInputFile(snapshot.manifestListLocation()))
-          .rename("manifest_file", GenericManifestFile.class.getName())
-          .classLoader(GenericManifestFile.class.getClassLoader())
-          .project(MANIFEST_PROJECTION)
-          .reuseContainers(true)
-          .build();
-    } else {
+    if (snapshot.manifestListLocation() == null) {
       return CloseableIterable.withNoopClose(snapshot.allManifests(fileIO));
     }
+    return Avro.read(fileIO.newInputFile(snapshot.manifestListLocation()))
+        .rename("manifest_file", GenericManifestFile.class.getName())
+        .classLoader(GenericManifestFile.class.getClassLoader())
+        .project(MANIFEST_PROJECTION)
+        .reuseContainers(true)
+        .build();
   }
 
   protected void deleteFiles(Set<String> pathsToDelete, String fileType) {
     Tasks.foreach(pathsToDelete)
-        .executeWith(deleteExecutorService)
+        .executeWith(cleanExecutorService)
         .retry(3)
         .stopRetryOn(NotFoundException.class)
         .suppressFailureWhenFinished()
         .onFailure(
-            (file, thrown) -> LOG.warn("Delete failed for {} file: {}", fileType, file, thrown))
+            (file, thrown) -> log.warn("Delete failed for {} file: {}", fileType, file, thrown))
         .run(deleteFunc::accept);
   }
 }
