@@ -24,8 +24,6 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.hadoop.fs.Path;
-
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor;
@@ -35,6 +33,7 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
@@ -56,15 +55,32 @@ public class DeltaActionsConverter {
       boolean includeColumnStats,
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
+    return convertAddActionToInternalDataFile(
+        addFile,
+        tableBasePath(deltaSnapshot),
+        fileFormat,
+        partitionFields,
+        fields,
+        includeColumnStats,
+        partitionExtractor,
+        fileStatsExtractor);
+  }
+
+  public InternalDataFile convertAddActionToInternalDataFile(
+      AddFile addFile,
+      String tableBasePath,
+      FileFormat fileFormat,
+      List<InternalPartitionField> partitionFields,
+      List<InternalField> fields,
+      boolean includeColumnStats,
+      DeltaPartitionExtractor partitionExtractor,
+      DeltaStatsExtractor fileStatsExtractor) {
+    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> columnStats =
-        includeColumnStats
-            ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
-            : Collections.emptyList();
-    long recordCount =
-        columnStats.stream().map(ColumnStat::getNumValues).max(Long::compareTo).orElse(0L);
-    // TODO(https://github.com/apache/incubator-xtable/issues/102): removed record count.
+        includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
+    long recordCount = fileStats.getNumRecords();
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(deltaSnapshot, addFile.path()))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.path()))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.size())
         .lastModified(addFile.modificationTime())
@@ -81,8 +97,18 @@ public class DeltaActionsConverter {
       FileFormat fileFormat,
       List<InternalPartitionField> partitionFields,
       DeltaPartitionExtractor partitionExtractor) {
+    return convertRemoveActionToInternalDataFile(
+        removeFile, tableBasePath(deltaSnapshot), fileFormat, partitionFields, partitionExtractor);
+  }
+
+  public InternalDataFile convertRemoveActionToInternalDataFile(
+      RemoveFile removeFile,
+      String tableBasePath,
+      FileFormat fileFormat,
+      List<InternalPartitionField> partitionFields,
+      DeltaPartitionExtractor partitionExtractor) {
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(deltaSnapshot, removeFile.path()))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, removeFile.path()))
         .fileFormat(fileFormat)
         .partitionValues(
             partitionExtractor.partitionValueExtraction(
@@ -101,11 +127,11 @@ public class DeltaActionsConverter {
   }
 
   static String getFullPathToFile(Snapshot snapshot, String dataFilePath) {
-    String tableBasePath = snapshot.deltaLog().dataPath().toUri().toString();
-    if (dataFilePath.startsWith(tableBasePath)) {
-      return dataFilePath;
-    }
-    return tableBasePath + Path.SEPARATOR + dataFilePath;
+    return DeltaPathUtils.getFullPathToFile(tableBasePath(snapshot), dataFilePath);
+  }
+
+  private static String tableBasePath(Snapshot snapshot) {
+    return snapshot.deltaLog().dataPath().toUri().toString();
   }
 
   /**
@@ -119,12 +145,16 @@ public class DeltaActionsConverter {
    *     is present
    */
   public String extractDeletionVectorFile(Snapshot snapshot, AddFile addFile) {
+    return extractDeletionVectorFile(tableBasePath(snapshot), addFile);
+  }
+
+  public String extractDeletionVectorFile(String tableBasePath, AddFile addFile) {
     DeletionVectorDescriptor deletionVector = addFile.deletionVector();
     if (deletionVector == null) {
       return null;
     }
 
     String dataFilePath = addFile.path();
-    return getFullPathToFile(snapshot, dataFilePath);
+    return DeltaPathUtils.getFullPathToFile(tableBasePath, dataFilePath);
   }
 }

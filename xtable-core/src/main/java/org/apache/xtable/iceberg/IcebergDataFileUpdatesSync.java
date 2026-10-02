@@ -18,21 +18,34 @@
  
 package org.apache.xtable.iceberg;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import lombok.AllArgsConstructor;
 
-import org.apache.iceberg.*;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.OverwriteFiles;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.io.CloseableIterable;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 @AllArgsConstructor(staticName = "of")
@@ -46,7 +59,8 @@ public class IcebergDataFileUpdatesSync {
       Transaction transaction,
       List<PartitionFileGroup> partitionedDataFiles,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec,
+      TableSyncMetadata metadata) {
 
     Map<String, DataFile> previousFiles = new HashMap<>();
     try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
@@ -57,35 +71,48 @@ public class IcebergDataFileUpdatesSync {
       throw new ReadException("Failed to iterate through Iceberg data files", e);
     }
 
-    FilesDiff<InternalDataFile, DataFile> diff =
-        DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+    FilesDiff<InternalFile, DataFile> diff =
+        InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
-    applyDiff(transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec);
+    applyDiff(
+        transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec, metadata);
   }
 
   public void applyDiff(
       Transaction transaction,
-      DataFilesDiff dataFilesDiff,
+      InternalFilesDiff internalFilesDiff,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec,
+      TableSyncMetadata metadata) {
 
     Collection<DataFile> filesRemoved =
-        dataFilesDiff.getFilesRemoved().stream()
+        internalFilesDiff.dataFilesRemoved().stream()
             .map(file -> getDataFile(partitionSpec, schema, file))
             .collect(Collectors.toList());
 
-    applyDiff(transaction, dataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec);
+    applyDiff(
+        transaction,
+        internalFilesDiff.dataFilesAdded(),
+        filesRemoved,
+        schema,
+        partitionSpec,
+        metadata);
   }
 
   private void applyDiff(
       Transaction transaction,
-      Collection<InternalDataFile> filesAdded,
+      Collection<? extends InternalFile> filesAdded,
       Collection<DataFile> filesRemoved,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec,
+      TableSyncMetadata metadata) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
-    filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
+    filesAdded.stream()
+        .filter(InternalDataFile.class::isInstance)
+        .map(file -> (InternalDataFile) file)
+        .forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
+    overwriteFiles.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     overwriteFiles.commit();
   }
 

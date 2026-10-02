@@ -93,7 +93,7 @@ echo ${NEXT_VERSION_BRANCH}
 echo "==============================================================="
 
 # Update main branch
-mvn versions:set -DnewVersion=${NEXT_VERSION_IN_BASE_BRANCH}-SNAPSHOT
+./mvnw versions:set -DnewVersion=${NEXT_VERSION_IN_BASE_BRANCH}-SNAPSHOT
 
 echo "===========Update next-version branch as following============="
 git diff
@@ -116,7 +116,7 @@ read confirmation
 
 # Checkout and update release branch
 git checkout ${RELEASE_BRANCH}
-mvn versions:set -DnewVersion=${RELEASE}
+./mvnw versions:set -DnewVersion=${RELEASE}
 
 echo "==================Current working branch======================="
 echo ${RELEASE_BRANCH}

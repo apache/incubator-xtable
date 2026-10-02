@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.xtable</groupId>
         <artifactId>xtable-hudi-support</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.5.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>xtable-hudi-support-extensions_${scala.binary.version}</artifactId>
@@ -96,6 +96,7 @@
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
             <exclusions>
                 <exclusion>
                     <groupId>io.airlift</groupId>
@@ -131,8 +132,18 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -141,8 +152,31 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+            <classifier>tests</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-defaults</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -205,13 +239,33 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE</file>
+                                    <file>target/classes/META-INF/LICENSE-bundled</file>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE</file>
+                                    <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>com.thoughtworks.paranamer:paranamer</include>
+                                    <include>org.apache.logging.log4j:log4j-1.2-api</include>
+                                    <include>org.apache.logging.log4j:log4j-api</include>
+                                    <include>org.apache.iceberg:iceberg-parquet</include>
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
+                                    <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>org.scala-lang:scala-library</include>
+                                    <include>org.slf4j:slf4j-api</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>

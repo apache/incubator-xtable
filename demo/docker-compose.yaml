@@ -37,6 +37,7 @@ services:
       - ./presto/config.properties:/opt/presto-server/etc/config.properties
       - ./presto/jvm.config:/opt/presto-server/etc/jvm.config
       - ./presto/node.properties:/opt/presto-server/etc/node.properties
+      - ./presto/log.properties:/opt/presto-server/etc/log.properties
       - ./data:/home/data
 
   hive-metastore:
@@ -54,9 +55,17 @@ services:
   jupyter:
     container_name: jupyter
     hostname: jupyter
-    image: 'almondsh/almond:latest'
+    build:
+      context: .
+      dockerfile: jupyter/Dockerfile
+    image: 'xtable-demo-jupyter'
+    ## Local demo only: the notebook server runs without authentication, so the
+    ## port is published to the loopback interface only. A Scala kernel is
+    ## arbitrary code execution with read/write access to the mounted ./data, so
+    ## do not widen this to 0.0.0.0 without restoring the token.
+    command: ["start-notebook.sh", "--IdentityProvider.token=", "--ServerApp.password="]
     ports:
-      - '8888:8888'
+      - '127.0.0.1:8888:8888'
     volumes:
       - ./notebook:/home/jovyan/work
       - ./jars:/home/jars

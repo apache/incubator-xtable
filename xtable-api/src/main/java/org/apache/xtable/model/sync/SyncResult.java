@@ -20,9 +20,13 @@ package org.apache.xtable.model.sync;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 
 import lombok.Builder;
 import lombok.Value;
+
+import org.apache.xtable.annotations.Evolving;
 
 /**
  * Result of a sync operation
@@ -30,7 +34,8 @@ import lombok.Value;
  * @since 0.1
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
+@Evolving
 public class SyncResult {
   // Mode used for the sync
   SyncMode mode;
@@ -38,16 +43,12 @@ public class SyncResult {
   Instant syncStartTime;
   // Duration
   Duration syncDuration;
-  // Status of the sync
-  SyncStatus status;
+  // Status of the tableFormat sync
+  SyncStatus tableFormatSyncStatus;
   // The Sync Mode recommended for the next sync (Usually filled on an error)
   SyncMode recommendedSyncMode;
-
-  public enum SyncStatusCode {
-    SUCCESS,
-    ABORTED,
-    ERROR
-  }
+  // The sync status for each catalog.
+  @Builder.Default List<CatalogSyncStatus> catalogSyncStatusList = Collections.emptyList();
 
   /** Represents the status of a Sync operation. */
   @Value
@@ -57,11 +58,19 @@ public class SyncResult {
         SyncStatus.builder().statusCode(SyncStatusCode.SUCCESS).build();
     // Status code
     SyncStatusCode statusCode;
-    // error Message if any
-    String errorMessage;
-    // Readable description of the error
-    String errorDescription;
-    // Can the client retry for this type of error (Transient error=true, persistent error=false)
-    boolean canRetryOnFailure;
+    // errorDetails if any
+    ErrorDetails errorDetails;
+  }
+
+  /** Represents status for catalog sync status operation */
+  @Value
+  @Builder
+  public static class CatalogSyncStatus {
+    // A user defined unique catalog identifier.
+    String catalogId;
+    // Status code
+    SyncStatusCode statusCode;
+    // errorDetails if any
+    ErrorDetails errorDetails;
   }
 }

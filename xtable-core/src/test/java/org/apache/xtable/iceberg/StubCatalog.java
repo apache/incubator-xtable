@@ -36,6 +36,7 @@ public class StubCatalog implements Catalog {
   public static void registerMock(String catalogName, Catalog catalog) {
     REGISTERED_MOCKS.put(catalogName, catalog);
   }
+
   // use a mocked catalog instance to more easily test
   private Catalog mockedCatalog;
 

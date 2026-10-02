@@ -27,6 +27,7 @@ import org.apache.parquet.schema.MessageType;
 
 import org.apache.hudi.avro.HoodieAvroWriteSupport;
 import org.apache.hudi.common.bloom.BloomFilter;
+import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 
@@ -48,13 +49,15 @@ import org.apache.xtable.hudi.idtracking.models.IdTracking;
 public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
   private static final IdTracker ID_TRACKER = IdTracker.getInstance();
 
+  // Hudi 1.2.0 reflectively instantiates the write support with the schema as a HoodieSchema, so
+  // this constructor must mirror that signature (see HoodieAvroWriteSupport).
   public HoodieAvroWriteSupportWithFieldIds(
       MessageType schema,
-      Schema avroSchema,
+      HoodieSchema avroSchema,
       Option<BloomFilter> bloomFilterOpt,
       Properties properties) {
     super(
-        addFieldIdsToParquetSchema(schema, avroSchema, properties),
+        addFieldIdsToParquetSchema(schema, avroSchema.toAvroSchema(), properties),
         avroSchema,
         bloomFilterOpt,
         properties);

@@ -28,6 +28,7 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
 
@@ -59,14 +60,7 @@ public class HudiSourceConfig {
     return new HudiSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
   }
 
-  @Value
-  static class PartitionFieldSpec {
-    String sourceFieldPath;
-    PartitionTransformType transformType;
-    String format;
-  }
-
-  private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
+  public static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
     if (input == null || input.isEmpty()) {
       return Collections.emptyList();
     }
@@ -84,9 +78,10 @@ public class HudiSourceConfig {
     return partitionFields;
   }
 
-  public HudiSourcePartitionSpecExtractor loadSourcePartitionSpecExtractor() {
+  public PathBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
         partitionSpecExtractorClass, "HudiSourcePartitionSpecExtractor class not provided");
-    return ReflectionUtils.createInstanceOfClass(partitionSpecExtractorClass, this);
+    return ReflectionUtils.createInstanceOfClass(
+        partitionSpecExtractorClass, this.getPartitionFieldSpecs());
   }
 }

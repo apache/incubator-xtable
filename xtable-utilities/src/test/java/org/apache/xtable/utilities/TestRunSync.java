@@ -21,19 +21,44 @@ package org.apache.xtable.utilities;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.iceberg.IcebergCatalogConfig;
+import org.apache.xtable.conversion.CatalogConfig;
+import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
+
+  @Test
+  public void testMain() {
+    String filePath = TestRunSync.class.getClassLoader().getResource("my_config.yaml").getPath();
+    String[] args = new String[] {"--datasetConfig", filePath};
+    Assertions.assertDoesNotThrow(
+        () -> RunSync.main(args), "RunSync.main() threw an unexpected exception.");
+  }
+
+  @Test
+  public void testGetDatasetConfigWithNonExistentFile() {
+    URL resourceUrl = TestRunSync.class.getClassLoader().getResource("my_config1.yaml");
+    Assertions.assertNull(resourceUrl, "Config file not found in classpath");
+  }
+
+  @Test
+  public void testGetDatasetConfigWithValidYAML() throws IOException {
+    String filePath = TestRunSync.class.getClassLoader().getResource("my_config.yaml").getPath();
+    DatasetConfig config = RunSync.getDatasetConfig(filePath);
+    // Assert
+    Assertions.assertNotNull(config);
+  }
 
   /** Tests that the default hadoop configs are loaded. */
   @Test
@@ -80,20 +105,33 @@ class TestRunSync {
   public void testTableFormatConverterConfigDefault() throws IOException {
     TableFormatConverters converters = RunSync.loadTableFormatConversionConfigs(null);
     Map<String, ConversionConfig> tfConverters = converters.getTableFormatConverters();
-    Assertions.assertEquals(3, tfConverters.size());
+    Assertions.assertEquals(4, tfConverters.size());
     Assertions.assertNotNull(tfConverters.get(DELTA));
     Assertions.assertNotNull(tfConverters.get(HUDI));
     Assertions.assertNotNull(tfConverters.get(ICEBERG));
+    Assertions.assertNotNull(tfConverters.get(PAIMON));
 
     Assertions.assertEquals(
         "org.apache.xtable.hudi.HudiConversionSourceProvider",
         tfConverters.get(HUDI).getConversionSourceProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.hudi.HudiConversionTarget",
+        tfConverters.get(HUDI).getConversionTargetProviderClass());
     Assertions.assertEquals(
         "org.apache.xtable.iceberg.IcebergConversionTarget",
         tfConverters.get(ICEBERG).getConversionTargetProviderClass());
     Assertions.assertEquals(
         "org.apache.xtable.iceberg.IcebergConversionSourceProvider",
         tfConverters.get(ICEBERG).getConversionSourceProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.delta.DeltaConversionTarget",
+        tfConverters.get(DELTA).getConversionTargetProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.delta.DeltaConversionSourceProvider",
+        tfConverters.get(DELTA).getConversionSourceProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.paimon.PaimonConversionSourceProvider",
+        tfConverters.get(PAIMON).getConversionSourceProviderClass());
   }
 
   @Test
@@ -111,7 +149,7 @@ class TestRunSync {
     TableFormatConverters converters =
         RunSync.loadTableFormatConversionConfigs(customConverters.getBytes());
     Map<String, ConversionConfig> tfConverters = converters.getTableFormatConverters();
-    Assertions.assertEquals(4, tfConverters.size());
+    Assertions.assertEquals(5, tfConverters.size());
 
     Assertions.assertNotNull(tfConverters.get("NEW_FORMAT"));
     Assertions.assertEquals(
@@ -133,7 +171,7 @@ class TestRunSync {
             + "catalogOptions: \n"
             + "  option1: value1\n"
             + "  option2: value2";
-    IcebergCatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
+    CatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
     Assertions.assertEquals("org.apache.xtable.CatalogImpl", catalogConfig.getCatalogImpl());
     Assertions.assertEquals("test", catalogConfig.getCatalogName());
     Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());

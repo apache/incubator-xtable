@@ -11,12 +11,12 @@ This page covers the essential steps to setup Apache XTable™ (incubating) in y
 Once the project is successfully cloned in your environment, you can build the jars from the source using the below command.
 
 ```shell md title=="shell"
-mvn clean package
+./mvnw clean package
 ```
 For skipping the tests while building, add `-DskipTests`.
 
 ```shell md title=="shell"
-mvn clean package -DskipTests
+./mvnw clean package -DskipTests
 ```
 
 For more information on the steps, follow the project's GitHub [README.md](https://github.com/apache/incubator-xtable/blob/main/README.md) 
@@ -24,3 +24,6 @@ For more information on the steps, follow the project's GitHub [README.md](https
 ## Next Steps
 See the [Quickstart](/docs/how-to) guide to learn to use Apache XTable™ (Incubating) to add interoperability between
 different table formats.
+
+To run a sync on a Spark cluster you already have, see
+[Run an XTable sync on Apache Spark](/docs/how-to-spark-runtime).

@@ -18,4 +18,5 @@
 
 org.apache.xtable.hudi.HudiConversionTarget
 org.apache.xtable.delta.DeltaConversionTarget
+org.apache.xtable.kernel.DeltaKernelConversionTarget
 org.apache.xtable.iceberg.IcebergConversionTarget

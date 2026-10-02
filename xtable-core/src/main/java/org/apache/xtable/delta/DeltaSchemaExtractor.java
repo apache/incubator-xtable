@@ -18,6 +18,14 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_ID;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NAME;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NESTED_IDS;
+import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
+import static org.apache.xtable.delta.Constants.PARQUET_LIST_ELEMENT_FIELD_NAME;
+import static org.apache.xtable.delta.Constants.PARQUET_MAP_KEY_FIELD_NAME;
+import static org.apache.xtable.delta.Constants.PARQUET_MAP_VALUE_FIELD_NAME;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,17 +37,13 @@ import lombok.NoArgsConstructor;
 
 import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
 import org.apache.spark.sql.types.MapType;
 import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.MetadataBuilder;
-import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -58,107 +62,30 @@ import org.apache.xtable.schema.SchemaUtils;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
-  private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
-  private static final String COMMENT = "comment";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
+  // Timestamps in Delta are microsecond precision by default
+  private static final Map<InternalSchema.MetadataKey, Object>
+      DEFAULT_TIMESTAMP_PRECISION_METADATA =
+          Collections.singletonMap(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
 
   public static DeltaSchemaExtractor getInstance() {
     return INSTANCE;
   }
 
-  public StructType fromInternalSchema(InternalSchema internalSchema) {
-    StructField[] fields =
-        internalSchema.getFields().stream()
-            .map(
-                field ->
-                    new StructField(
-                        field.getName(),
-                        convertFieldType(field),
-                        field.getSchema().isNullable(),
-                        getMetaData(field.getSchema())))
-            .toArray(StructField[]::new);
-    return new StructType(fields);
+  private static String childIdPath(String nestedIdPath, String childName) {
+    return nestedIdPath == null ? null : nestedIdPath + "." + childName;
   }
 
-  private DataType convertFieldType(InternalField field) {
-    switch (field.getSchema().getDataType()) {
-      case ENUM:
-      case STRING:
-        return DataTypes.StringType;
-      case INT:
-        return DataTypes.IntegerType;
-      case LONG:
-      case TIMESTAMP_NTZ:
-        return DataTypes.LongType;
-      case BYTES:
-      case FIXED:
-      case UUID:
-        return DataTypes.BinaryType;
-      case BOOLEAN:
-        return DataTypes.BooleanType;
-      case FLOAT:
-        return DataTypes.FloatType;
-      case DATE:
-        return DataTypes.DateType;
-      case TIMESTAMP:
-        return DataTypes.TimestampType;
-      case DOUBLE:
-        return DataTypes.DoubleType;
-      case DECIMAL:
-        int precision =
-            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
-        int scale =
-            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-        return DataTypes.createDecimalType(precision, scale);
-      case RECORD:
-        return fromInternalSchema(field.getSchema());
-      case MAP:
-        InternalField key =
-            field.getSchema().getFields().stream()
-                .filter(
-                    mapField ->
-                        InternalField.Constants.MAP_KEY_FIELD_NAME.equals(mapField.getName()))
-                .findFirst()
-                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
-        InternalField value =
-            field.getSchema().getFields().stream()
-                .filter(
-                    mapField ->
-                        InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
-                .findFirst()
-                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
-        return DataTypes.createMapType(
-            convertFieldType(key), convertFieldType(value), value.getSchema().isNullable());
-      case LIST:
-        InternalField element =
-            field.getSchema().getFields().stream()
-                .filter(
-                    arrayField ->
-                        InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(
-                            arrayField.getName()))
-                .findFirst()
-                .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
-        return DataTypes.createArrayType(
-            convertFieldType(element), element.getSchema().isNullable());
-      default:
-        throw new NotSupportedException("Unsupported type: " + field.getSchema().getDataType());
+  private static Integer nestedFieldId(Metadata nestedIds, String path) {
+    if (nestedIds == null || path == null || !nestedIds.contains(path)) {
+      return null;
     }
-  }
-
-  private Metadata getMetaData(InternalSchema schema) {
-    InternalType type = schema.getDataType();
-    MetadataBuilder metadataBuilder = new MetadataBuilder();
-    if (type == InternalType.UUID) {
-      metadataBuilder.putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");
-    }
-    if (schema.getComment() != null) {
-      metadataBuilder.putString(COMMENT, schema.getComment());
-    }
-    return metadataBuilder.build();
+    return (int) nestedIds.getLong(path);
   }
 
   public InternalSchema toInternalSchema(StructType structType) {
-    return toInternalSchema(structType, null, false, null, null);
+    return toInternalSchema(structType, null, false, null, null, null, null);
   }
 
   private InternalSchema toInternalSchema(
@@ -167,6 +94,23 @@ public class DeltaSchemaExtractor {
       boolean nullable,
       String comment,
       Metadata originalMetadata) {
+    return toInternalSchema(dataType, parentPath, nullable, comment, originalMetadata, null, null);
+  }
+
+  /**
+   * @param nestedIds the {@code delta.columnMapping.nested.ids} metadata of the enclosing struct
+   *     field, or null when the field carries none
+   * @param nestedIdPath the path of the current type within that metadata, starting at the
+   *     enclosing field's physical name
+   */
+  private InternalSchema toInternalSchema(
+      DataType dataType,
+      String parentPath,
+      boolean nullable,
+      String comment,
+      Metadata originalMetadata,
+      Metadata nestedIds,
+      String nestedIdPath) {
     Map<InternalSchema.MetadataKey, Object> metadata = null;
     List<InternalField> fields = null;
     InternalType type;
@@ -191,7 +135,8 @@ public class DeltaSchemaExtractor {
         type = InternalType.DOUBLE;
         break;
       case "binary":
-        if (originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
+        if (originalMetadata != null
+            && originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
             && "uuid".equals(originalMetadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE))) {
           type = InternalType.UUID;
         } else {
@@ -206,26 +151,26 @@ public class DeltaSchemaExtractor {
         break;
       case "timestamp":
         type = InternalType.TIMESTAMP;
-        // Timestamps in Delta are microsecond precision by default
-        metadata =
-            Collections.singletonMap(
-                InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
-                InternalSchema.MetadataValue.MICROS);
+        metadata = DEFAULT_TIMESTAMP_PRECISION_METADATA;
+        break;
+      case "timestamp_ntz":
+        type = InternalType.TIMESTAMP_NTZ;
+        metadata = DEFAULT_TIMESTAMP_PRECISION_METADATA;
         break;
       case "struct":
         StructType structType = (StructType) dataType;
         fields =
             Arrays.stream(structType.fields())
-                .filter(
-                    field ->
-                        !field
-                            .metadata()
-                            .contains(DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION))
+                .filter(field -> !field.metadata().contains(DELTA_GENERATION_EXPRESSION))
                 .map(
                     field -> {
                       Integer fieldId =
                           field.metadata().contains(DELTA_COLUMN_MAPPING_ID)
                               ? (int) field.metadata().getLong(DELTA_COLUMN_MAPPING_ID)
+                              : null;
+                      String storageName =
+                          field.metadata().contains(DELTA_COLUMN_MAPPING_NAME)
+                              ? field.metadata().getString(DELTA_COLUMN_MAPPING_NAME)
                               : null;
                       String fieldComment =
                           field.getComment().isDefined() ? field.getComment().get() : null;
@@ -235,10 +180,15 @@ public class DeltaSchemaExtractor {
                               SchemaUtils.getFullyQualifiedPath(parentPath, field.name()),
                               field.nullable(),
                               fieldComment,
-                              field.metadata());
+                              field.metadata(),
+                              field.metadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                                  ? field.metadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                                  : null,
+                              storageName != null ? storageName : field.name());
                       return InternalField.builder()
                           .name(field.name())
                           .fieldId(fieldId)
+                          .storageName(storageName)
                           .parentPath(parentPath)
                           .schema(schema)
                           .defaultValue(
@@ -257,6 +207,7 @@ public class DeltaSchemaExtractor {
         break;
       case "array":
         ArrayType arrayType = (ArrayType) dataType;
+        String elementIdPath = childIdPath(nestedIdPath, PARQUET_LIST_ELEMENT_FIELD_NAME);
         InternalSchema elementSchema =
             toInternalSchema(
                 arrayType.elementType(),
@@ -264,11 +215,14 @@ public class DeltaSchemaExtractor {
                     parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
                 arrayType.containsNull(),
                 null,
-                null);
+                null,
+                nestedIds,
+                elementIdPath);
         InternalField elementField =
             InternalField.builder()
                 .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                 .parentPath(parentPath)
+                .fieldId(nestedFieldId(nestedIds, elementIdPath))
                 .schema(elementSchema)
                 .build();
         type = InternalType.LIST;
@@ -276,18 +230,23 @@ public class DeltaSchemaExtractor {
         break;
       case "map":
         MapType mapType = (MapType) dataType;
+        String keyIdPath = childIdPath(nestedIdPath, PARQUET_MAP_KEY_FIELD_NAME);
+        String valueIdPath = childIdPath(nestedIdPath, PARQUET_MAP_VALUE_FIELD_NAME);
         InternalSchema keySchema =
             toInternalSchema(
                 mapType.keyType(),
                 SchemaUtils.getFullyQualifiedPath(
-                    parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
+                    parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME),
                 false,
                 null,
-                null);
+                null,
+                nestedIds,
+                keyIdPath);
         InternalField keyField =
             InternalField.builder()
                 .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                 .parentPath(parentPath)
+                .fieldId(nestedFieldId(nestedIds, keyIdPath))
                 .schema(keySchema)
                 .build();
         InternalSchema valueSchema =
@@ -297,11 +256,14 @@ public class DeltaSchemaExtractor {
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
                 mapType.valueContainsNull(),
                 null,
-                null);
+                null,
+                nestedIds,
+                valueIdPath);
         InternalField valueField =
             InternalField.builder()
                 .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                 .parentPath(parentPath)
+                .fieldId(nestedFieldId(nestedIds, valueIdPath))
                 .schema(valueSchema)
                 .build();
         type = InternalType.MAP;

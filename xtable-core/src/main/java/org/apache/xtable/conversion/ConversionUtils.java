@@ -18,40 +18,16 @@
  
 package org.apache.xtable.conversion;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-import org.apache.xtable.model.storage.TableFormat;
-
 public class ConversionUtils {
 
-  /**
-   * Few table formats need the metadata to be located at the root level of the data files. Eg: An
-   * iceberg table generated through spark will have two directories basePath/data and
-   * basePath/metadata For synchronising the iceberg metadata to hudi and delta, they need to be
-   * present in basePath/data/.hoodie and basePath/data/_delta_log.
-   *
-   * @param config conversion config for synchronizing source and target tables
-   * @return updated table config.
-   */
-  public static ConversionConfig normalizeTargetPaths(ConversionConfig config) {
-    if (!config.getSourceTable().getDataPath().equals(config.getSourceTable().getBasePath())
-        && config.getSourceTable().getFormatName().equals(TableFormat.ICEBERG)) {
-      List<TargetTable> updatedTargetTables =
-          config.getTargetTables().stream()
-              .filter(
-                  targetTable ->
-                      targetTable.getFormatName().equals(TableFormat.HUDI)
-                          || targetTable.getFormatName().equals(TableFormat.DELTA))
-              .map(
-                  targetTable ->
-                      targetTable.toBuilder()
-                          .basePath(config.getSourceTable().getDataPath())
-                          .build())
-              .collect(Collectors.toList());
-      return new ConversionConfig(
-          config.getSourceTable(), updatedTargetTables, config.getSyncMode());
-    }
-    return config;
+  public static SourceTable convertToSourceTable(TargetTable table) {
+    return new SourceTable(
+        table.getName(),
+        table.getFormatName(),
+        table.getBasePath(),
+        table.getBasePath(),
+        table.getNamespace(),
+        table.getCatalogConfig(),
+        table.getAdditionalProperties());
   }
 }

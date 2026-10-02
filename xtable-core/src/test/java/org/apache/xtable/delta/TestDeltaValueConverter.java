@@ -21,6 +21,9 @@ package org.apache.xtable.delta;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -32,6 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import com.google.common.collect.ImmutableMap;
 
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -213,5 +218,110 @@ public class TestDeltaValueConverter {
         Arguments.of("+Infinity", floatSchema, Float.POSITIVE_INFINITY),
         Arguments.of(Double.NaN, doubleSchema, Double.NaN),
         Arguments.of(Double.POSITIVE_INFINITY, doubleSchema, Double.POSITIVE_INFINITY));
+  }
+
+  @ParameterizedTest
+  @MethodSource("decimalValues")
+  void parseDecimalValues(
+      Object deltaValue, InternalSchema fieldSchema, BigDecimal expectedOutput) {
+    assertEquals(
+        expectedOutput,
+        DeltaValueConverter.convertFromDeltaColumnStatValue(deltaValue, fieldSchema));
+  }
+
+  private static Stream<Arguments> decimalValues() {
+    return Stream.of(
+        Arguments.of(
+            -8.00,
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 5)
+                        .build())
+                .build(),
+            new BigDecimal("-8.00", new MathContext(5, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)),
+        Arguments.of(
+            -8.00f,
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 5)
+                        .build())
+                .build(),
+            new BigDecimal("-8.00", new MathContext(5, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)),
+        Arguments.of(
+            1000,
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 6)
+                        .build())
+                .build(),
+            new BigDecimal("1000.00", new MathContext(6, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)),
+        Arguments.of(
+            1000L,
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 6)
+                        .build())
+                .build(),
+            new BigDecimal("1000.00", new MathContext(6, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)),
+        Arguments.of(
+            "1000",
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 6)
+                        .build())
+                .build(),
+            new BigDecimal("1000.00", new MathContext(6, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)),
+        Arguments.of(
+            1234.56,
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 6)
+                        .build())
+                .build(),
+            new BigDecimal("1234.56", new MathContext(6, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)),
+        Arguments.of(
+            new BigDecimal("1234.56", new MathContext(6, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY),
+            InternalSchema.builder()
+                .name("decimal")
+                .dataType(InternalType.DECIMAL)
+                .metadata(
+                    ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                        .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                        .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 6)
+                        .build())
+                .build(),
+            new BigDecimal("1234.56", new MathContext(6, RoundingMode.UNNECESSARY))
+                .setScale(2, RoundingMode.UNNECESSARY)));
   }
 }

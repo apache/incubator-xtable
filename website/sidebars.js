@@ -18,7 +18,9 @@ module.exports = {
             label: 'Quick Start',
             collapsed: false,
             items: [
-                'how-to'
+                'how-to',
+                'how-to-catalog-sync',
+                'how-to-spark-runtime'
             ],
         },
         {

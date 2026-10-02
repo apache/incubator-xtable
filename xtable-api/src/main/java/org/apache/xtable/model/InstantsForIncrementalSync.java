@@ -48,6 +48,15 @@ import lombok.Value;
 @Builder
 public class InstantsForIncrementalSync {
   Instant lastSyncInstant;
+  // last synced instants by target format for all targets considered for this incremental sync.
+  @Builder.Default List<TargetSyncInstant> targetSyncInstants = Collections.emptyList();
   // pending commits that are not yet synced and to be considered for next incremental sync.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+
+  @Value
+  @Builder
+  public static class TargetSyncInstant {
+    String tableFormat;
+    Instant lastSyncInstant;
+  }
 }

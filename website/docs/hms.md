@@ -17,7 +17,7 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    or a distributed system like Amazon EMR, Google Cloud's Dataproc, Azure HDInsight etc.
    This is a required step to register the table in HMS using a Spark client.
 3. Clone the XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup) 
+   `xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup) 
 4. This guide also assumes that you have configured the Hive Metastore locally or on EMR/Dataproc/HDInsight
    and is already running.
 
@@ -88,7 +88,7 @@ datasets:
 
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 ```shell md title="shell"
-java -jar xtable-utilities/target/xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+java -jar xtable-utilities/target/xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 :::tip Note:
@@ -148,7 +148,7 @@ SELECT * FROM <database_name>.<table_name>;
 <TabItem value="delta">
 
 ```shell md title="shell"
-spark-sql --packages io.delta:delta-core_2.12:2.0.0 \
+spark-sql --packages io.delta:delta-core_2.12:2.4.0 \
 --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
 --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
 --conf "spark.sql.catalogImplementation=hive"
@@ -182,7 +182,7 @@ SELECT * FROM delta_db.<table_name>;
 <TabItem value="iceberg">
 
 ```shell md title="shell"
-spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.1 \
+spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2 \
 --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
 --conf "spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog" \
 --conf "spark.sql.catalog.spark_catalog.type=hive" \

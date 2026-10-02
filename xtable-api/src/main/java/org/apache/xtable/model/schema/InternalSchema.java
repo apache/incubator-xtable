@@ -75,7 +75,8 @@ public class InternalSchema {
 
   public enum MetadataValue {
     MICROS,
-    MILLIS
+    MILLIS,
+    NANOS
   }
 
   public static final String XTABLE_LOGICAL_TYPE = "xtableLogicalType";

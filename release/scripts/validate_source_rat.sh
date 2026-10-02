@@ -16,5 +16,5 @@
 # limitations under the License.
 #
 echo "Running RAT Check"
-(bash -c "mvn apache-rat:check -DdeployArtifacts=true") || (echo -e "\t\t Rat Check Failed. [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
+(bash -c "./mvnw apache-rat:check -DdeployArtifacts=true") || (echo -e "\t\t Rat Check Failed. [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
 echo -e "\t\tRAT Check Passed [OK]\n"

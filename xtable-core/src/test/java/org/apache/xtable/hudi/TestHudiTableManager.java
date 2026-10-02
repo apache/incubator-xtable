@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,6 +38,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.storage.StorageConfiguration;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
@@ -48,11 +50,12 @@ import org.apache.xtable.model.storage.TableFormat;
 
 public class TestHudiTableManager {
 
-  private static final Configuration CONFIGURATION = new Configuration();
+  private static final StorageConfiguration CONFIGURATION = getStorageConf(new Configuration());
   @TempDir public static Path tempDir;
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
 
-  private final HudiTableManager tableManager = HudiTableManager.of(CONFIGURATION);
+  private final HudiTableManager tableManager =
+      HudiTableManager.of((Configuration) CONFIGURATION.unwrapCopy());
 
   @ParameterizedTest
   @MethodSource("dataLayoutAndHivePartitioningEnabled")
@@ -93,7 +96,7 @@ public class TestHudiTableManager {
             .layoutStrategy(dataLayoutStrategy)
             .build();
 
-    tableManager.initializeHudiTable(tableBasePath, table);
+    tableManager.initializeHudiTable(tableBasePath, table, null);
 
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
@@ -101,6 +104,8 @@ public class TestHudiTableManager {
             .setConf(CONFIGURATION)
             .setLoadActiveTimelineOnLoad(false)
             .build();
+    // a null database name falls back to the default
+    assertEquals("default_hudi", metaClient.getTableConfig().getDatabaseName());
     assertFalse(metaClient.getTableConfig().populateMetaFields());
     assertEquals(
         expectedHivePartitioningEnabled,
@@ -111,11 +116,39 @@ public class TestHudiTableManager {
     assertEquals(
         Arrays.asList(recordKeyField),
         Arrays.asList(metaClient.getTableConfig().getRecordKeyFields().get()));
-    assertEquals(tableBasePath, metaClient.getBasePath());
+    assertEquals(tableBasePath, metaClient.getBasePath().toString());
     assertEquals(tableName, metaClient.getTableConfig().getTableName());
     assertEquals(
         "org.apache.hudi.keygen.ComplexKeyGenerator",
         metaClient.getTableConfig().getKeyGeneratorClassName());
+  }
+
+  @Test
+  void initializeHudiTableUsesProvidedDatabaseName() {
+    InternalTable table =
+        InternalTable.builder()
+            .name("testing_db")
+            .partitioningFields(Collections.emptyList())
+            .readSchema(
+                InternalSchema.builder()
+                    .fields(
+                        Collections.singletonList(InternalField.builder().name("field1").build()))
+                    .recordKeyFields(Collections.emptyList())
+                    .build())
+            .basePath("file://fake_path")
+            .tableFormat(TableFormat.ICEBERG)
+            .layoutStrategy(DataLayoutStrategy.FLAT)
+            .build();
+
+    tableManager.initializeHudiTable(tableBasePath, table, "my_namespace");
+
+    HoodieTableMetaClient metaClient =
+        HoodieTableMetaClient.builder()
+            .setBasePath(tableBasePath)
+            .setConf(CONFIGURATION)
+            .setLoadActiveTimelineOnLoad(false)
+            .build();
+    assertEquals("my_namespace", metaClient.getTableConfig().getDatabaseName());
   }
 
   public static Stream<Arguments> dataLayoutAndHivePartitioningEnabled() {
@@ -134,7 +167,7 @@ public class TestHudiTableManager {
     assertEquals(
         Collections.singletonList("timestamp"),
         Arrays.asList(metaClient.getTableConfig().getPartitionFields().get()));
-    assertEquals(tableBasePath, metaClient.getBasePath());
+    assertEquals(tableBasePath, metaClient.getBasePath().toString());
     assertEquals("test_table", metaClient.getTableConfig().getTableName());
   }
 

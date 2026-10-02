@@ -56,6 +56,10 @@ import org.apache.iceberg.types.Types.NestedField;
 @Value
 public class TestIcebergDataHelper {
   private static final Random RANDOM = new Random();
+  private static final List<Types.NestedField> BASIC_FIELDS =
+      Arrays.asList(
+          NestedField.optional(1, "field1", Types.StringType.get()),
+          NestedField.optional(2, "field2", Types.StringType.get()));
   private static final List<Types.NestedField> COMMON_FIELDS =
       Arrays.asList(
           NestedField.optional(1, "id", Types.StringType.get()),
@@ -114,6 +118,7 @@ public class TestIcebergDataHelper {
   private static final Schema SCHEMA_WITH_UUID_COLUMN =
       new Schema(
           Stream.concat(COMMON_FIELDS.stream(), UUID_FIELDS.stream()).collect(Collectors.toList()));
+  private static final Schema BASIC_SCHEMA = new Schema(BASIC_FIELDS);
   private static final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
   private static final LocalDate EPOCH_DAY = EPOCH.toLocalDate();
 
@@ -121,7 +126,8 @@ public class TestIcebergDataHelper {
   String recordKeyField;
   List<String> partitionFieldNames;
 
-  public static enum SchemaType {
+  public enum SchemaType {
+    BASIC,
     COMMON,
     COMMON_WITH_ADDITIONAL_COLUMNS,
     COMMON_WITH_UUID_COLUMN,
@@ -145,6 +151,8 @@ public class TestIcebergDataHelper {
         return SCHEMA_WITH_ADDITIONAL_COLUMNS;
       case COMMON_WITH_UUID_COLUMN:
         return SCHEMA_WITH_UUID_COLUMN;
+      case BASIC:
+        return BASIC_SCHEMA;
       default:
         throw new IllegalArgumentException("Unknown schema type: " + schemaType);
     }
@@ -193,6 +201,13 @@ public class TestIcebergDataHelper {
   public PartitionSpec getPartitionSpec() {
     if (partitionFieldNames.isEmpty()) {
       return PartitionSpec.unpartitioned();
+    }
+    if (partitionFieldNames.equals(Arrays.asList("level", "string_field"))) {
+      return PartitionSpec.builderFor(tableSchema)
+          .alwaysNull("bytes_field")
+          .identity("level")
+          .bucket("string_field", 10)
+          .build();
     }
     if (partitionFieldNames.size() > 1) {
       throw new IllegalArgumentException(
@@ -318,11 +333,7 @@ public class TestIcebergDataHelper {
       case STRUCT:
         return generateInsertRecord(timeLowerBound, timeUpperBound, fieldType.asStructType());
       case UUID:
-        UUID uuid = UUID.randomUUID();
-        ByteBuffer byteBuffer = ByteBuffer.wrap(new byte[16]);
-        byteBuffer.putLong(uuid.getMostSignificantBits());
-        byteBuffer.putLong(uuid.getLeastSignificantBits());
-        return byteBuffer.array();
+        return UUID.randomUUID();
       case LIST:
         Types.ListType listType = (Types.ListType) fieldType;
         int listSize = RANDOM.nextInt(5) + 1;

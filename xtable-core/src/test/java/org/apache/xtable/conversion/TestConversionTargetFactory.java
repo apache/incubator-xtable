@@ -20,14 +20,21 @@ package org.apache.xtable.conversion;
 
 import static org.apache.xtable.GenericTable.getTableName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Properties;
+
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
+import org.apache.xtable.delta.DeltaConversionTarget;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.hudi.HudiConversionTarget;
+import org.apache.xtable.kernel.DeltaKernelConversionTarget;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
@@ -86,6 +93,48 @@ public class TestConversionTargetFactory {
     conf.setStrings("spark.master", "local");
     ConversionTarget tc = ConversionTargetFactory.getInstance().createForFormat(targetTable, conf);
     assertEquals(tc.getTableFormat(), TableFormat.DELTA);
+  }
+
+  @Test
+  public void testDeltaTargetDefaultsToStandalone() {
+    // No properties and an empty properties set both resolve to the Delta Standalone target.
+    assertInstanceOf(
+        DeltaConversionTarget.class,
+        ConversionTargetFactory.getInstance().createConversionTargetForName(TableFormat.DELTA));
+    assertInstanceOf(
+        DeltaConversionTarget.class,
+        ConversionTargetFactory.getInstance()
+            .createConversionTargetForName(TableFormat.DELTA, new Properties()));
+  }
+
+  @Test
+  public void testDeltaTargetExplicitlyDisablingKernelUsesStandalone() {
+    Properties properties = new Properties();
+    properties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "false");
+    assertInstanceOf(
+        DeltaConversionTarget.class,
+        ConversionTargetFactory.getInstance()
+            .createConversionTargetForName(TableFormat.DELTA, properties));
+  }
+
+  @Test
+  public void testDeltaTargetUsesKernelWhenFlagEnabled() {
+    Properties properties = new Properties();
+    properties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
+    assertInstanceOf(
+        DeltaKernelConversionTarget.class,
+        ConversionTargetFactory.getInstance()
+            .createConversionTargetForName(TableFormat.DELTA, properties));
+  }
+
+  @Test
+  public void testKernelFlagDoesNotAffectNonDeltaFormats() {
+    Properties properties = new Properties();
+    properties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
+    assertInstanceOf(
+        HudiConversionTarget.class,
+        ConversionTargetFactory.getInstance()
+            .createConversionTargetForName(TableFormat.HUDI, properties));
   }
 
   private TargetTable getPerTableConfig(String tableFormat) {

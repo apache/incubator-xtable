@@ -18,6 +18,7 @@
  
 package org.apache.xtable.conversion;
 
+import java.util.Properties;
 import java.util.ServiceLoader;
 
 import lombok.AccessLevel;
@@ -25,7 +26,10 @@ import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.kernel.DeltaKernelConversionTarget;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -46,7 +50,9 @@ public class ConversionTargetFactory {
    * @return an intialized {@link ConversionTarget}
    */
   public ConversionTarget createForFormat(TargetTable targetTable, Configuration configuration) {
-    ConversionTarget conversionTarget = createConversionTargetForName(targetTable.getFormatName());
+    ConversionTarget conversionTarget =
+        createConversionTargetForName(
+            targetTable.getFormatName(), targetTable.getAdditionalProperties());
 
     conversionTarget.init(targetTable, configuration);
     return conversionTarget;
@@ -62,12 +68,35 @@ public class ConversionTargetFactory {
    * @return
    */
   public ConversionTarget createConversionTargetForName(String tableFormatName) {
+    return createConversionTargetForName(tableFormatName, new Properties());
+  }
+
+  /**
+   * Resolves the ConversionTarget for the given format, using the target properties to pick between
+   * the Delta Standalone and Delta Kernel implementations (both registered under {@link
+   * TableFormat#DELTA}) via {@link DeltaConversionTargetConfig#USE_KERNEL} (default {@code false}).
+   * Other formats have a single implementation, so the flag has no effect.
+   *
+   * @param tableFormatName the target table format name
+   * @param properties target table additional properties used to resolve the implementation
+   * @return an uninitialized {@link ConversionTarget}
+   */
+  public ConversionTarget createConversionTargetForName(
+      String tableFormatName, Properties properties) {
+    boolean useKernel =
+        TableFormat.DELTA.equalsIgnoreCase(tableFormatName)
+            && DeltaConversionTargetConfig.fromProperties(properties).isUseKernel();
     ServiceLoader<ConversionTarget> loader = ServiceLoader.load(ConversionTarget.class);
     for (ConversionTarget target : loader) {
-      if (target.getTableFormat().equalsIgnoreCase(tableFormatName)) {
+      if (target.getTableFormat().equalsIgnoreCase(tableFormatName)
+          && isDeltaKernelTarget(target) == useKernel) {
         return target;
       }
     }
     throw new NotSupportedException("Target format is not yet supported: " + tableFormatName);
+  }
+
+  private static boolean isDeltaKernelTarget(ConversionTarget target) {
+    return target instanceof DeltaKernelConversionTarget;
   }
 }

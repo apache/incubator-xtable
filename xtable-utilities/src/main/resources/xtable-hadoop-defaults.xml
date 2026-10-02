@@ -55,7 +55,7 @@
   </property>
   <property>
     <name>fs.s3.aws.credentials.provider</name>
-    <value>com.amazonaws.auth.DefaultAWSCredentialsProviderChain</value>
+    <value>software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider</value>
   </property>
   <property>
     <name>fs.s3a.impl</name>
@@ -63,7 +63,7 @@
   </property>
   <property>
     <name>fs.s3a.aws.credentials.provider</name>
-    <value>com.amazonaws.auth.DefaultAWSCredentialsProviderChain</value>
+    <value>software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider</value>
   </property>
 
   <!-- Default file system for GCP scheme, gs:// -->

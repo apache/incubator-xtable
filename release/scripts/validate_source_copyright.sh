@@ -40,6 +40,41 @@ if [ ! -f "$noticeFile" ]; then
 fi
 echo -e "\t\tNotice file exists ? [OK]\n"
 
+### Checking NOTICE distribution years
+# The copyright range has to cover the year the release is published, otherwise
+# every release cut after a new year ships a stale NOTICE (see XTABLE-692 and the
+# 0.4.0-incubating-rc1 vote). Checking that the file merely exists is not enough.
+echo "Checking NOTICE distribution years"
+currentYear=$(date +%Y)
+inceptionYear=$(sed -n 's:.*<inceptionYear>\(.*\)</inceptionYear>.*:\1:p' ./pom.xml | head -n 1)
+copyrightLine=$(grep -E '^Copyright [0-9]{4}(-[0-9]{4})? The Apache Software Foundation$' "$noticeFile" | head -n 1)
+
+if [ -z "$copyrightLine" ]; then
+  echo "NOTICE does not contain a well-formed copyright line [ERROR]"
+  echo -e "\t\texpected: Copyright ${inceptionYear:-<inceptionYear>}-${currentYear} The Apache Software Foundation"
+  exit 1
+fi
+
+# Keep this portable: BSD/macOS sed has no GNU-style branch chaining, so split the
+# "YYYY" / "YYYY-YYYY" range with parameter expansion instead.
+noticeYears=$(echo "$copyrightLine" | sed -E 's/^Copyright ([0-9]{4}(-[0-9]{4})?) .*/\1/')
+noticeStartYear="${noticeYears%%-*}"
+noticeEndYear="${noticeYears##*-}"
+
+if [ -n "$inceptionYear" ] && [ "$noticeStartYear" != "$inceptionYear" ]; then
+  echo "NOTICE copyright starts at ${noticeStartYear} but pom.xml <inceptionYear> is ${inceptionYear} [ERROR]"
+  echo -e "\t\tfound: ${copyrightLine}"
+  exit 1
+fi
+
+if [ "$noticeEndYear" != "$currentYear" ]; then
+  echo "NOTICE copyright must cover the release year ${currentYear} but ends at ${noticeEndYear} [ERROR]"
+  echo -e "\t\tfound:    ${copyrightLine}"
+  echo -e "\t\texpected: Copyright ${noticeStartYear}-${currentYear} The Apache Software Foundation"
+  exit 1
+fi
+echo -e "\t\tNOTICE copyright covers ${currentYear} ? [OK]\n"
+
 ### Licensing Check
 echo "Performing custom Licensing Check "
 numfilesWithNoLicense=`find . -iname '*' -type f | grep -v NOTICE | grep -v LICENSE | grep -v '.jpg' | grep -v '.json' | grep -v '.hfile' | grep -v '.data' | grep -v '.commit' | grep -v emptyFile | grep -v DISCLAIMER | grep -v KEYS | grep -v '.mailmap' | grep -v '.sqltemplate' | grep -v 'banner.txt' | grep -v "fixtures" | xargs grep -L "Licensed to the Apache Software Foundation (ASF)" | wc -l`

@@ -156,10 +156,10 @@ Usage
 
 ## Verify that a Release Build Works
 
-Run "mvn -Prelease clean install" to ensure that the build processes are in good shape. // You need to execute this command once you have the release branch in apache/incubator-xtable
+Run "./mvnw -Prelease clean install" to ensure that the build processes are in good shape. // You need to execute this command once you have the release branch in apache/incubator-xtable
 
 ```shell
-mvn -Prelease clean install
+./mvnw -Prelease clean install
 ```
 
 # Build a release candidate
@@ -189,7 +189,7 @@ Set up a few environment variables to simplify Maven commands that follow. This 
         4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
         5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
         6. Ensure the diff contains assets,demo,website,xtable-utilities and non-binary files only in incubator-xtable-tmp-clone.
-        7. cd apache-xtable-${RELEASE_VERSION} && mvn clean package -DskipTests
+        7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
         8. If they pass, delete the repository we got from the tar-ball
           - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
 
@@ -238,7 +238,7 @@ Set up a few environment variables to simplify Maven commands that follow. This 
     1. This will deploy jar artifacts to the Apache Nexus Repository, which is the staging area for deploying jars to Maven Central.
     2. Review all staged artifacts (https://repository.apache.org/). They should contain all relevant parts for each module, including pom.xml, jar, test jar, source, test source, javadoc, etc. Carefully review any new artifacts.
     3. git checkout ${RELEASE_BRANCH} && export GPG_TTY=$(tty)
-    4. mvn deploy -Prelease -DskipTests  -DdeployArtifacts=true
+    4. ./mvnw deploy -Prelease -DskipTests  -DdeployArtifacts=true
         1. when prompted for the passphrase, if you have multiple gpg keys in your keyring, make sure that you enter the right passphase corresponding to the same key (FINGERPRINT) as used while generating source release in step f.ii.
            > If the prompt is not for the same key (by default the maven-gpg-plugin will pick up the first key in your keyring so that could be different), then add the following option to your ~/.gnupg/gpg.conf file
         2. make sure your IP is not changing while uploading, otherwise it creates a different staging repo
@@ -399,8 +399,13 @@ Once the release candidate has been reviewed and approved by the community, the 
 4. Use the Apache Nexus repository to release the staged binary artifacts to the Maven Central repository. In the Staging Repositories section, find the relevant release candidate orgapachextable-XXX entry and click `Release`.
    > Note: make sure and check you click `Release` repo, it cannot be withdrawn.
 5. Drop all other release candidates that are not being released. It can take up to 24 hours for the new release to show up in [Maven Central repository](https://search.maven.org/search?q=g:org.apache.xtable).
-6. Finalize the Release in GH by providing the release date.
-7. Update [DOAP]
+6. After the artifacts are visible on Maven Central, update `website/releases/downloads.mdx`.
+   1. Keep the signed source archive as the first and official Apache release download.
+   2. Label Maven Central JARs as convenience binaries.
+   3. Add direct links for the published, user-facing JARs and retain a version-filtered Maven search link for the complete artifact list.
+   4. Verify every exact JAR URL before adding it. Do not assume that every repository module is published.
+7. Finalize the Release in GH by providing the release date.
+8. Update [DOAP]
 
 # Promote the release
 

@@ -21,6 +21,7 @@ package org.apache.xtable.spi.extractor;
 import java.io.Closeable;
 import java.time.Instant;
 
+import org.apache.xtable.annotations.Evolving;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -32,6 +33,7 @@ import org.apache.xtable.model.TableChange;
  * source system. The client uses {@link Instant} to represent the point in time a commit was made
  * to be as generic as possible across source table formats.
  */
+@Evolving
 public interface ConversionSource<COMMIT> extends Closeable {
   /**
    * Extracts the {@link InternalTable} definition as of the provided commit.
@@ -40,6 +42,15 @@ public interface ConversionSource<COMMIT> extends Closeable {
    * @return the table definition
    */
   InternalTable getTable(COMMIT commit);
+
+  /**
+   * Extracts the {@link InternalTable} as of latest state. This method is less expensive as
+   * compared to {@link ConversionSource#getCurrentSnapshot()} as it doesn't load the files present
+   * in the table.
+   *
+   * @return {@link InternalTable} representing the current table.
+   */
+  InternalTable getCurrentTable();
 
   /**
    * Extracts the {@link InternalSnapshot} as of latest state.
@@ -78,4 +89,18 @@ public interface ConversionSource<COMMIT> extends Closeable {
    *     false.
    */
   boolean isIncrementalSyncSafeFrom(Instant instant);
+
+  /**
+   * Extract the identifier of the provided commit. The identifier is defined as:
+   *
+   * <ul>
+   *   <li>Snapshot ID in Iceberg
+   *   <li>Version ID in Delta
+   *   <li>Timestamp in Hudi
+   * </ul>
+   *
+   * @param commit The provided commit
+   * @return the string version of the commit identifier
+   */
+  String getCommitIdentifier(COMMIT commit);
 }

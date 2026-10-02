@@ -22,8 +22,12 @@ import java.util.Collections;
 import java.util.List;
 
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
-import lombok.Value;
+import lombok.ToString;
+import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -33,18 +37,17 @@ import org.apache.xtable.model.stat.PartitionValue;
  *
  * @since 0.1
  */
-@Builder(toBuilder = true)
-@Value
-public class InternalDataFile {
-  // physical path of the file (absolute with scheme)
-  @NonNull String physicalPath;
+@SuperBuilder(toBuilder = true)
+@FieldDefaults(makeFinal = true, level = lombok.AccessLevel.PRIVATE)
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+@Getter
+public class InternalDataFile extends InternalFile {
   // file format
   @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
   // partition ranges for the data file
   @Builder.Default @NonNull List<PartitionValue> partitionValues = Collections.emptyList();
 
-  long fileSizeBytes;
-  long recordCount;
   // column stats for each column in the data file
   @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch

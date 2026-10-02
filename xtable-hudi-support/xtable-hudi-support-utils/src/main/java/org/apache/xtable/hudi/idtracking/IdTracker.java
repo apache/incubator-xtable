@@ -34,7 +34,8 @@ import lombok.NoArgsConstructor;
 
 import org.apache.avro.Schema;
 
-import org.apache.hudi.avro.HoodieAvroUtils;
+import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.schema.HoodieSchemaUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 
@@ -122,12 +123,25 @@ public class IdTracker {
     AtomicInteger currentId = new AtomicInteger(existingState.getLastIdUsed());
     // add meta fields to the schema in order to ensure they will be assigned IDs
     Schema schemaForIdMapping =
-        includeMetaFields ? HoodieAvroUtils.addMetadataFields(schema) : schema;
+        includeMetaFields
+            ? HoodieSchemaUtils.addMetadataFields(HoodieSchema.fromAvroSchema(schema))
+                .toAvroSchema()
+            : schema;
     List<IdMapping> newMappings =
         generateIdMappings(schemaForIdMapping, currentId, existingState.getIdMappings());
     return new IdTracking(newMappings, currentId.get());
   }
 
+  /**
+   * Generates IdMappings for the provided schema.
+   *
+   * <p>It does pre-order traversal over the entire schema tree. At each node, it generates/reuse
+   * the id for its child nodes.
+   *
+   * @param schema schema to generate id mappings for.
+   * @param lastFieldId last ID used.
+   * @param existingMappings id mapping from the old schema.
+   */
   private static List<IdMapping> generateIdMappings(
       Schema schema, AtomicInteger lastFieldId, List<IdMapping> existingMappings) {
     Map<String, IdMapping> fieldNameToExistingMapping =
