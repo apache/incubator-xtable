@@ -24,7 +24,7 @@ history to enable proper point in time queries.
 1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed service like Amazon EMR, Google Cloud's Dataproc, Azure HDInsight etc
 2. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+   `xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2 
@@ -55,7 +55,7 @@ values={[
 
 ```shell md title="shell"
 pyspark \
-  --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
+  --packages org.apache.hudi:hudi-spark3.4-bundle_2.12:1.2.0 \
   --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" \
   --conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
@@ -65,7 +65,7 @@ pyspark \
 
 ```shell md title="shell"
 pyspark \
-  --packages io.delta:delta-core_2.12:2.1.0 \
+  --packages io.delta:delta-core_2.12:2.4.0 \
   --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 ```
@@ -74,7 +74,7 @@ pyspark \
 
 ```shell md title="shell"
 pyspark \
-  --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.4.1 \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2 \
   --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
   --conf "spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog"
 ```
@@ -351,7 +351,7 @@ Authentication for GCP requires service account credentials to be exported. i.e.
 In your terminal under the cloned Apache XTable™ (Incubating) directory, run the below command.
 
 ```shell md title="shell"
-java -jar xtable-utilities/target/xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+java -jar xtable-utilities/target/xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 **Optional:**

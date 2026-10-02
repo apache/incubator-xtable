@@ -22,14 +22,14 @@
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
-        <version>33</version>
+        <version>39</version>
     </parent>
 
     <groupId>org.apache.xtable</groupId>
     <artifactId>xtable</artifactId>
     <name>XTable Project Parent POM</name>
     <inceptionYear>2024</inceptionYear>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.5.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <url>https://xtable.apache.org/</url>
 
@@ -61,14 +61,14 @@
         <delta.kernel.version>4.0.0</delta.kernel.version>
         <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
-        <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
-        <maven.compiler.target>8</maven.compiler.target>
+        <project.build.outputTimestamp>2026-07-21T19:16:22Z</project.build.outputTimestamp>
+        <javaVersion>8</javaVersion>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <avro.version>1.12.0</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
         <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>1.2.0</hudi.version>
@@ -449,17 +449,19 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- AWS -->
+            <!-- AWS. The BOM manages every SDK artifact except bundle, so modules name only what they use. -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>bundle</artifactId>
                 <version>${aws.version}</version>
                 <scope>runtime</scope>
-            </dependency>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>glue</artifactId>
-                <version>${aws.version}</version>
             </dependency>
 
             <!-- Protobuf -->
@@ -675,7 +677,27 @@
                                             <exclude>META-INF/*.DSA</exclude>
                                             <exclude>META-INF/*.RSA</exclude>
                                             <exclude>**/Log4j2Plugins.dat</exclude>
+                                            <!-- RocksDB natives for platforms we do not run on. -->
+                                            <exclude>librocksdbjni-linux-ppc64le*</exclude>
+                                            <exclude>librocksdbjni-linux-s390x*</exclude>
+                                            <exclude>librocksdbjni-linux32*</exclude>
                                         </excludes>
+                                    </filter>
+                                    <!-- hadoop-aws is compiled against the bundle, so its STS endpoint and
+                                         SSL channel code links to the relocated Apache HTTP client. Take
+                                         that client, the SDK adapter bound to it and the relocated logging
+                                         and codec classes they call; every other SDK class comes from the
+                                         standalone artifact of the same version. -->
+                                    <filter>
+                                        <artifact>software.amazon.awssdk:bundle</artifact>
+                                        <includes>
+                                            <include>software/amazon/awssdk/http/apache/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/apache/http/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/apache/commons/codec/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/apache/commons/logging/**</include>
+                                            <include>software/amazon/awssdk/thirdparty/org/slf4j/**</include>
+                                            <include>META-INF/services/software.amazon.awssdk.http.SdkHttpService</include>
+                                        </includes>
                                     </filter>
                                 </filters>
                                 <shadedArtifactAttached>true</shadedArtifactAttached>
@@ -708,17 +730,17 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version> <configuration>
-                <source>${maven.compiler.source}</source>
-                <target>${maven.compiler.target}</target>
-                <annotationProcessorPaths>
-                    <path>
-                        <groupId>org.projectlombok</groupId>
-                        <artifactId>lombok</artifactId>
-                        <version>${lombok.version}</version>
-                    </path>
-                </annotationProcessorPaths>
-            </configuration>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <release>${javaVersion}</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -744,13 +766,6 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <release>${maven.compiler.target}</release>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
                 <executions>
@@ -764,6 +779,9 @@
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <trimStackTrace>false</trimStackTrace>
+                    <!-- Hudi stamps its timeline in UTC, so a JVM on any other zone reads its own
+                         commits as not yet completed. Pin the tests to UTC. -->
+                    <argLine>-Duser.timezone=UTC</argLine>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
@@ -784,7 +802,7 @@
                     <reuseForks>false</reuseForks>
                     <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
-                    <argLine>-Xmx1500m</argLine>
+                    <argLine>-Xmx1500m -Duser.timezone=UTC</argLine>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
@@ -902,6 +920,7 @@
                         <excludes>
                             <exclude>${target.dir.pattern}</exclude>
                             <exclude>release/scripts/generate_shaded_license_metadata.py</exclude>
+                            <exclude>release/scripts/validate_bundled_license_texts.py</exclude>
                             <exclude>website/node_modules/**</exclude>
                             <exclude>website/build/**</exclude>
                             <exclude>website/.docusaurus/**</exclude>
@@ -953,7 +972,8 @@
                         </excludes>
                         <licenseHeader>
                             <file>style/xml-license-header</file>
-                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component</delimiter>
+                            <!-- ^&lt;cache is the root element of .mvn/maven-build-cache-config.xml -->
+                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component|^&lt;cache</delimiter>
                             <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
                         </licenseHeader>
                     </pom>
@@ -1060,6 +1080,42 @@
             </activation>
             <build>
                 <plugins>
+                    <!--
+                      Delombok only runs here: its sole consumer is the javadoc plugin below,
+                      which reads ${delombok.output.dir} so that the generated builders, getters
+                      and equals/hashCode show up in the javadoc jar. Running it on ordinary
+                      builds costs time and forces every contributor through
+                      lombok-maven-plugin, whose last release is 1.18.20.0 (April 2021).
+                    -->
+                    <plugin>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok-maven-plugin</artifactId>
+                        <version>${lombok-maven-plugin.version}</version>
+                        <dependencies>
+                            <!-- 1.18.20.0 ships lombok 1.18.20, which cannot delombok on
+                                 JDK 21+. Override it with the lombok the build compiles
+                                 against so a release can be cut on a modern JDK. -->
+                            <dependency>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+                            <addOutputDirectory>false</addOutputDirectory>
+                            <outputDirectory>${delombok.output.dir}</outputDirectory>
+                            <encoding>UTF-8</encoding>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>delombok</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>

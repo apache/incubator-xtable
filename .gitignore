@@ -27,6 +27,7 @@ hs_err_pid*
 .java-version
 .idea
 .vscode
+.claude/
 
 # Ignore Gradle project-specific cache directory
 .gradle
@@ -50,3 +51,6 @@ spec/generated
 
 # SDKMan
 .sdkmanrc
+demo/notebook/spark-warehouse/
+demo/notebook/metastore_db/
+demo/notebook/derby.log

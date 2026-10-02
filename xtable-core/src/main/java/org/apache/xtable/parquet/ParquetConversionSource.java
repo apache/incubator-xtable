@@ -118,25 +118,28 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private Stream<InternalDataFile> getInternalDataFiles(
       Stream<LocatedFileStatus> parquetFiles, InternalSchema schema) {
     return parquetFiles.map(
-        file ->
-            InternalDataFile.builder()
-                .physicalPath(file.getPath().toString())
-                .fileFormat(FileFormat.APACHE_PARQUET)
-                .fileSizeBytes(file.getLen())
-                .partitionValues(
-                    partitionValueExtractor.extractPartitionValues(
-                        partitionSpecExtractor.spec(schema),
-                        HudiPathUtils.getPartitionPath(new Path(basePath), file.getPath())))
-                .lastModified(file.getModificationTime())
-                .columnStats(
-                    parquetStatsExtractor.getStatsForFile(
-                        parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                        schema))
-                .build());
+        file -> {
+          ParquetMetadata parquetMetadata =
+              parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath());
+          return InternalDataFile.builder()
+              .physicalPath(file.getPath().toString())
+              .fileFormat(FileFormat.APACHE_PARQUET)
+              .fileSizeBytes(file.getLen())
+              .recordCount(parquetMetadataExtractor.getRowCount(parquetMetadata))
+              .partitionValues(
+                  partitionValueExtractor.extractPartitionValues(
+                      partitionSpecExtractor.spec(schema),
+                      HudiPathUtils.getPartitionPath(new Path(basePath), file.getPath())))
+              .lastModified(file.getModificationTime())
+              .columnStats(parquetStatsExtractor.getStatsForFile(parquetMetadata, schema))
+              .build();
+        });
   }
 
   public InternalDataFile createInternalDataFileFromParquetFile(
       FileStatus parquetFile, InternalSchema schema) {
+    ParquetMetadata parquetMetadata =
+        parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath());
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
@@ -145,10 +148,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
-        .columnStats(
-            parquetStatsExtractor.getStatsForFile(
-                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath()),
-                schema))
+        .recordCount(parquetMetadataExtractor.getRowCount(parquetMetadata))
+        .columnStats(parquetStatsExtractor.getStatsForFile(parquetMetadata, schema))
         .build();
   }
 

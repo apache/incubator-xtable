@@ -22,6 +22,17 @@
 The `rest-service-open-api.yaml` defines the api contract for running table format conversion using XTable's REST service. 
 See XTable's `spec` module for more details: https://github.com/apache/incubator-xtable/tree/main/spec
 
+## Deployment scope and security
+
+The service is a developer utility for local testing and for trusted internal
+deployments. It is not hardened for multi-tenant or internet-facing use, and it is
+not described in the user documentation at https://xtable.apache.org.
+
+It ships with no authentication and no authorization. Any client that can reach the
+port can start a conversion against any storage path the service credentials can read
+or write. Run it on loopback, or only inside a network you control, and put your own
+authentication in front of it if you expose it at all.
+
 ## How to run the service locally
 
 #### Before running the service, ensure that you have the required credentials set in your enviroment needed to read and write to cloud storage.

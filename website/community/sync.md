@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Community
 
 We have set up the following regular syncs for community users and developers to meet, interact and exchange ideas. Meetings will be recorded and made available after every sync.

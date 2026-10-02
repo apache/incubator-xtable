@@ -22,11 +22,22 @@
     <parent>
         <groupId>org.apache.xtable</groupId>
         <artifactId>xtable</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.5.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>xtable-utilities_${scala.binary.version}</artifactId>
     <name>XTable Project Utilities</name>
+    <properties>
+        <!--
+          This module produces a large bundled jar (~1 GB). Keep it out of the
+          maven-build-cache entirely: the property disables both restore and save
+          for this project, so the artifact never enters the cache directory that
+          CI persists between runs. Shading is cheap relative to the test suites
+          the cache is there to skip, so there is nothing worth caching here.
+          See .mvn/maven-build-cache-config.xml.
+        -->
+        <maven.build.cache.enabled>false</maven.build.cache.enabled>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -153,6 +164,26 @@
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-common</artifactId>
         </dependency>
+        <!--
+          Hudi 1.x split the former hudi-common into hudi-common + hudi-io +
+          hudi-hadoop-common. xtable-core compiles against these with the Hudi
+          Spark bundle in provided scope (a real Spark cluster supplies them),
+          but the standalone utilities jar has no such runtime, so it must bundle
+          hudi-hadoop-common itself (hudi-io comes in transitively at runtime).
+          Without this, RunSync fails with NoClassDefFoundError:
+          org/apache/hudi/hadoop/fs/HadoopFSUtils.
+        -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hadoop-common</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+        <!-- Required for MultiPartKeysValueExtractor in standalone Glue catalog sync. -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hive-sync</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
@@ -190,7 +221,33 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-aws</artifactId>
+            <exclusions>
+                <!-- The all-services SDK jar. We name the artifacts S3A uses instead. -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>bundle</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
+        <!-- What hadoop-aws S3A needs. The all-services `bundle` artifact was 63% of the shaded jar. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sts</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3-transfer-manager</artifactId>
+        </dependency>
+        <!-- Only for the relocated Apache HTTP client hadoop-aws links against; the shade
+             filter in the root pom drops everything else in it. -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>bundle</artifactId>
@@ -220,27 +277,21 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.xtable</groupId>
-            <artifactId>xtable-core_${scala.binary.version}</artifactId>
-            <version>${project.version}</version>
-            <classifier>tests</classifier>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-java-client</artifactId>
-            <scope>test</scope>
-        </dependency>
+        <!--
+          Hudi's ObjectSizeCalculator loads org.openjdk.jol at runtime (not only in tests),
+          so the bundled utilities jar must ship it. The parent dependencyManagement pins
+          jol-core to test scope, so override to runtime here and add it to the shaded
+          artifactSet below. See https://github.com/apache/incubator-xtable/issues/736.
+        -->
         <dependency>
             <groupId>org.openjdk.jol</groupId>
             <artifactId>jol-core</artifactId>
-            <scope>test</scope>
+            <version>${jol.core.version}</version>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 
@@ -267,6 +318,7 @@
                             <resource>META-INF/NOTICE</resource>
                             <file>target/classes/META-INF/NOTICE-bundled</file>
                         </transformer>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                             <mainClass>org.apache.xtable.utilities.RunSync</mainClass>
                         </transformer>
@@ -414,6 +466,7 @@
                             <include>io.grpc:grpc-services</include>
                             <include>io.grpc:grpc-stub</include>
                             <include>io.grpc:grpc-util</include>
+                            <!-- google-c2p delegates to xds on Google Cloud. -->
                             <include>io.grpc:grpc-xds</include>
                             <include>io.javalin:javalin</include>
                             <include>io.netty:netty</include>
@@ -574,6 +627,9 @@
                             <include>org.apache.httpcomponents.core5:httpcore5-h2</include>
                             <include>org.apache.hudi:hudi-client-common</include>
                             <include>org.apache.hudi:hudi-common</include>
+                            <include>org.apache.hudi:hudi-hadoop-common</include>
+                            <include>org.apache.hudi:hudi-hive-sync</include>
+                            <include>org.apache.hudi:hudi-io</include>
                             <include>org.apache.hudi:hudi-java-client</include>
                             <include>org.apache.hudi:hudi-timeline-service</include>
                             <include>org.apache.iceberg:iceberg-api</include>
@@ -636,7 +692,6 @@
                             <include>org.bouncycastle:bcprov-jdk18on</include>
                             <include>org.checkerframework:checker-compat-qual</include>
                             <include>org.checkerframework:checker-qual</include>
-                            <include>org.codehaus.groovy:groovy-all</include>
                             <include>org.codehaus.jackson:jackson-core-asl</include>
                             <include>org.codehaus.jackson:jackson-jaxrs</include>
                             <include>org.codehaus.jackson:jackson-mapper-asl</include>
@@ -696,6 +751,7 @@
                             <include>org.json4s:json4s-scalap_${scala.binary.version}</include>
                             <include>org.lz4:lz4-java</include>
                             <include>org.objenesis:objenesis</include>
+                            <include>org.openjdk.jol:jol-core</include>
                             <include>org.reactivestreams:reactive-streams</include>
                             <include>org.roaringbitmap:RoaringBitmap</include>
                             <include>org.roaringbitmap:shims</include>
@@ -707,6 +763,7 @@
                             <include>org.scala-lang.modules:scala-xml_${scala.binary.version}</include>
                             <include>org.slf4j:jcl-over-slf4j</include>
                             <include>org.slf4j:jul-to-slf4j</include>
+                            <include>org.slf4j:slf4j-api</include>
                             <include>org.slf4j:slf4j-reload4j</include>
                             <include>org.threeten:threeten-extra</include>
                             <include>org.threeten:threetenbp</include>
@@ -716,11 +773,18 @@
                             <include>org.yaml:snakeyaml</include>
                             <include>oro:oro</include>
                             <include>software.amazon.awssdk:annotations</include>
-                            <include>software.amazon.awssdk:apache-client</include>
+                            <include>software.amazon.awssdk:bundle</include>
                             <include>software.amazon.awssdk:auth</include>
+                            <include>software.amazon.awssdk:arns</include>
+                            <include>software.amazon.awssdk:aws-query-protocol</include>
+                            <include>software.amazon.awssdk:aws-xml-protocol</include>
+                            <include>software.amazon.awssdk:crt-core</include>
                             <include>software.amazon.awssdk:aws-core</include>
                             <include>software.amazon.awssdk:aws-json-protocol</include>
-                            <include>software.amazon.awssdk:bundle</include>
+                            <include>software.amazon.awssdk:s3</include>
+                            <include>software.amazon.awssdk:sts</include>
+                            <include>software.amazon.awssdk:netty-nio-client</include>
+                            <include>software.amazon.awssdk:s3-transfer-manager</include>
                             <include>software.amazon.awssdk:checksums</include>
                             <include>software.amazon.awssdk:checksums-spi</include>
                             <include>software.amazon.awssdk:endpoints-spi</include>
@@ -733,7 +797,6 @@
                             <include>software.amazon.awssdk:identity-spi</include>
                             <include>software.amazon.awssdk:json-utils</include>
                             <include>software.amazon.awssdk:metrics-spi</include>
-                            <include>software.amazon.awssdk:netty-nio-client</include>
                             <include>software.amazon.awssdk:profiles</include>
                             <include>software.amazon.awssdk:protocol-core</include>
                             <include>software.amazon.awssdk:regions</include>

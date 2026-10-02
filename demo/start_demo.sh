@@ -15,17 +15,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-## Create the require jars for the demo and copy them into a directory we'll mount in our notebook container
+## Start the demo containers in the background. Builds the XTable jars first
+## (via build_demo.sh) if they are not present. Use stop_demo.sh to stop the
+## demo when you are done.
+
+set -e
 
 CURRENT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
-XTABLE_HOME="$( cd "$(dirname "$CURRENT_DIR")" ; pwd -P )"
-cd $XTABLE_HOME
 
-./mvnw install -am -pl xtable-core -DskipTests -T 2
-mkdir -p demo/jars
-cp xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-0.2.0-SNAPSHOT.jar demo/jars
-cp xtable-api/target/xtable-api-0.2.0-SNAPSHOT.jar demo/jars
-cp xtable-core/target/xtable-core_2.12-0.2.0-SNAPSHOT.jar demo/jars
+## Validate the demo jars are built; build them if anything is missing.
+if [ ! -f "${CURRENT_DIR}/jars/versions.properties" ] || ! ls "${CURRENT_DIR}"/jars/xtable-core_*.jar > /dev/null 2>&1; then
+  echo "XTable demo jars not found. Building the XTable jars first..."
+  "${CURRENT_DIR}/build_demo.sh"
+fi
 
-cd demo
-docker-compose up
+if [ ! -f "${CURRENT_DIR}/jars/versions.properties" ] || ! ls "${CURRENT_DIR}"/jars/xtable-core_*.jar > /dev/null 2>&1; then
+  echo "ERROR: the XTable build did not produce the expected demo jars under demo/jars." >&2
+  echo "Fix the build (see output above) and re-run this script." >&2
+  exit 1
+fi
+
+cd "${CURRENT_DIR}"
+## The first start builds the notebook image (JDK 11 and all notebook
+## dependencies are baked in); later starts reuse the cached image.
+docker-compose up -d --build
+
+echo "Waiting for the Jupyter server to start..."
+JUPYTER_READY=""
+for _ in $(seq 1 150); do
+  if docker logs jupyter 2>&1 | grep -qE "Jupyter Server .* is running at"; then
+    JUPYTER_READY="yes"
+    break
+  fi
+  sleep 2
+done
+
+if [ -n "${JUPYTER_READY}" ]; then
+  echo ""
+  echo "Jupyter is running at: http://localhost:8888/lab"
+  echo "The demo notebooks are under the work/ directory."
+else
+  echo "Jupyter did not report as running yet; check its status with: docker logs jupyter"
+fi
+echo "Run ./stop_demo.sh when you are done (add --reset-data to restore the seed datasets)."
