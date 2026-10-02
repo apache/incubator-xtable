@@ -138,18 +138,26 @@ Hudi changes before XTable can provide this lookup contract.
 
 ### Execution and configuration
 
-`HudiExecutionEngineProvider` will select Java for file-level indexing or Spark for distributed index builds. Java remains
-the default, and record-level or secondary indexing requires Spark. The Hudi target will reject an unsupported engine
-configuration before sync starts.
+`HudiExecutionEngineProvider` selects the Java or the Spark engine for the Hudi target. Java remains the default and can
+build every index on small tables. Spark distributes record-level and secondary index builds, reusing the active Spark
+session. The Hudi target rejects an unknown engine before sync starts.
 
-The following proposed properties belong to the Hudi `TargetTable.additionalProperties` map:
+The following properties belong to the Hudi `TargetTable.additionalProperties` map:
 
 | Property | Default | Meaning |
 |----------|---------|---------|
-| `xtable.hudi.target.execution_engine` | `java` | Execution engine (`java` or `spark`) |
-| `xtable.hudi.target.metadata.record_index.enabled` | `false` | Enable the record-level index |
-| `xtable.hudi.target.metadata.secondary_index.columns` | unset | Columns with separate secondary indexes; also enables RLI |
-| `xtable.hudi.target.metadata.secondary_index.parallelism` | Hudi default | Parallelism for secondary index builds and updates |
+| `xtable.hudi.target.execution.engine` | `java` | Execution engine (`java` or `spark`) |
+| `xtable.hudi.target.table_version` | `6` | Hudi table version; record-level and secondary indexes require `9` |
+| `xtable.hudi.target.secondary.index.column` | unset | Column with a secondary index; also enables the global record-level index |
+| `xtable.hudi.target.metadata.record.index.min.filegroup.count` | Hudi default | Lower bound of record-level index file groups, set together with the upper bound |
+| `xtable.hudi.target.metadata.record.index.max.filegroup.count` | Hudi default | Upper bound of record-level index file groups |
+| `xtable.hudi.target.metadata.index.secondary.parallelism` | Hudi default | Parallelism for secondary index records |
+
+A sync names one secondary index column, and a table can have secondary indexes on several columns. An incremental sync
+makes no Hudi commit when the source has no new snapshot, so it cannot build the index of a column that is added after
+the first sync, or added again after a drop. XTable builds such an index with Hudi's indexer (`HoodieSparkIndexClient`)
+from the files the table already has. Later syncs keep every existing secondary index current, whichever column they
+name.
 
 Existing column-statistics behavior stays unchanged. Partition statistics for external files require additional Hudi
 support; table version 9 alone does not enable them [^9].
@@ -179,35 +187,96 @@ flowchart TB
   SCAN --> EXEC
 ```
 
-Each `Index` instance will bind to one table and one completed Hudi target instant. The Spark lookup interface will use
-DataFrames, represented as `Dataset<Row>` in Java:
+The index API lives in `xtable-core` (`org.apache.xtable.index`) and uses DataFrames, represented as `Dataset<Row>` in
+Java. `HudiBackedIcebergSecondaryIndex` implements it for an Iceberg `Table`:
 
 ```java
-public interface Index {
+public interface Index<T> {
   boolean doesIndexExist(String columnName);
-  Optional<TableSyncMetadata> lastSynced();
-  Dataset<Row> lookup(Dataset<Row> keys, String columnName);
+  void syncIndex(T table, String columnName);
+  void dropIndex(T table, String columnName);
+  Optional<String> getLastSyncedSourceIdentifier();
+  Dataset<Row> lookup(T table, Dataset<Row> keys, String columnName);
 }
 ```
 
-The input DataFrame contains one `key` column with the indexed column's type. The output contains `key` with that same
-type, `file` as an absolute path string, and `position` as a long. Each distinct input key returns all matching physical
-locations; a missing key returns no rows. Lookup supports single-column equality, and null keys return no matches.
+- `syncIndex` syncs the Hudi target with the current source snapshot and builds the index of the column if it does not
+  exist yet. It fails when the sync fails.
+- `dropIndex` drops the secondary index of one column and keeps the indexes of other columns and the record-level index.
+- `getLastSyncedSourceIdentifier` returns the source commit, for Iceberg the snapshot id, that the last completed Hudi
+  target commit represents.
+- `lookup` takes a DataFrame with a column named after the indexed column. The index stores values as strings, so lookup
+  casts the keys to strings and drops nulls. The output has the key column as a string, `_file` as an absolute path
+  string, `_pos` as a long, and `_partition` as a struct in the table's partition type (null for unpartitioned tables).
+  The names match Iceberg's metadata columns, so results join directly with Iceberg reads. Each key returns all of its
+  locations; a missing key returns no rows.
+
+`_file` is built from the table's data path and the path stored in the record key, so its scheme can differ from the
+path in the source metadata, for example `file:/` and `/`. Callers compare paths without the scheme and authority.
 
 The query engine joins locations back to the source rows and retains unmatched rows for merge inserts. It applies the
 source format's delete rules and remaining query predicates. Unsupported predicates use the normal query plan.
 
-The Spark API and execution provider belong in the proposed `xtable-spark-runtime` module [^10]. Shared index metadata
-belongs in the core modules. Expression and vector lookups require separate contracts beyond this equality API.
+Expression and vector lookups require separate contracts beyond this equality API.
+
+### Spark SQL
+
+The `xtable-spark-extensions` module gives the index a SQL interface in Spark. It follows Iceberg's layout: the module
+holds the code, as `iceberg-spark-extensions` does, and a runtime jar such as the proposed `xtable-spark-runtime` [^10]
+can bundle it, as `iceberg-spark-runtime` does. Users add the extensions after Iceberg's:
+
+```
+spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.apache.xtable.spark.extensions.XTableSparkSessionExtensions
+```
+
+```sql
+CREATE INDEX [IF NOT EXISTS] email_idx ON cat.db.customer USING xtable (email) [OPTIONS (...)];
+REFRESH INDEX email_idx ON cat.db.customer;
+DROP INDEX [IF EXISTS] email_idx ON cat.db.customer;
+
+-- reads only the files that hold these keys
+SELECT * FROM cat.db.customer WHERE email IN ('a@example.com', 'b@example.com');
+```
+
+Spark parses `CREATE INDEX` and `DROP INDEX`, but Iceberg's `SparkTable` does not implement Spark's `SupportsIndex`. A
+planner strategy runs both commands for `USING xtable` on Iceberg tables and leaves other index types to Spark. A small
+parser adds `REFRESH INDEX` and passes every other statement to the parser it wraps. The index definition is kept in the
+table properties, `xtable.index.<name>.column` and `xtable.index.<name>.option.<key>`, so every session and engine can
+find it. `CREATE INDEX` writes the definition only after the build succeeds. An index covers one top-level `string`, `int`
+or `bigint` column, the types whose string form is the same in Spark and Hudi.
+
+An optimizer rule uses the index for `col = literal`, `col IN (literals)` and the `InSet` form Spark uses for long lists,
+alone or combined with other filters by `AND`. Iceberg does not prune files on a `_file` filter, so the rule cannot
+rewrite the filter. Instead it looks the keys up, keeps the files that also survive Iceberg's partition and min/max
+pruning, and stages them as the scan's task set through Iceberg's `ScanTaskSetManager` and the `scan-task-set-id` read
+option. Iceberg then reads only those files. The filter stays in the plan, so the query returns the same rows as without
+the rule. A key with no match turns the scan into an empty relation. The rule leaves the plan unchanged when:
+
+- the index is not synced to the table's current snapshot,
+- the query reads an older snapshot or a branch,
+- Iceberg's own pruning already leaves a small scan, because a lookup runs a Spark job,
+- the filter has more keys than a limit.
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `spark.xtable.index.pruning.enabled` | `true` | Use indexes for queries |
+| `spark.xtable.index.pruning.minCandidateFiles` | `32` | Use an index only if Iceberg's pruning leaves at least this many files |
+| `spark.xtable.index.pruning.minCandidateBytes` | `1073741824` | ... or at least this many bytes |
+| `spark.xtable.index.pruning.maxKeys` | `10000` | Do not use an index for filters with more keys |
+
+Staged task sets are released by a query execution listener when the query ends. Joins, subqueries, `MERGE`, `UPDATE`
+and `DELETE` do not use the index yet; they need the lookup to run on the keys of the other side before the scan, which
+is the query flow above.
 
 ### Consistency
 
 The Hudi target sync must complete file and index updates before it marks the corresponding replace commit complete.
-`lastSynced()` must describe the same completed target instant that lookup reads, including during lazy DataFrame
-execution. Failed or incomplete index builds must remain unavailable to lookup.
+`getLastSyncedSourceIdentifier()` must describe the same completed target instant that lookup reads, including during
+lazy DataFrame execution. Failed or incomplete index builds must remain unavailable to lookup.
 
 The query engine must verify that the index represents the source snapshot selected for the query. If the index is
-missing, stale or unavailable for that snapshot, the engine uses the normal query plan. This follows the snapshot
+missing, stale or unavailable for that snapshot, the engine uses the normal query plan. The Spark SQL rule compares `getLastSyncedSourceIdentifier()` with the current
+snapshot of the table while it plans the query. This follows the snapshot
 mapping model in the Iceberg proposal [^1]. Plain Parquet requires an immutable file set during indexing and query
 execution because it has no table snapshot protocol.
 
@@ -216,6 +285,8 @@ execution because it has no table snapshot protocol.
 New indexes are opt-in, and enabling an index builds it during the next sync. Existing users retain their current sync
 behavior. Record-level and secondary indexing require Spark and compatible Hudi support for external-file keys and
 index updates. XTable must validate the required Hudi version and table version before it enables these indexes.
+The Spark SQL extensions are opt-in through `spark.sql.extensions`; sessions without them, and other engines, read the
+table as before.
 
 ## Test Plan
 
@@ -223,6 +294,9 @@ index updates. XTable must validate the required Hudi version and table version 
 - **Lookup.** Compare DataFrame results with source rows, including repeated values, missing keys, nulls and typed keys.
 - **Maintenance.** Verify initial builds, incremental inserts, file removal, rewrites and source delete handling.
 - **Consistency.** Verify failure recovery, incomplete builds, stale snapshots and concurrent sync during lazy lookup.
+- **Spark SQL.** Compare every query that uses an index with the same query without it, and compare the files the
+  rule stages with the files that hold matching rows. Cover equality, `IN`, `InSet`, combined filters, missing keys,
+  time travel, the size thresholds, stale indexes, `REFRESH`, deletes, several indexes, `DROP` and re-`CREATE`.
 - **Compatibility.** Run file-level sync on a Spark-free Java classpath and record-level index tests under Spark.
 - **Performance.** Compare index-aware merges with the normal query plan using concentrated and widely distributed keys.
   Report files read, rows shuffled, build cost and query time.
