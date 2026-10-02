@@ -26,12 +26,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -60,6 +63,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 
 @Log4j2
 public class IcebergConversionTarget implements ConversionTarget {
+
   private static final String METADATA_DIR_PATH = "/metadata/";
   private IcebergSchemaExtractor schemaExtractor;
   private IcebergSchemaSync schemaSync;
@@ -75,6 +79,8 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
+  private boolean metadataOnlyCleanerEnabled;
+  private int cleanerParallelism;
   private TableSyncMetadata tableSyncMetadata;
 
   public IcebergConversionTarget() {}
@@ -117,6 +123,8 @@ public class IcebergConversionTarget implements ConversionTarget {
     this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
     this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    this.metadataOnlyCleanerEnabled = IcebergSyncConfig.canUseMetadataCleaner(targetTable);
+    this.cleanerParallelism = IcebergSyncConfig.getMetadataCleanerThreadPoolSize(targetTable);
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
@@ -288,17 +296,41 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void completeSync() {
-    transaction
-        .expireSnapshots()
-        .expireOlderThan(
-            Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
-        .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
-        .cleanExpiredFiles(true)
-        .commit();
+    boolean useMetadataOnlyCleaner = canUseMetadataOnlyCleaner();
+    ExpireSnapshots expireSnapshots =
+        transaction
+            .expireSnapshots()
+            .expireOlderThan(
+                Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
+            .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
+            // the metadata-only cleaner runs after the commit, so skip the iceberg file cleanup
+            .cleanExpiredFiles(!useMetadataOnlyCleaner);
+    List<Snapshot> removedSnapshots = expireSnapshots.apply();
+    expireSnapshots.commit();
     transaction.commitTransaction();
+    // after commit is complete, clean up the manifest files
+    if (useMetadataOnlyCleaner) {
+      cleanExpiredSnapshots(removedSnapshots);
+    }
     transaction = null;
     internalTableState = null;
     tableSyncMetadata = null;
+  }
+
+  private boolean canUseMetadataOnlyCleaner() {
+    return metadataOnlyCleanerEnabled && table.refs().size() <= 1;
+  }
+
+  private void cleanExpiredSnapshots(List<Snapshot> removedSnapshots) {
+    ExecutorService cleanExecutorService = Executors.newFixedThreadPool(cleanerParallelism);
+    try {
+      IcebergMetadataCleanupStrategy cleanupStrategy =
+          new IcebergMetadataFileCleaner(
+              transaction.table().io(), cleanExecutorService, this::safeDelete);
+      cleanupStrategy.cleanFiles(table, removedSnapshots);
+    } finally {
+      cleanExecutorService.shutdown();
+    }
   }
 
   private void safeDelete(String file) {
