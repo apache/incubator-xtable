@@ -58,4 +58,36 @@ class TestDeltaPathUtils {
   void getFullPathToFile(String tableBasePath, String dataFilePath, String expected) {
     assertEquals(expected, DeltaPathUtils.getFullPathToFile(tableBasePath, dataFilePath));
   }
+
+  private static Stream<Arguments> deltaLogPathCases() {
+    return Stream.of(
+        // files under the base path are recorded relative to it
+        Arguments.of("s3a://bucket/tab", "s3a://bucket/tab/part-0.parquet", "part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3://bucket/tab/year=2024/part-0.parquet",
+            "year=2024/part-0.parquet"),
+        Arguments.of("s3://bucket/tab", "s3a://bucket/tab/part-0.parquet", "part-0.parquet"),
+        Arguments.of("file:///tmp/tab", "file:/tmp/tab/part-0.parquet", "part-0.parquet"),
+        Arguments.of("s3a://bucket/tab", "part-0.parquet", "part-0.parquet"),
+        // files outside the base path keep their absolute path
+        Arguments.of(
+            "s3a://bucket/target/tab",
+            "s3://bucket/source/tab/data/part-0.parquet",
+            "s3://bucket/source/tab/data/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3a://other-bucket/tab/part-0.parquet",
+            "s3a://other-bucket/tab/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3a://bucket/tab2/part-0.parquet",
+            "s3a://bucket/tab2/part-0.parquet"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("deltaLogPathCases")
+  void getPathForDeltaLog(String tableBasePath, String dataFilePath, String expected) {
+    assertEquals(expected, DeltaPathUtils.getPathForDeltaLog(tableBasePath, dataFilePath));
+  }
 }

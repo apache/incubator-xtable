@@ -46,6 +46,7 @@ import io.delta.kernel.statistics.DataFileStatistics;
 import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.delta.DeltaPathUtils;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -57,7 +58,6 @@ import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
-import org.apache.xtable.paths.PathUtils;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 
 @Builder
@@ -205,9 +205,7 @@ public class DeltaKernelDataFileUpdatesExtractor {
     Row addFileRow =
         AddFile.createAddFileRow(
             physicalSchema,
-            // Delta Lake supports relative and absolute paths in theory but relative paths seem
-            // more commonly supported by query engines in our testing
-            PathUtils.getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
+            DeltaPathUtils.getPathForDeltaLog(tableBasePath, dataFile.getPhysicalPath()),
             partitionValues,
             dataFile.getFileSizeBytes(),
             dataFile.getLastModified(),
