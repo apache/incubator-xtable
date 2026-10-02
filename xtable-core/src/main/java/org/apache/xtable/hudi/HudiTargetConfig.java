@@ -23,6 +23,7 @@ import java.util.Properties;
 import lombok.Value;
 
 import org.apache.hudi.common.table.HoodieTableVersion;
+import org.apache.hudi.exception.HoodieException;
 
 /** Configuration of the Hudi conversion target. */
 @Value
@@ -55,7 +56,7 @@ public class HudiTargetConfig {
   private static HoodieTableVersion parseTableVersion(String configured) {
     try {
       return HoodieTableVersion.fromVersionCode(Integer.parseInt(configured));
-    } catch (RuntimeException e) {
+    } catch (NumberFormatException | HoodieException e) {
       // A non-numeric value, or a version code that Hudi does not know.
       throw unsupportedTableVersion(configured, e);
     }

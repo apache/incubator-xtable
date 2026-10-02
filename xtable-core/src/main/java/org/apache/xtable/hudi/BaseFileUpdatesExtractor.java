@@ -61,6 +61,8 @@ import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 import org.apache.hudi.stats.ValueMetadata;
 import org.apache.hudi.stats.XTableValueMetadata;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalType;
@@ -264,10 +266,16 @@ public class BaseFileUpdatesExtractor {
         HudiPathUtils.getPartitionPath(tableBasePath, new CachingPath(file.getPhysicalPath()));
     return file.getPartitionSubdirectory()
         .map(
-            prefix ->
-                prefix.equals(partitionPath)
-                    ? ""
-                    : partitionPath.substring(0, partitionPath.length() - prefix.length() - 1))
+            prefix -> {
+              Preconditions.checkArgument(
+                  partitionPath.endsWith(prefix),
+                  "File %s is not under its partition subdirectory %s",
+                  file.getPhysicalPath(),
+                  prefix);
+              return prefix.equals(partitionPath)
+                  ? ""
+                  : partitionPath.substring(0, partitionPath.length() - prefix.length() - 1);
+            })
         .orElse(partitionPath);
   }
 
@@ -297,11 +305,10 @@ public class BaseFileUpdatesExtractor {
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
     Optional<String> partitionSubdirectory = file.getPartitionSubdirectory();
-    // For files under a partition subdirectory encode it as the file-group prefix in the marker and
-    // keep the
-    // file name
-    // (not the bucket-relative path) as the marked name; otherwise fall back to the plain marker on
-    // the full relative path. In both cases the directory portion is preserved as-is.
+    // For files under a partition subdirectory, encode it as the file-group prefix in the marker
+    // and keep the file name (not the bucket-relative path) as the marked name. Otherwise, fall
+    // back to the plain marker on the full relative path. In both cases the directory portion is
+    // preserved as-is.
     String markedPath =
         partitionSubdirectory
             .map(

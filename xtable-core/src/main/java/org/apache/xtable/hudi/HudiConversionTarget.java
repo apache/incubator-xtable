@@ -105,8 +105,8 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 @Log4j2
 public class HudiConversionTarget implements ConversionTarget {
   // Commit extra-metadata key that marks a table whose file groups use the file-group prefix
-  // layout,
-  // where a file such as Paimon's <partition>/bucket-N/<file> is registered under <partition>.
+  // layout, where a file such as Paimon's <partition>/bucket-N/<file> is registered under
+  // <partition>.
   static final String FILE_GROUP_PREFIX_LAYOUT = "XTABLE_HUDI_FILE_GROUP_PREFIX_LAYOUT";
   private BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private AvroSchemaConverter avroSchemaConverter;
