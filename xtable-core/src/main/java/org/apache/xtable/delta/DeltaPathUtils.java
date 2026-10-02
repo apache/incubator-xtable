@@ -18,10 +18,15 @@
  
 package org.apache.xtable.delta;
 
+import java.net.URI;
+import java.util.Objects;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.fs.Path;
+
+import org.apache.xtable.paths.PathUtils;
 
 /**
  * Shared path resolution for Delta log actions. Used by both Delta Standalone and Delta Kernel
@@ -49,6 +54,35 @@ public class DeltaPathUtils {
     return tableBasePath.endsWith(Path.SEPARATOR)
         ? tableBasePath + dataFilePath
         : tableBasePath + Path.SEPARATOR + dataFilePath;
+  }
+
+  /**
+   * Returns the path to record in an AddFile or RemoveFile action for a data file.
+   *
+   * <p>A file under the table base path is recorded relative to it, since relative paths seem more
+   * commonly supported by query engines. A file outside the base path, for example one written to a
+   * separate data location of an Iceberg source, is recorded with its absolute path, since a
+   * relative path cannot point to it.
+   *
+   * @param tableBasePath the table base path
+   * @param dataFilePath the path to the data file, relative or absolute
+   * @return the path to record in the Delta log
+   */
+  public static String getPathForDeltaLog(String tableBasePath, String dataFilePath) {
+    return isUnderBasePath(tableBasePath, dataFilePath)
+        ? PathUtils.getRelativePath(dataFilePath, tableBasePath)
+        : dataFilePath;
+  }
+
+  private static boolean isUnderBasePath(String tableBasePath, String dataFilePath) {
+    URI file = new Path(dataFilePath).toUri();
+    if (file.getScheme() == null) {
+      return true;
+    }
+    // compare without the scheme to handle differences like s3 vs s3a
+    URI base = new Path(tableBasePath).toUri();
+    return Objects.equals(base.getAuthority(), file.getAuthority())
+        && file.getPath().startsWith(base.getPath() + Path.SEPARATOR);
   }
 
   private static boolean isAbsolutePath(String dataFilePath) {
