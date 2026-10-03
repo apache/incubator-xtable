@@ -175,6 +175,9 @@ public class ITDeltaLogTruncationSafetyCheck {
   //    that version's backing file is gone.
   //  - Standalone does not throw; it silently narrows the backlog to only the commits at or
   //    after the checkpoint, silently dropping the earlier commits it had just approved reading.
+  //    If https://github.com/apache/incubator-xtable/issues/779 is ever fixed on the Standalone
+  //    path, this assertion should start failing because commitsToProcess becomes empty (or the
+  //    read starts throwing) rather than narrowed -- that's the bug going away, not a regression.
   @Test
   public void testSafetyCheckRaceWithConcurrentCleanup_Standalone() throws Exception {
     RaceOutcome outcome =
@@ -190,6 +193,13 @@ public class ITDeltaLogTruncationSafetyCheck {
             + " now throws, Standalone's behavior has changed and this test needs updating: "
             + outcome.getThrown());
     assertNotNull(outcome.getCommitsToProcess());
+    // allMatch alone would pass vacuously on an empty backlog, which would hide Standalone
+    // silently dropping every commit instead of just the pre-checkpoint ones -- assert non-empty
+    // too so that regression fails loudly instead of passing by vacuous truth.
+    assertFalse(
+        outcome.getCommitsToProcess().isEmpty(),
+        "Expected Standalone's backlog to still contain the post-checkpoint commits, not be"
+            + " empty");
     assertTrue(
         outcome.getCommitsToProcess().stream().allMatch(c -> c > outcome.getCheckpointVersion()),
         "Expected Standalone to silently drop every commit at or before the checkpoint version ("
