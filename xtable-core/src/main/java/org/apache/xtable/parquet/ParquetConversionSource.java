@@ -19,9 +19,6 @@
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
@@ -252,13 +249,12 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   private Stream<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
     try {
-      FileSystem fs = FileSystem.get(hadoopConf);
-      URI uriBasePath = new URI(basePath);
-      String parentPath = Paths.get(uriBasePath).toString();
-      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
+      Path path = new Path(basePath);
+      FileSystem fs = path.getFileSystem(hadoopConf);
+      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(path, true);
       return RemoteIterators.toList(iterator).stream()
           .filter(file -> file.getPath().getName().endsWith("parquet"));
-    } catch (IOException | URISyntaxException e) {
+    } catch (IOException e) {
       throw new ReadException("Unable to read files from file system", e);
     }
   }
