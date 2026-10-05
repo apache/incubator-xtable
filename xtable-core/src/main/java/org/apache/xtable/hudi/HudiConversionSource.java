@@ -23,7 +23,6 @@ import static org.apache.hudi.common.table.timeline.InstantComparison.LESSER_THA
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -417,10 +416,12 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
       @NonNull List<T> list2,
       Function<T, K> keyExtractor,
       Comparator<T> ordering) {
-    Map<K, T> dedupedByKey = new LinkedHashMap<>();
-    Stream.concat(list1.stream(), list2.stream())
-        .forEach(element -> dedupedByKey.putIfAbsent(keyExtractor.apply(element), element));
-    return dedupedByKey.values().stream().sorted(ordering).collect(Collectors.toList());
+    return Stream.concat(list1.stream(), list2.stream())
+        .collect(Collectors.toMap(keyExtractor, Function.identity(), (first, second) -> first))
+        .values()
+        .stream()
+        .sorted(ordering)
+        .collect(Collectors.toList());
   }
 
   private Comparator<HoodieInstant> instantOrdering() {

@@ -319,10 +319,9 @@ public class HudiConversionTarget implements ConversionTarget {
     if (!fileGroupPrefixLayout && hasPartitionSubdirectory(internalFilesDiff)) {
       throw new NotSupportedException(
           String.format(
-              "Hudi target table at %s was written from a Paimon source by an XTable version earlier"
-                  + " than 0.5.0. That version registered the files under <partition>/bucket-N"
-                  + " partitions, and an incremental sync cannot update this layout. Run one sync"
-                  + " with syncMode FULL, and incremental sync then resumes.",
+              "Hudi target table at %s registered files that have a partition subdirectory as"
+                  + " separate partitions, and an incremental sync cannot update this layout. Run"
+                  + " one sync with syncMode FULL, and incremental sync then resumes.",
               tableDataPath));
     }
     HoodieIndexVersion indexVersion =
@@ -343,9 +342,9 @@ public class HudiConversionTarget implements ConversionTarget {
   }
 
   /**
-   * XTable 0.4.0 registered Paimon files under {@code <partition>/bucket-N} partitions and did not
-   * write {@link #FILE_GROUP_PREFIX_LAYOUT}. A table without completed commits has no file groups,
-   * so it uses the new layout.
+   * A target written without {@link #FILE_GROUP_PREFIX_LAYOUT} registered files that have a
+   * partition subdirectory under {@code <partition>/<subdirectory>} partitions. A table without
+   * completed commits has no file groups, so it uses the new layout.
    */
   private static boolean lastCommitHasFileGroupPrefixLayout(HoodieTableMetaClient client) {
     return client
