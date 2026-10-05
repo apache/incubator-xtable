@@ -61,6 +61,8 @@ import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 import org.apache.hudi.stats.ValueMetadata;
 import org.apache.hudi.stats.XTableValueMetadata;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalType;
@@ -231,10 +233,9 @@ public class BaseFileUpdatesExtractor {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         internalFilesDiff.dataFilesRemoved().stream()
-            .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
-                    path -> HudiPathUtils.getPartitionPath(tableBasePath, path),
+                    file -> getHudiPartitionPath(tableBasePath, file),
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
@@ -244,13 +245,38 @@ public class BaseFileUpdatesExtractor {
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 
-  private String getFileId(Path filePath) {
-    String fileName = filePath.getName();
+  private String getFileId(InternalDataFile file) {
+    String fileName = new CachingPath(file.getPhysicalPath()).getName();
     // if file was created by Hudi use original fileId, otherwise use the file name as IDs
     if (isFileCreatedByHudiWriter(fileName)) {
       return FSUtils.getFileId(fileName);
     }
-    return fileName;
+    // Files under a partition subdirectory keep it as part of the fileId so the subdirectory can be
+    // recovered when Hudi resolves the physical path of the externally created file.
+    return file.getPartitionSubdirectory().map(prefix -> prefix + "/" + fileName).orElse(fileName);
+  }
+
+  /**
+   * Resolves the Hudi partition path for a file. A partition subdirectory (e.g. Paimon's {@code
+   * bucket-N}) is a file group within the partition (see Hudi PR #17788), so it is stripped from
+   * the partition path.
+   */
+  private String getHudiPartitionPath(Path tableBasePath, InternalDataFile file) {
+    String partitionPath =
+        HudiPathUtils.getPartitionPath(tableBasePath, new CachingPath(file.getPhysicalPath()));
+    return file.getPartitionSubdirectory()
+        .map(
+            prefix -> {
+              Preconditions.checkArgument(
+                  partitionPath.endsWith(prefix),
+                  "File %s is not under its partition subdirectory %s",
+                  file.getPhysicalPath(),
+                  prefix);
+              return prefix.equals(partitionPath)
+                  ? ""
+                  : partitionPath.substring(0, partitionPath.length() - prefix.length() - 1);
+            })
+        .orElse(partitionPath);
   }
 
   /**
@@ -273,17 +299,32 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
-        partitionPathOptional.orElseGet(() -> HudiPathUtils.getPartitionPath(tableBasePath, path));
-    String fileId = getFileId(path);
+        partitionPathOptional.orElseGet(() -> getHudiPartitionPath(tableBasePath, file));
+    String fileId = getFileId(file);
     String filePath =
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
+    Optional<String> partitionSubdirectory = file.getPartitionSubdirectory();
+    // For files under a partition subdirectory, encode it as the file-group prefix in the marker
+    // and keep the file name (not the bucket-relative path) as the marked name. Otherwise, fall
+    // back to the plain marker on the full relative path. In both cases the directory portion is
+    // preserved as-is.
+    String markedPath =
+        partitionSubdirectory
+            .map(
+                prefix ->
+                    filePath.substring(0, filePath.length() - fileName.length())
+                        + ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                            fileName, commitTime, prefix))
+            .orElseGet(
+                () ->
+                    ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                        filePath, commitTime));
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(partitionPath);
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
     writeStat.setFileId(fileId);
-    writeStat.setPath(
-        ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
+    writeStat.setPath(markedPath);
     writeStat.setPartitionPath(partitionPath);
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
@@ -339,7 +380,6 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
-    return HudiPathUtils.getPartitionPath(
-        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
+    return getHudiPartitionPath(tableBasePath, files.get(0));
   }
 }

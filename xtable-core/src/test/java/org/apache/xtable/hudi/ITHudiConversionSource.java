@@ -21,7 +21,9 @@ package org.apache.xtable.hudi;
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -54,14 +56,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.xtable.GenericTable;
@@ -230,11 +235,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void insertAndUpsertData(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = GenericTable.getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -284,14 +291,107 @@ public class ITHudiConversionSource {
     }
   }
 
+  /**
+   * On table version 9 (timeline layout V2) a commit becomes visible at its completion time. This
+   * test creates a commit whose requested (instant) time is older than a later commit but whose
+   * completion is newer (out-of-order completion) and verifies the incremental backlog still
+   * surfaces it. With the legacy requested-time selection the straggler would be skipped because
+   * its requested time precedes the checkpoint.
+   */
   @Test
-  public void testOnlyUpsertsAfterInserts() {
+  public void testIncrementalSyncWithOutOfOrderCompletionOnTableVersionNine() {
+    String tableName = GenericTable.getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, HoodieTableVersion.NINE)) {
+      // Baseline commit that the incremental sync resumes from.
+      String baseInstant = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), baseInstant, true);
+
+      // "early" is requested first (smaller instant time) but completed last; "late" is requested
+      // second but completed first -> completion order is the reverse of requested order.
+      String earlyRequestedInstant = table.startCommit();
+      List<WriteStatus> earlyStatuses =
+          table.bulkInsertWithoutCommit(table.generateRecords(20), earlyRequestedInstant);
+      String lateRequestedInstant = table.startCommit();
+      List<WriteStatus> lateStatuses =
+          table.bulkInsertWithoutCommit(table.generateRecords(20), lateRequestedInstant);
+      table.commitInstant(lateRequestedInstant, lateStatuses);
+      table.commitInstant(earlyRequestedInstant, earlyStatuses);
+
+      HudiConversionSource hudiClient = getHudiSourceClient(CONFIGURATION, table.getBasePath(), "");
+
+      // Resume from the checkpoint a sync of the later-requested commit writes, which is its
+      // completion time on table version 9. Under requested-time selection the earlier-requested
+      // straggler (earlyRequestedInstant < lateRequestedInstant) would be dropped; completion-time
+      // selection must still return it.
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(getCompletionInstant(table.getMetaClient(), lateRequestedInstant))
+              .build();
+      CommitsBacklog<HoodieInstant> backlog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      List<String> backlogInstants =
+          backlog.getCommitsToProcess().stream()
+              .map(HoodieInstant::requestedTime)
+              .collect(Collectors.toList());
+
+      assertEquals(
+          Collections.singletonList(earlyRequestedInstant),
+          backlogInstants,
+          "Out-of-order completed commit must be included in the incremental backlog");
+
+      // The current snapshot must reflect the most-recently-completed commit (the straggler), and
+      // its commit time is the straggler's completion time.
+      InternalSnapshot snapshot = hudiClient.getCurrentSnapshot();
+      assertEquals(
+          getCompletionInstant(table.getMetaClient(), earlyRequestedInstant),
+          snapshot.getTable().getLatestCommitTime());
+    }
+  }
+
+  /**
+   * Sanity check that ordinary in-order incremental sync on table version 9 returns every commit in
+   * completion-time order.
+   */
+  @Test
+  public void testIncrementalSyncOrderingOnTableVersionNine() {
+    String tableName = GenericTable.getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, HoodieTableVersion.NINE)) {
+      String baseInstant = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), baseInstant, true);
+      String second = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), second, true);
+      String third = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), third, true);
+
+      HudiConversionSource hudiClient = getHudiSourceClient(CONFIGURATION, table.getBasePath(), "");
+      CommitsBacklog<HoodieInstant> backlog =
+          hudiClient.getCommitsBacklog(
+              InstantsForIncrementalSync.builder()
+                  .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(baseInstant))
+                  .build());
+      assertIterableEquals(
+          Arrays.asList(second, third),
+          backlog.getCommitsToProcess().stream()
+              .map(HoodieInstant::requestedTime)
+              .collect(Collectors.toList()));
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  public void testOnlyUpsertsAfterInserts(HoodieTableVersion tableVersion) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -332,14 +432,17 @@ public class ITHudiConversionSource {
     }
   }
 
-  @Test
-  public void testForIncrementalSyncSafetyCheck() {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  public void testForIncrementalSyncSafetyCheck(HoodieTableVersion tableVersion) {
     HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
     HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
     String tableName = GenericTable.getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       String commitInstant1 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
@@ -365,6 +468,15 @@ public class ITHudiConversionSource {
       assertTrue(
           hudiClient.isIncrementalSyncSafeFrom(
               HudiInstantUtils.parseFromInstantTime(commitInstant2)));
+      if (tableVersion == HoodieTableVersion.NINE) {
+        // On table version 9 the sync checkpoint is the completion time of the synced commit.
+        assertFalse(
+            hudiClient.isIncrementalSyncSafeFrom(
+                getCompletionInstant(table.getMetaClient(), commitInstant1)));
+        assertTrue(
+            hudiClient.isIncrementalSyncSafeFrom(
+                getCompletionInstant(table.getMetaClient(), commitInstant2)));
+      }
       // commit older by an hour is not present in table, hence not safe for incremental sync.
       Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
       assertFalse(hudiClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
@@ -373,10 +485,11 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testsForDropPartition(HoodieTableType tableType) {
+  public void testsForDropPartition(HoodieTableType tableType, HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -422,10 +535,12 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testMultipleInsertOverwriteOnSamePartitions(HoodieTableType tableType) {
+  public void testMultipleInsertOverwriteOnSamePartitions(
+      HoodieTableType tableType, HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -470,10 +585,12 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testsForDeleteAllRecordsInPartition(HoodieTableType tableType) {
+  public void testsForDeleteAllRecordsInPartition(
+      HoodieTableType tableType, HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -523,11 +640,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForClustering(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -590,11 +709,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForSavepointRestore(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -657,11 +778,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForRollbacks(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
 
       String commitInstant1 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -717,9 +840,23 @@ public class ITHudiConversionSource {
     }
   }
 
+  private static Instant getCompletionInstant(
+      HoodieTableMetaClient metaClient, String requestedInstant) {
+    return metaClient.reloadActiveTimeline().filterCompletedInstants().getInstants().stream()
+        .filter(instant -> instant.requestedTime().equals(requestedInstant))
+        .map(instant -> HudiInstantUtils.parseFromInstantTime(instant.getCompletionTime()))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No completed instant " + requestedInstant));
+  }
+
   private static Stream<Arguments> testsForAllTableTypes() {
-    return Stream.of(
-        Arguments.of(HoodieTableType.COPY_ON_WRITE), Arguments.of(HoodieTableType.MERGE_ON_READ));
+    List<HoodieTableType> tableTypes =
+        Arrays.asList(HoodieTableType.COPY_ON_WRITE, HoodieTableType.MERGE_ON_READ);
+    List<HoodieTableVersion> tableVersions =
+        Arrays.asList(HoodieTableVersion.SIX, HoodieTableVersion.NINE);
+    return tableTypes.stream()
+        .flatMap(
+            tableType -> tableVersions.stream().map(version -> Arguments.of(tableType, version)));
   }
 
   private static Stream<Arguments> testsForAllTableTypesAndPartitions() {
@@ -730,10 +867,17 @@ public class ITHudiConversionSource {
         Arrays.asList(unPartitionedConfig, partitionedConfig);
     List<HoodieTableType> tableTypes =
         Arrays.asList(HoodieTableType.COPY_ON_WRITE, HoodieTableType.MERGE_ON_READ);
+    List<HoodieTableVersion> tableVersions =
+        Arrays.asList(HoodieTableVersion.SIX, HoodieTableVersion.NINE);
 
     return tableTypes.stream()
         .flatMap(
-            tableType -> partitionConfigs.stream().map(config -> Arguments.of(tableType, config)));
+            tableType ->
+                partitionConfigs.stream()
+                    .flatMap(
+                        config ->
+                            tableVersions.stream()
+                                .map(version -> Arguments.of(tableType, config, version))));
   }
 
   private HudiConversionSource getHudiSourceClient(
