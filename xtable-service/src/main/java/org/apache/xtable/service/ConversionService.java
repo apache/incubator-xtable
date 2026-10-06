@@ -50,6 +50,7 @@ import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergSchemaExtractor;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SparkSchemaExtractor;
@@ -141,8 +142,12 @@ public class ConversionService {
     Map<String, ConversionSourceProvider<?>> sourceProviders = new HashMap<>();
     ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
         new HudiConversionSourceProvider();
+    // Kernel is the default Delta source as of https://github.com/apache/incubator-xtable/issues/886.
+    // Set xtable.delta.source.use_kernel=false to fall back to Delta Standalone instead.
     ConversionSourceProvider<Long> deltaConversionSourceProvider =
-        new DeltaConversionSourceProvider();
+        serviceConfig.isDeltaSourceUseKernel()
+            ? new DeltaKernelConversionSourceProvider()
+            : new DeltaConversionSourceProvider();
     ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
         new IcebergConversionSourceProvider();
 
