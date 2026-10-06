@@ -32,11 +32,13 @@ import java.util.Collections;
 import java.util.HashMap;
 
 import org.apache.hadoop.conf.Configuration;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
@@ -56,9 +58,12 @@ class TestHudiConversionSource {
         .build();
   }
 
-  @Test
-  void testIsIncrementalSyncSafeFromWithNullEarliestCommitToRetainNoCleanInstants()
-      throws Exception {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  void testIsIncrementalSyncSafeFromWithNullEarliestCommitToRetainNoCleanInstants(
+      HoodieTableVersion tableVersion) throws Exception {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
     HoodieTimeline mockCleanerTimeline = mock(HoodieTimeline.class);
@@ -71,6 +76,7 @@ class TestHudiConversionSource {
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(mockTableConfig.getTableVersion()).thenReturn(tableVersion);
     doReturn(getStorageConf(new Configuration())).when(mockMetaClient).getStorageConf();
     when(mockMetaClient.getBasePath()).thenReturn(new StoragePath("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
@@ -87,6 +93,10 @@ class TestHudiConversionSource {
         .thenReturn(mockCompletedCommitsTimeline);
     when(mockCommitInstant.requestedTime()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
+    // table version 9 resolves the checkpoint by completion time
+    when(mockCommitInstant.getCompletionTime()).thenReturn("20200101120000001");
+    when(mockCompletedCommitsTimeline.getInstants())
+        .thenReturn(Collections.singletonList(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
         new HudiConversionSource(mockMetaClient, mock(PathBasedPartitionSpecExtractor.class));
@@ -97,9 +107,12 @@ class TestHudiConversionSource {
         "isIncrementalSyncSafeFrom should return true when earliestCommitToRetain is null and no clean instants after last sync");
   }
 
-  @Test
-  void testIsIncrementalSyncSafeFromWithNullEarliestCommitToRetainWithCleanInstants()
-      throws Exception {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  void testIsIncrementalSyncSafeFromWithNullEarliestCommitToRetainWithCleanInstants(
+      HoodieTableVersion tableVersion) throws Exception {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
     HoodieTimeline mockCleanerTimeline = mock(HoodieTimeline.class);
@@ -113,6 +126,7 @@ class TestHudiConversionSource {
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(mockTableConfig.getTableVersion()).thenReturn(tableVersion);
     doReturn(getStorageConf(new Configuration())).when(mockMetaClient).getStorageConf();
     when(mockMetaClient.getBasePath()).thenReturn(new StoragePath("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
@@ -130,6 +144,10 @@ class TestHudiConversionSource {
         .thenReturn(mockCompletedCommitsTimeline);
     when(mockCommitInstant.requestedTime()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
+    // table version 9 resolves the checkpoint by completion time
+    when(mockCommitInstant.getCompletionTime()).thenReturn("20200101120000001");
+    when(mockCompletedCommitsTimeline.getInstants())
+        .thenReturn(Collections.singletonList(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
         new HudiConversionSource(mockMetaClient, mock(PathBasedPartitionSpecExtractor.class));
@@ -140,9 +158,12 @@ class TestHudiConversionSource {
         "isIncrementalSyncSafeFrom should return false when earliestCommitToRetain is null but clean instants exist after last sync");
   }
 
-  @Test
-  void testIsIncrementalSyncSafeFromWithEmptyEarliestCommitToRetainWithCleanInstants()
-      throws Exception {
+  @ParameterizedTest
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  void testIsIncrementalSyncSafeFromWithEmptyEarliestCommitToRetainWithCleanInstants(
+      HoodieTableVersion tableVersion) throws Exception {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
     HoodieTimeline mockCleanerTimeline = mock(HoodieTimeline.class);
@@ -156,6 +177,7 @@ class TestHudiConversionSource {
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(mockTableConfig.getTableVersion()).thenReturn(tableVersion);
     doReturn(getStorageConf(new Configuration())).when(mockMetaClient).getStorageConf();
     when(mockMetaClient.getBasePath()).thenReturn(new StoragePath("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
@@ -172,6 +194,10 @@ class TestHudiConversionSource {
         .thenReturn(mockCompletedCommitsTimeline);
     when(mockCommitInstant.requestedTime()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
+    // table version 9 resolves the checkpoint by completion time
+    when(mockCommitInstant.getCompletionTime()).thenReturn("20200101120000001");
+    when(mockCompletedCommitsTimeline.getInstants())
+        .thenReturn(Collections.singletonList(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
         new HudiConversionSource(mockMetaClient, mock(PathBasedPartitionSpecExtractor.class));
