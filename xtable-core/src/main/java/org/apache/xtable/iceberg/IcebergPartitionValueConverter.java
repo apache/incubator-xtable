@@ -34,6 +34,7 @@ import lombok.NoArgsConstructor;
 
 import org.apache.avro.generic.IndexedRecord;
 
+import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
@@ -80,12 +81,12 @@ public class IcebergPartitionValueConverter {
     List<PartitionValue> partitionValues = new ArrayList<>(partitionSpec.fields().size());
     Map<InternalField, Map<PartitionTransformType, InternalPartitionField>> partitionFieldMap =
         getInternalPartitionFieldMap(internalTable);
-    IndexedRecord partitionData = ((IndexedRecord) structLike);
-    for (PartitionField partitionField : partitionSpec.fields()) {
+    List<PartitionField> partitionFields = partitionSpec.fields();
+    for (int specPosition = 0; specPosition < partitionFields.size(); specPosition++) {
+      PartitionField partitionField = partitionFields.get(specPosition);
       Object value;
       PartitionTransformType transformType;
-      int fieldPosition =
-          partitionData.getSchema().getField(escapeFieldName(partitionField.name())).pos();
+      int fieldPosition = getFieldPosition(structLike, partitionField.name(), specPosition);
       // Convert date based partitions into millis since epoch
       switch (partitionField.transform().toString()) {
         case YEAR:
@@ -179,6 +180,28 @@ public class IcebergPartitionValueConverter {
             Collectors.groupingBy(
                 InternalPartitionField::getSourceField,
                 Collectors.toMap(InternalPartitionField::getTransformType, Function.identity())));
+  }
+
+  /**
+   * Resolves the position of a partition field in the partition struct by name. The struct is
+   * checked against Iceberg's {@link PartitionData} before Avro's {@link IndexedRecord}, because
+   * iceberg-spark-runtime relocates Avro, so its {@link PartitionData} does not implement the
+   * unshaded {@link IndexedRecord}.
+   */
+  private static int getFieldPosition(StructLike structLike, String fieldName, int specPosition) {
+    if (structLike instanceof PartitionData) {
+      List<Types.NestedField> fields = ((PartitionData) structLike).getPartitionType().fields();
+      for (int position = 0; position < fields.size(); position++) {
+        if (fields.get(position).name().equals(fieldName)) {
+          return position;
+        }
+      }
+      throw new IllegalStateException("Partition field not found in partition data: " + fieldName);
+    }
+    if (structLike instanceof IndexedRecord) {
+      return ((IndexedRecord) structLike).getSchema().getField(escapeFieldName(fieldName)).pos();
+    }
+    return specPosition;
   }
 
   private static String escapeFieldName(String fieldName) {

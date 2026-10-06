@@ -19,23 +19,31 @@
 package org.apache.xtable.hudi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Optional;
 import java.util.Properties;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import org.apache.hudi.common.table.HoodieTableVersion;
 
 public class TestHudiTargetConfig {
 
   @Test
-  void defaultsToTableVersionSix() {
-    assertEquals(
-        HoodieTableVersion.SIX,
-        HudiTargetConfig.fromProperties(new Properties()).getTableVersion());
-    assertEquals(HoodieTableVersion.SIX, HudiTargetConfig.fromProperties(null).getTableVersion());
+  void defaultsToTableVersionSixAndJavaEngine() {
+    HudiTargetConfig config = HudiTargetConfig.fromProperties(new Properties());
+    assertEquals(HoodieTableVersion.SIX, config.getTableVersion());
+    assertFalse(config.isSparkEngine());
+    assertEquals(Optional.empty(), config.getSecondaryIndexColumn());
+    assertEquals(Optional.empty(), config.getRecordIndexMinFileGroupCount());
+    assertEquals(Optional.empty(), config.getRecordIndexMaxFileGroupCount());
+    assertEquals(Optional.empty(), config.getSecondaryIndexParallelism());
+    assertEquals(config, HudiTargetConfig.fromProperties(null));
   }
 
   @Test
@@ -55,6 +63,67 @@ public class TestHudiTargetConfig {
   void rejectsUnsupportedVersion() {
     Properties props = new Properties();
     props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "8");
+    assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"java, false", "JAVA, false", "spark, true", "Spark, true"})
+  void parsesExecutionEngine(String engine, boolean expectSparkEngine) {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.EXECUTION_ENGINE, engine);
+    assertEquals(expectSparkEngine, HudiTargetConfig.fromProperties(props).isSparkEngine());
+  }
+
+  @Test
+  void rejectsUnsupportedExecutionEngine() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.EXECUTION_ENGINE, "flink");
+    assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+  }
+
+  @Test
+  void parsesSecondaryIndexSettings() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, " id ");
+    props.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "2");
+    props.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "4");
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_PARALLELISM, "8");
+    HudiTargetConfig config = HudiTargetConfig.fromProperties(props);
+    assertEquals(Optional.of("id"), config.getSecondaryIndexColumn());
+    assertEquals(Optional.of(2), config.getRecordIndexMinFileGroupCount());
+    assertEquals(Optional.of(4), config.getRecordIndexMaxFileGroupCount());
+    assertEquals(Optional.of(8), config.getSecondaryIndexParallelism());
+  }
+
+  @Test
+  void ignoresBlankSecondaryIndexColumn() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "  ");
+    assertFalse(HudiTargetConfig.fromProperties(props).getSecondaryIndexColumn().isPresent());
+  }
+
+  @Test
+  void secondaryIndexRequiresTableVersionNine() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "id");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+    assertTrue(exception.getMessage().contains(HudiTargetConfig.HUDI_TABLE_VERSION));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    // only one bound of the record index file group count
+    "xtable.hudi.target.metadata.record.index.min.filegroup.count, 2",
+    "xtable.hudi.target.metadata.record.index.max.filegroup.count, 2",
+    // non positive values
+    "xtable.hudi.target.metadata.index.secondary.parallelism, 0",
+    "xtable.hudi.target.metadata.index.secondary.parallelism, -1",
+  })
+  void rejectsInvalidIndexSettings(String key, String value) {
+    Properties props = new Properties();
+    props.setProperty(key, value);
     assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
   }
 
