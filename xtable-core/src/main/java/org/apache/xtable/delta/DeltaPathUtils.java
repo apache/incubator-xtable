@@ -75,10 +75,10 @@ public class DeltaPathUtils {
   }
 
   private static boolean isUnderBasePath(String tableBasePath, String dataFilePath) {
-    URI file = new Path(dataFilePath).toUri();
-    if (file.getScheme() == null) {
+    if (!dataFilePath.contains(":")) {
       return true;
     }
+    URI file = new Path(dataFilePath).toUri();
     // compare without the scheme to handle differences like s3 vs s3a
     URI base = new Path(tableBasePath).toUri();
     return Objects.equals(base.getAuthority(), file.getAuthority())
@@ -86,7 +86,6 @@ public class DeltaPathUtils {
   }
 
   private static boolean isAbsolutePath(String dataFilePath) {
-    return dataFilePath.startsWith(Path.SEPARATOR)
-        || new Path(dataFilePath).toUri().getScheme() != null;
+    return dataFilePath.startsWith(Path.SEPARATOR) || dataFilePath.contains(":");
   }
 }
