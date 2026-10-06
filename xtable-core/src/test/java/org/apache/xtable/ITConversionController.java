@@ -1381,8 +1381,13 @@ public class ITConversionController {
             .map(
                 formatName -> {
                   TypedProperties targetProperties = new TypedProperties();
-                  if (useDeltaKernelTarget && formatName.equals(DELTA)) {
-                    targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
+                  if (formatName.equals(DELTA)) {
+                    // Pin explicitly rather than relying on DeltaConversionTargetConfig's
+                    // default, so the Standalone cases stay Standalone regardless of which
+                    // implementation the default currently points at.
+                    targetProperties.setProperty(
+                        DeltaConversionTargetConfig.USE_KERNEL,
+                        String.valueOf(useDeltaKernelTarget));
                   }
                   return TargetTable.builder()
                       .name(tableName)
