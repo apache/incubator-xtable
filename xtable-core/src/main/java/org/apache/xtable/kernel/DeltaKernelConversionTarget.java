@@ -202,7 +202,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
           "init() called on an already initialized instance. "
               + "Do not call init() after using the parameterized constructor.");
     }
-    
+
     Engine engine = DefaultEngine.create(configuration);
 
     initInternal(

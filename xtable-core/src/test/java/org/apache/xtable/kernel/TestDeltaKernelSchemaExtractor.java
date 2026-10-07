@@ -1182,21 +1182,13 @@ public class TestDeltaKernelSchemaExtractor {
   @Test
   public void testNestedFieldIdsAndPhysicalNamesInDeltaSchema() {
     FieldMetadata mapNestedIds =
-        FieldMetadata.builder()
-            .putLong("col-map.key", 7)
-            .putLong("col-map.value", 8)
-            .build();
-    FieldMetadata listNestedIds =
-        FieldMetadata.builder()
-            .putLong("col-list.element", 9)
-            .build();
+        FieldMetadata.builder().putLong("col-map.key", 7).putLong("col-map.value", 8).build();
+    FieldMetadata listNestedIds = FieldMetadata.builder().putLong("col-list.element", 9).build();
     FieldMetadata nestedMapNestedIds =
         FieldMetadata.builder()
             .putLong("col-nested-map.key", 40)
             .putLong("col-nested-map.value", 41)
-            .putLong(
-                "col-nested-map.value.element",
-                42)
+            .putLong("col-nested-map.value.element", 42)
             .build();
 
     FieldMetadata mapMetadata =

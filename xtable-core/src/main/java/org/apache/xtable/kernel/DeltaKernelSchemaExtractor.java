@@ -84,7 +84,10 @@ public class DeltaKernelSchemaExtractor {
   }
 
   private static Integer nestedFieldId(
-      FieldMetadata nestedIds, String nestedIdPath, String parquetChildName, String internalChildName) {
+      FieldMetadata nestedIds,
+      String nestedIdPath,
+      String parquetChildName,
+      String internalChildName) {
     Integer fieldId = nestedFieldId(nestedIds, childIdPath(nestedIdPath, parquetChildName));
     if (fieldId != null || parquetChildName.equals(internalChildName)) {
       return fieldId;
