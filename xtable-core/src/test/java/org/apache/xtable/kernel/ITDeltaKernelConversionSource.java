@@ -210,7 +210,7 @@ public class ITDeltaKernelConversionSource {
             .fields(fields)
             .build(),
         DataLayoutStrategy.FLAT,
-        "file://" + basePath,
+        basePath.toString(),
         snapshot.getTable().getLatestMetadataPath(),
         Collections.emptyList());
     // Validate data files
@@ -269,7 +269,7 @@ public class ITDeltaKernelConversionSource {
             .fields(fields)
             .build(),
         DataLayoutStrategy.FLAT,
-        "file://" + basePath,
+        basePath.toString(),
         internalTable.getLatestMetadataPath(),
         Collections.emptyList());
   }
@@ -321,7 +321,7 @@ public class ITDeltaKernelConversionSource {
             .fields(fields)
             .build(),
         DataLayoutStrategy.HIVE_STYLE_PARTITION,
-        "file://" + basePath,
+        basePath.toString(),
         snapshot.getTable().getLatestMetadataPath(),
         Collections.singletonList(
             InternalPartitionField.builder()

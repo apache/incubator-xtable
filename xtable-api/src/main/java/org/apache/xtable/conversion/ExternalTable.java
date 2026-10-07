@@ -69,11 +69,9 @@ class ExternalTable {
     Path path = new Path(tableBasePath);
     Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
     if (path.isAbsoluteAndSchemeAuthorityNull()) {
-      // assume this is local file system and append scheme
-      return "file://" + path;
-    } else if (path.toUri().getScheme().equals("file")) {
-      // add extra slashes
-      return "file://" + path.toUri().getPath();
+      return path.toUri().getPath();
+    } else if ("file".equals(path.toUri().getScheme())) {
+      return path.toUri().toString();
     } else {
       return path.toString();
     }
