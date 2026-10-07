@@ -230,20 +230,7 @@ public class TestHudiFileStatsExtractor {
   void columnStatsWithMetadataTableMissingFallsBackToParquetFooters(@TempDir Path tempDir) {
     List<InternalDataFile> inputFiles = generateInputFiles(tempDir, 1);
 
-    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
-    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
-        .thenReturn(true);
-
-    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
-
-    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    doReturn(storageConf).when(mockMetaClient).getStorageConf();
-    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
-        .when(mockMetaClient)
-        .getStorage();
-    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
-    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
-    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    HoodieTableMetaClient mockMetaClient = createMockMetaClient(tempDir);
 
     HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
     when(mockMetadataTable.getColumnStats(any(), anyString())).thenReturn(Collections.emptyMap());
@@ -266,20 +253,7 @@ public class TestHudiFileStatsExtractor {
     Pair<String, String> fileWithStatsPair =
         Pair.of("", new org.apache.hadoop.fs.Path(fileWithStats.getPhysicalPath()).getName());
 
-    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
-    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
-        .thenReturn(true);
-
-    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
-
-    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    doReturn(storageConf).when(mockMetaClient).getStorageConf();
-    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
-        .when(mockMetaClient)
-        .getStorage();
-    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
-    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
-    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    HoodieTableMetaClient mockMetaClient = createMockMetaClient(tempDir);
 
     // Metadata table only returns stats for fileWithStats; fileWithoutStats is missing entirely
     HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
@@ -344,19 +318,7 @@ public class TestHudiFileStatsExtractor {
     Pair<String, String> filePair =
         Pair.of("", new org.apache.hadoop.fs.Path(file.getPhysicalPath()).getName());
 
-    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
-    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
-        .thenReturn(true);
-    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
-
-    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    doReturn(storageConf).when(mockMetaClient).getStorageConf();
-    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
-        .when(mockMetaClient)
-        .getStorage();
-    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
-    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
-    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    HoodieTableMetaClient mockMetaClient = createMockMetaClient(tempDir);
 
     HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
     when(mockMetadataTable.getColumnStats(any(), anyString()))
@@ -383,23 +345,7 @@ public class TestHudiFileStatsExtractor {
             .addStatsToFiles(mockMetadataTable, inputFiles.stream(), schema)
             .collect(Collectors.toList());
 
-    assertEquals(1, output.size());
-    InternalDataFile result = output.get(0);
-    // Must have fallen back to the parquet footer (real row count), not the degenerate
-    // metadata-table stats (which would previously have produced recordCount=0).
-    assertEquals(2, result.getRecordCount());
-    // Assert an actual footer-derived column stat, not just non-emptiness -- the degenerate
-    // metadata-table stats (valueCount=0 for every column) would also pass an isEmpty() check
-    // if they leaked through, since the list itself would be non-empty.
-    ColumnStat longColumnStat =
-        result.getColumnStats().stream()
-            .filter(stat -> stat.getField().equals(longField))
-            .findFirst()
-            .get();
-    assertEquals(2, longColumnStat.getNumValues());
-    assertEquals(1, longColumnStat.getNumNulls());
-    assertEquals(-25L, (Long) longColumnStat.getRange().getMinValue());
-    assertEquals(-25L, (Long) longColumnStat.getRange().getMaxValue());
+    validateOutput(output, false);
     verify(mockMetaClient, times(1)).getStorage();
   }
 
@@ -532,6 +478,28 @@ public class TestHudiFileStatsExtractor {
       assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMinValue());
       assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMaxValue());
     }
+  }
+
+  private HoodieTableMetaClient createMockMetaClient(Path tempDir) {
+    HoodieTableConfig mockTableConfig = createMockTableConfig();
+
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    doReturn(storageConf).when(mockMetaClient).getStorageConf();
+    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
+        .when(mockMetaClient)
+        .getStorage();
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    return mockMetaClient;
+  }
+
+  private HoodieTableConfig createMockTableConfig() {
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
+        .thenReturn(true);
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
+    return mockTableConfig;
   }
 
   private HoodieRecord<HoodieAvroPayload> buildRecord(GenericRecord record) {
