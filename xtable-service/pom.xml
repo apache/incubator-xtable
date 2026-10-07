@@ -229,6 +229,11 @@
             <artifactId>delta-kernel-api</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-defaults</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Paimon dependencies -->
         <dependency>
