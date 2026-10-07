@@ -150,14 +150,14 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
    */
   public DeltaKernelConversionTarget(TargetTable targetTable, Engine engine) {
     this(
-         DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath()),
+        DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath()),
         targetTable.getMetadataRetention().toHours(),
         engine,
         DeltaKernelSchemaExtractor.getInstance(),
         DeltaKernelPartitionExtractor.getInstance(),
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
-             .basePath(DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath()))
+            .basePath(DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath()))
             // Column statistics are not needed for conversion operations
             .includeColumnStats(false)
             .build());
