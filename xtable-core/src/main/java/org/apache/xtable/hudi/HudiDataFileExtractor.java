@@ -357,14 +357,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
       String prevCommitTime,
       List<PartitionValue> partitionValues) {
     return timeline.getInstants().stream()
-        .filter(instant -> prevCommitTime.equals(instant.getTimestamp()))
+        .filter(instant -> prevCommitTime.equals(instant.requestedTime()))
         .findFirst()
         .flatMap(
             prevInstant -> {
               try {
-                HoodieCommitMetadata prevMeta =
-                    HoodieCommitMetadata.fromBytes(
-                        timeline.getInstantDetails(prevInstant).get(), HoodieCommitMetadata.class);
+                HoodieCommitMetadata prevMeta = timeline.readCommitMetadata(prevInstant);
                 return prevMeta
                     .getPartitionToWriteStats()
                     .getOrDefault(partitionPath, Collections.emptyList())

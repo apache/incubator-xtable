@@ -21,6 +21,7 @@ package org.apache.xtable.hudi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +29,6 @@ import java.util.Collections;
 import java.util.Optional;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hudi.common.model.HoodieCommitMetadata;
@@ -37,7 +37,9 @@ import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import org.apache.xtable.model.storage.InternalDataFile;
 
@@ -53,12 +55,14 @@ class TestHudiDataFileExtractor {
 
     HoodieInstant prevInstant =
         new HoodieInstant(
-            HoodieInstant.State.COMPLETED, HoodieTimeline.COMMIT_ACTION, prevCommitTime);
+            HoodieInstant.State.COMPLETED,
+            HoodieTimeline.COMMIT_ACTION,
+            prevCommitTime,
+            InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
     HoodieTimeline timeline = mock(HoodieTimeline.class);
     when(timeline.getInstants()).thenReturn(Collections.singletonList(prevInstant));
-    when(timeline.getInstantDetails(prevInstant))
-        .thenReturn(
-            Option.of(singleStatCommit(partition, fileId, oldPath).toJsonString().getBytes()));
+    when(timeline.readCommitMetadata(prevInstant))
+        .thenReturn(singleStatCommit(partition, fileId, oldPath));
 
     Optional<InternalDataFile> result =
         extractor.recoverRemovedFile(
@@ -90,15 +94,15 @@ class TestHudiDataFileExtractor {
 
     HoodieInstant prevInstant =
         new HoodieInstant(
-            HoodieInstant.State.COMPLETED, HoodieTimeline.COMMIT_ACTION, prevCommitTime);
+            HoodieInstant.State.COMPLETED,
+            HoodieTimeline.COMMIT_ACTION,
+            prevCommitTime,
+            InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
     HoodieTimeline timeline = mock(HoodieTimeline.class);
     when(timeline.getInstants()).thenReturn(Collections.singletonList(prevInstant));
-    when(timeline.getInstantDetails(prevInstant))
+    when(timeline.readCommitMetadata(prevInstant))
         .thenReturn(
-            Option.of(
-                singleStatCommit(partition, "different-fg", partition + "/different-fg.parquet")
-                    .toJsonString()
-                    .getBytes()));
+            singleStatCommit(partition, "different-fg", partition + "/different-fg.parquet"));
 
     Optional<InternalDataFile> result =
         extractor.recoverRemovedFile(
@@ -120,10 +124,10 @@ class TestHudiDataFileExtractor {
   private static HudiDataFileExtractor buildExtractorWithBasePath(String basePathStr) {
     HoodieTableMetaClient metaClient = mock(HoodieTableMetaClient.class);
     HoodieTableConfig tableConfig = mock(HoodieTableConfig.class);
-    when(metaClient.getHadoopConf()).thenReturn(new Configuration());
+    doReturn(new HadoopStorageConfiguration(new Configuration())).when(metaClient).getStorageConf();
     when(metaClient.getTableConfig()).thenReturn(tableConfig);
     when(tableConfig.isMetadataTableAvailable()).thenReturn(false);
-    when(metaClient.getBasePathV2()).thenReturn(new Path(basePathStr));
+    when(metaClient.getBasePath()).thenReturn(new StoragePath(basePathStr));
     return new HudiDataFileExtractor(metaClient, null, null);
   }
 }
