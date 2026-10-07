@@ -142,7 +142,8 @@ public class ConversionService {
     Map<String, ConversionSourceProvider<?>> sourceProviders = new HashMap<>();
     ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
         new HudiConversionSourceProvider();
-    // Kernel is the default Delta source as of https://github.com/apache/incubator-xtable/issues/886.
+    // Kernel is the default Delta source as of
+    // https://github.com/apache/incubator-xtable/issues/886.
     // Set xtable.delta.source.use_kernel=false to fall back to Delta Standalone instead.
     ConversionSourceProvider<Long> deltaConversionSourceProvider =
         serviceConfig.isDeltaSourceUseKernel()
