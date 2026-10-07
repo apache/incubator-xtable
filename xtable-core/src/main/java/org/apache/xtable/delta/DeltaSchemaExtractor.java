@@ -97,6 +97,12 @@ public class DeltaSchemaExtractor {
     return toInternalSchema(structType, null, false, null, null, null, null);
   }
 
+  /**
+   * @param nestedIds the {@code delta.columnMapping.nested.ids} metadata of the enclosing struct
+   *     field, or null when the field carries none
+   * @param nestedIdPath the path of the current type within that metadata, starting at the
+   *     enclosing field's physical name
+   */
   private InternalSchema toInternalSchema(
       DataType dataType,
       String parentPath,
