@@ -56,7 +56,7 @@ public class DeltaKernelUtils {
    */
   public static boolean tableExists(Engine engine, String basePath) {
     try {
-       Table table = Table.forPath(engine, normalizeTablePath(basePath));
+      Table table = Table.forPath(engine, normalizeTablePath(basePath));
       table.getLatestSnapshot(engine);
       return true;
     } catch (TableNotFoundException e) {
@@ -66,17 +66,17 @@ public class DeltaKernelUtils {
     // Let other exceptions propagate (network issues, permissions, corrupted metadata, etc.)
   }
 
-   public static String normalizeTablePath(String basePath) {
-     if (basePath == null) {
-       return basePath;
-     }
-     Path path = new Path(basePath);
-     if (path.isAbsoluteAndSchemeAuthorityNull()) {
-       return path.toUri().getPath();
-     } else if ("file".equals(path.toUri().getScheme())) {
-       return path.toUri().toString();
-     } else {
-       return path.toString();
-     }
-   }
+  public static String normalizeTablePath(String basePath) {
+    if (basePath == null) {
+      return basePath;
+    }
+    Path path = new Path(basePath);
+    if (path.isAbsoluteAndSchemeAuthorityNull()) {
+      return path.toUri().getPath();
+    } else if ("file".equals(path.toUri().getScheme())) {
+      return path.toUri().toString();
+    } else {
+      return path.toString();
+    }
+  }
 }
