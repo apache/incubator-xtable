@@ -33,7 +33,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -81,6 +80,7 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
+import org.apache.hudi.metadata.MetadataPartitionType;
 import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
@@ -403,6 +403,30 @@ public class HudiConversionTarget implements ConversionTarget {
                 .flatMap(instant -> getMetadata(instant, client)));
   }
 
+  /**
+   * XTable 0.4.0 did not build the column-stats index for partitioned tables. Hudi cannot build it
+   * later for the externally created files, so a snapshot sync registers every file again with its
+   * stats.
+   */
+  @Override
+  public boolean isIncrementalSyncSafe() {
+    return metaClient
+        .map(
+            client -> {
+              if (!client.isTimelineNonEmpty()
+                  || client
+                      .getTableConfig()
+                      .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS)) {
+                return true;
+              }
+              log.info(
+                  "Hudi target table at {} has no column-stats index, so a snapshot sync builds it.",
+                  tableDataPath);
+              return false;
+            })
+        .orElse(true);
+  }
+
   @Override
   public String getTableFormat() {
     return TableFormat.HUDI;
@@ -590,23 +614,33 @@ public class HudiConversionTarget implements ConversionTarget {
                       deletePathsForPartition -> {
                         String partition = deletePathsForPartition.getKey();
                         // we need to manipulate the path to properly clean from the metadata table,
-                        // so we map the file path to the base file
-                        Map<String, HoodieBaseFile> baseFilesByPath =
-                            fsView
-                                .getAllReplacedFileGroups(partition)
-                                .flatMap(HoodieFileGroup::getAllBaseFiles)
-                                .collect(
-                                    Collectors.toMap(HoodieBaseFile::getPath, Function.identity()));
+                        // so we map the file path to the base files that can be cleaned. A file
+                        // registered again by a snapshot sync has an older file slice in a live
+                        // file group with the same path, so the latest slice of a live file group
+                        // is never a candidate.
+                        Map<String, List<HoodieBaseFile>> cleanableBaseFilesByPath =
+                            Stream.concat(
+                                    fsView
+                                        .getAllFileGroups(partition)
+                                        .flatMap(fileGroup -> fileGroup.getAllBaseFiles().skip(1)),
+                                    fsView
+                                        .getAllReplacedFileGroups(partition)
+                                        .flatMap(HoodieFileGroup::getAllBaseFiles))
+                                .collect(Collectors.groupingBy(HoodieBaseFile::getPath));
                         return deletePathsForPartition.getValue().getValue().stream()
+                            .map(cleanFileInfo -> cleanFileInfo.getFilePath())
+                            .distinct()
+                            .flatMap(
+                                path ->
+                                    cleanableBaseFilesByPath
+                                        .getOrDefault(path, Collections.emptyList())
+                                        .stream())
                             .map(
-                                cleanFileInfo -> {
-                                  HoodieBaseFile baseFile =
-                                      baseFilesByPath.get(cleanFileInfo.getFilePath());
-                                  return new HoodieCleanFileInfo(
-                                      ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
-                                          baseFile.getFileName(), baseFile.getCommitTime()),
-                                      false);
-                                })
+                                baseFile ->
+                                    new HoodieCleanFileInfo(
+                                        ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                                            baseFile.getFileName(), baseFile.getCommitTime()),
+                                        false))
                             .collect(Collectors.toList());
                       }));
       // there is nothing to clean, so exit early
@@ -656,7 +690,7 @@ public class HudiConversionTarget implements ConversionTarget {
                       String partitionPath = entry.getKey();
                       List<String> deletePaths =
                           entry.getValue().stream()
-                              .map(HoodieCleanFileInfo::getFilePath)
+                              .map(cleanFileInfo -> cleanFileInfo.getFilePath())
                               .collect(Collectors.toList());
                       return HoodieCleanStat.builder()
                           .withPolicy(HoodieCleaningPolicy.KEEP_LATEST_COMMITS)
