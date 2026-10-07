@@ -200,8 +200,9 @@
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-parquet</artifactId>
         </dependency>
-        <!-- GlueCatalog and S3FileIO for icebergCatalogConfig. The AWS SDK clients it needs are
-             already bundled below. -->
+        <!-- GlueCatalog and S3FileIO for icebergCatalogConfig. The s3 and sts SDK clients are
+             declared below; glue arrives transitively from xtable-aws, so its shade include goes
+             stale if xtable-aws ever drops it. -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-aws</artifactId>
