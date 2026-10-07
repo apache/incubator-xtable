@@ -115,6 +115,14 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  *       (SnapshotImpl, TableImpl) to access metadata and commit history, as Delta Kernel 4.0.0
  *       lacks public APIs for these operations. These casts are brittle and may break on version
  *       upgrades. Public API alternatives should be used when available.
+ *   <li><strong>Generated Columns:</strong> Delta Kernel 4.0.0 does not support the {@code
+ *       generatedColumns} writer table feature, which XTable's schema/partition extraction emits
+ *       for a derived (transform-based, e.g. a date truncation) partition column. Writing such a
+ *       schema throws {@link io.delta.kernel.exceptions.KernelException} ("Unsupported Delta writer
+ *       feature"), caught per-target by {@code TableFormatSync} and surfaced as a {@code
+ *       SyncStatusCode.ERROR} entry rather than corrupting the table. Delta Standalone does support
+ *       this. Set {@link org.apache.xtable.delta.DeltaConversionTargetConfig#USE_KERNEL} to {@code
+ *       false} to fall back to it.
  * </ul>
  *
  * <p><strong>Implementation Choice:</strong> Delta Kernel API was chosen over Delta Standalone to:

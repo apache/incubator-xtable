@@ -78,6 +78,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
+import org.apache.hudi.common.config.TypedProperties;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.conversion.ConversionConfig;
@@ -85,6 +86,7 @@ import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -166,13 +168,23 @@ public class ITParquetConversionSource {
     List<TargetTable> targetTables =
         targetTableFormats.stream()
             .map(
-                formatName ->
-                    TargetTable.builder()
-                        .name(tableName)
-                        .formatName(formatName)
-                        .basePath(table.getBasePath())
-                        .metadataRetention(metadataRetention)
-                        .build())
+                formatName -> {
+                  TypedProperties targetProperties = new TypedProperties();
+                  if (formatName.equals(DELTA)) {
+                    // Pin to Delta Standalone: a MONTH-transform partition (the partitioned
+                    // case this test exercises) is implemented as a Delta generated column,
+                    // whose writer table feature Delta Kernel 4.0.0 does not support. See
+                    // DeltaKernelConversionTarget's "Known Limitations" Javadoc.
+                    targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "false");
+                  }
+                  return TargetTable.builder()
+                      .name(tableName)
+                      .formatName(formatName)
+                      .basePath(table.getBasePath())
+                      .metadataRetention(metadataRetention)
+                      .additionalProperties(targetProperties)
+                      .build();
+                })
             .collect(Collectors.toList());
 
     return ConversionConfig.builder()
