@@ -47,8 +47,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.delta.kernel.Operation;
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
+import io.delta.kernel.Transaction;
 import io.delta.kernel.data.FilteredColumnarBatch;
 import io.delta.kernel.data.Row;
 import io.delta.kernel.defaults.engine.DefaultEngine;
@@ -56,6 +58,7 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.ScanImpl;
 import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.AddFile;
+import io.delta.kernel.utils.CloseableIterable;
 import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
@@ -382,7 +385,60 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  public void testGetTargetCommitIdentifierWithNullSourceIdentifier() throws Exception {
+  public void testSourceTargetIdMappingIgnoresCarriedForwardMetadata() throws Exception {
+    InternalSchema schema = getInternalSchema();
+    InternalTable sourceTable =
+        getInternalTable("source_table", basePath, schema, null, LAST_COMMIT_TIME);
+    InternalSnapshot sourceSnapshot =
+        buildSnapshot(sourceTable, "0", getDataFile(101, Collections.emptyList(), basePath));
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot);
+
+    commitTableProperties(
+        "Test metadata update", Collections.singletonMap("unrelated.property", "updated"));
+
+    Optional<String> mappedTargetId =
+        conversionTarget.getTargetCommitIdentifier(sourceSnapshot.getSourceIdentifier());
+    assertTrue(mappedTargetId.isPresent());
+    assertEquals("0", mappedTargetId.get());
+  }
+
+  @Test
+  public void testSourceTargetIdMappingSkipsMalformedMetadata() throws Exception {
+    InternalSchema schema = getInternalSchema();
+    InternalTable sourceTable =
+        getInternalTable("source_table", basePath, schema, null, LAST_COMMIT_TIME);
+    InternalSnapshot sourceSnapshot1 =
+        buildSnapshot(sourceTable, "0", getDataFile(101, Collections.emptyList(), basePath));
+    InternalSnapshot sourceSnapshot2 =
+        buildSnapshot(sourceTable, "1", getDataFile(102, Collections.emptyList(), basePath));
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot1);
+    commitTableProperties(
+        "Test malformed metadata",
+        Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, "{invalid-json"));
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot2);
+
+    assertEquals(
+        Optional.of("0"),
+        conversionTarget.getTargetCommitIdentifier(sourceSnapshot1.getSourceIdentifier()));
+    assertEquals(
+        Optional.of("2"),
+        conversionTarget.getTargetCommitIdentifier(sourceSnapshot2.getSourceIdentifier()));
+  }
+
+  @Test
+  public void testGetTargetCommitIdentifierWithInvalidSourceIdentifier() {
+    assertFalse(conversionTarget.getTargetCommitIdentifier(null).isPresent());
+    assertFalse(conversionTarget.getTargetCommitIdentifier("").isPresent());
+    assertFalse(conversionTarget.getTargetCommitIdentifier("  ").isPresent());
+  }
+
+  @Test
+  public void testGetTargetCommitIdentifierWithoutSourceMetadata() throws Exception {
     InternalSchema baseSchema = getInternalSchema();
     InternalTable internalTable =
         getInternalTable("source_table", basePath, baseSchema, null, LAST_COMMIT_TIME);
@@ -459,6 +515,16 @@ public class TestDeltaKernelSync {
 
     assertEquals(
         expectedFiles.size(), count, "Number of files from Delta scan don't match expectation");
+  }
+
+  private void commitTableProperties(String engineInfo, Map<String, String> properties) {
+    Table deltaTable = Table.forPath(engine, basePath.toString());
+    Transaction metadataTransaction =
+        deltaTable
+            .createTransactionBuilder(engine, engineInfo, Operation.WRITE)
+            .withTableProperties(engine, properties)
+            .build(engine);
+    metadataTransaction.commit(engine, CloseableIterable.emptyIterable());
   }
 
   private InternalSnapshot buildSnapshot(
