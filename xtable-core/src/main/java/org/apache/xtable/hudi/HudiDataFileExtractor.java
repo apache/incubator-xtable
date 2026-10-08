@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +85,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieMetadataConfig metadataConfig;
   private final FileSystemViewManager fileSystemViewManager;
   private final Path basePath;
+  // Previous-commit metadata read to recover cleaned files, keyed by instant time. The extractor
+  // lives for a single sync, so each instant is read at most once per sync.
+  private final Map<String, Optional<HoodieCommitMetadata>> prevCommitMetadataCache =
+      new HashMap<>();
 
   public HudiDataFileExtractor(
       HoodieTableMetaClient metaClient,
@@ -356,14 +361,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
       String fileId,
       String prevCommitTime,
       List<PartitionValue> partitionValues) {
-    return timeline.getInstants().stream()
-        .filter(instant -> prevCommitTime.equals(instant.requestedTime()))
-        .findFirst()
+    return prevCommitMetadataCache
+        .computeIfAbsent(prevCommitTime, commitTime -> readCommitMetadata(timeline, commitTime))
         .flatMap(
-            prevInstant -> {
-              try {
-                HoodieCommitMetadata prevMeta = timeline.readCommitMetadata(prevInstant);
-                return prevMeta
+            prevMeta ->
+                prevMeta
                     .getPartitionToWriteStats()
                     .getOrDefault(partitionPath, Collections.emptyList())
                     .stream()
@@ -372,18 +374,24 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     .map(
                         ws ->
                             buildFileWithoutStats(
-                                partitionValues, new HoodieBaseFile(ws.getPath())));
-              } catch (IOException e) {
-                log.warn(
-                    "Unable to read previous commit {} to recover removed file for fileId {} "
-                        + "in partition {}",
-                    prevCommitTime,
-                    fileId,
-                    partitionPath,
-                    e);
-                return Optional.empty();
-              }
-            });
+                                partitionValues, new HoodieBaseFile(ws.getPath()))));
+  }
+
+  private Optional<HoodieCommitMetadata> readCommitMetadata(
+      HoodieTimeline timeline, String commitTime) {
+    Optional<HoodieInstant> instant =
+        timeline.getInstants().stream()
+            .filter(hoodieInstant -> commitTime.equals(hoodieInstant.requestedTime()))
+            .findFirst();
+    if (!instant.isPresent()) {
+      return Optional.empty();
+    }
+    try {
+      return Optional.of(timeline.readCommitMetadata(instant.get()));
+    } catch (IOException e) {
+      log.warn("Unable to read previous commit {} to recover removed files", commitTime, e);
+      return Optional.empty();
+    }
   }
 
   private AddedAndRemovedFiles getUpdatesToPartitionForReplaceCommit(

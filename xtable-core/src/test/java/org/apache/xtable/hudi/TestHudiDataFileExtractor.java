@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -109,6 +111,41 @@ class TestHudiDataFileExtractor {
             timeline, partition, "fg-1", prevCommitTime, Collections.emptyList());
 
     assertFalse(result.isPresent());
+  }
+
+  @Test
+  void recoverRemovedFile_readsPreviousCommitMetadataOncePerInstant() throws Exception {
+    HudiDataFileExtractor extractor = buildExtractorWithBasePath("file:///tmp/test-table");
+    String partition = "year=2023";
+    String prevCommitTime = "20230101000000000";
+    String oldPath1 = partition + "/fg-1_0-0-0_" + prevCommitTime + ".parquet";
+    String oldPath2 = partition + "/fg-2_0-0-0_" + prevCommitTime + ".parquet";
+
+    HoodieInstant prevInstant =
+        new HoodieInstant(
+            HoodieInstant.State.COMPLETED,
+            HoodieTimeline.COMMIT_ACTION,
+            prevCommitTime,
+            InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+    HoodieCommitMetadata prevMetadata = singleStatCommit(partition, "fg-1", oldPath1);
+    HoodieWriteStat secondStat = new HoodieWriteStat();
+    secondStat.setFileId("fg-2");
+    secondStat.setPath(oldPath2);
+    prevMetadata.addWriteStat(partition, secondStat);
+    HoodieTimeline timeline = mock(HoodieTimeline.class);
+    when(timeline.getInstants()).thenReturn(Collections.singletonList(prevInstant));
+    when(timeline.readCommitMetadata(prevInstant)).thenReturn(prevMetadata);
+
+    Optional<InternalDataFile> result1 =
+        extractor.recoverRemovedFile(
+            timeline, partition, "fg-1", prevCommitTime, Collections.emptyList());
+    Optional<InternalDataFile> result2 =
+        extractor.recoverRemovedFile(
+            timeline, partition, "fg-2", prevCommitTime, Collections.emptyList());
+
+    assertEquals(oldPath1, result1.get().getPhysicalPath());
+    assertEquals(oldPath2, result2.get().getPhysicalPath());
+    verify(timeline, times(1)).readCommitMetadata(prevInstant);
   }
 
   private static HoodieCommitMetadata singleStatCommit(
