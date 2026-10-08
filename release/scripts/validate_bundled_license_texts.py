@@ -23,7 +23,7 @@ pom chain declares none. Anything not Apache-2.0 must have
 META-INF/licenses/LICENSE-<artifactId>, and a text with no dependency behind it
 is reported too.
 
-Flow, for each */target/*-bundled.jar:
+Flow, for each */target/*-bundled.jar, plus each module in MAIN_ARTIFACT_BUNDLES:
 
   main()            find the jars, print each report, exit non-zero on any failure
   check()           everything below, for one jar
@@ -55,6 +55,10 @@ from functools import lru_cache
 M2 = pathlib.Path.home() / ".m2" / "repository"
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TREE = "target/dependency-tree.txt"
+
+# Modules whose shaded jar replaces the main artifact instead of a *-bundled.jar.
+MAIN_ARTIFACT_BUNDLES = ("xtable-spark-runtime/target/xtable-spark-runtime_*.jar",)
+NOT_BUNDLES = ("-sources.jar", "-tests.jar", "-javadoc.jar")
 
 # Shade cannot merge module descriptors, so it drops them from every dependency.
 DROPPED_BY_SHADE = {"module-info.class"}
@@ -295,9 +299,17 @@ REPORTS = [
 ]
 
 
+def default_jars() -> list[pathlib.Path]:
+    """Every */target/*-bundled.jar, plus the main jar of each MAIN_ARTIFACT_BUNDLES module."""
+    jars = set(ROOT.glob("**/target/*-bundled.jar"))
+    for pattern in MAIN_ARTIFACT_BUNDLES:
+        jars.update(jar for jar in ROOT.glob(pattern) if not jar.name.endswith(NOT_BUNDLES))
+    return sorted(jars)
+
+
 def main() -> None:
     """Check every bundled jar, or only those named on the command line."""
-    jars = [pathlib.Path(a) for a in sys.argv[1:]] or sorted(ROOT.glob("**/target/*-bundled.jar"))
+    jars = [pathlib.Path(a) for a in sys.argv[1:]] or default_jars()
     if not jars:
         raise SystemExit(
             "FAIL: no */target/*-bundled.jar found; nothing was validated.\n"

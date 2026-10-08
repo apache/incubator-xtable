@@ -54,6 +54,7 @@
         <module>xtable-aws</module>
         <module>xtable-hive-metastore</module>
         <module>xtable-service</module>
+        <module>xtable-spark-runtime</module>
     </modules>
 
     <properties>
@@ -970,6 +971,8 @@
                         <excludes>
                             <exclude>.idea/**</exclude>
                             <exclude>${target.dir.pattern}</exclude>
+                            <!-- Written by maven-shade-plugin in xtable-spark-runtime -->
+                            <exclude>**/dependency-reduced-pom.xml</exclude>
                             <exclude>website/node_modules/**</exclude>
                             <exclude>website/build/**</exclude>
                             <exclude>website/.docusaurus/**</exclude>
