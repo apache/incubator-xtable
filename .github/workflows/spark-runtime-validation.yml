@@ -1,0 +1,86 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+name: Spark Runtime Bundle Validation
+
+# Runs ITXTableSparkRuntimeBundle, which spark-submits the shaded bundle. The IT skips itself
+# unless SPARK_HOME is set, so it only runs here.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'main') }}
+
+# No path filter, so the check always reports and can be a required status check.
+on:
+  push:
+    branches:
+      - "main"
+
+  pull_request:
+    branches:
+      - "main"
+
+  workflow_dispatch:
+
+env:
+  SPARK_HADOOP_PROFILE: "hadoop3"
+
+jobs:
+  validate-spark-runtime-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.4: Delta via delta-core. 3.5: Delta auto-switches to the Spark-free Delta Kernel.
+        spark_version: ["3.4.3", "3.5.9"]
+    env:
+      SPARK_VERSION: ${{ matrix.spark_version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache Spark distribution
+        uses: actions/cache@v4
+        with:
+          path: ~/spark
+          key: spark-${{ env.SPARK_VERSION }}-bin-${{ env.SPARK_HADOOP_PROFILE }}
+
+      - name: Install Spark
+        run: |
+          set -euo pipefail
+          SPARK_DIR="spark-${SPARK_VERSION}-bin-${SPARK_HADOOP_PROFILE}"
+          if [ ! -d "$HOME/spark/$SPARK_DIR" ]; then
+            mkdir -p "$HOME/spark"
+            echo "Downloading $SPARK_DIR from the Apache archive"
+            curl -fsSL "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIR}.tgz" \
+              | tar -xz -C "$HOME/spark"
+          fi
+          echo "SPARK_HOME=$HOME/spark/$SPARK_DIR" >> "$GITHUB_ENV"
+
+      - name: Build reactor (skip tests)
+        run: ./mvnw clean install -ntp -B -DskipTests
+
+      - name: Run xtable-spark-runtime bundle IT
+        env:
+          SPARK_LOCAL_IP: "127.0.0.1"
+        run: ./mvnw verify -ntp -B -pl xtable-spark-runtime

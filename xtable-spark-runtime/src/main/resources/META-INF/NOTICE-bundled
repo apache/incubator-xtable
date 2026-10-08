@@ -1,0 +1,22 @@
+Apache XTable (incubating)
+Copyright 2024-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+This binary artifact bundles the following projects with NOTICE:
+
+--------------------------------------------------------------------------------
+
+Group: commons-cli Name: commons-cli Version: 1.5.0
+
+NOTICE:
+| Apache Commons CLI
+| Copyright 2002-2021 The Apache Software Foundation
+|
+| This product includes software developed at
+| The Apache Software Foundation (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
