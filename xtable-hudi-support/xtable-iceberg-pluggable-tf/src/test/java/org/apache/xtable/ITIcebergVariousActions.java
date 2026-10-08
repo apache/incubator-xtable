@@ -21,12 +21,16 @@ package org.apache.xtable;
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.Closeable;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -37,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -62,6 +67,14 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
+
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.util.SnapshotUtil;
 
 import org.apache.xtable.hudi.HudiConversionSource;
 import org.apache.xtable.hudi.HudiInstantUtils;
@@ -681,11 +694,21 @@ public class ITIcebergVariousActions {
 
       table.rollback(commitInstant3);
       List<String> baseFilesAfterRollback = table.getAllLatestBaseFilePaths();
+      // Hudi deleted the files commit 3 wrote, so Iceberg has to reference exactly the files that
+      // survived, and the timeline reconstructed from Iceberg must not report commit 3 at all.
+      assertIcebergReferencesExactly(table.getBasePath(), baseFilesAfterRollback);
+      assertReconstructedTimeline(
+          table.getBasePath(), Arrays.asList(commitInstant1, commitInstant2), commitInstant3);
 
       String commitInstant4 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit4 = table.generateRecords(50);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit4, commitInstant4, true);
       List<String> baseFilesAfterCommit4 = table.getAllLatestBaseFilePaths();
+      assertIcebergReferencesExactly(table.getBasePath(), baseFilesAfterCommit4);
+      assertReconstructedTimeline(
+          table.getBasePath(),
+          Arrays.asList(commitInstant1, commitInstant2, commitInstant4),
+          commitInstant3);
 
       hudiClient =
           getHudiSourceClient(
@@ -715,9 +738,79 @@ public class ITIcebergVariousActions {
           fail("Please add proper asserts here");
         }
       }
+
+      // Two more commits take the timeline past the archival threshold. The snapshot the rollback
+      // left behind is unreachable, so archival has to expire it along with the archived commits.
+      for (int i = 0; i < 2; i++) {
+        String commitInstant = table.startCommit();
+        table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(50), commitInstant, true);
+      }
+      table.getWriteClient().archive();
+      assertArchivalLeftOnlyReachableSnapshots(table.getBasePath());
     } finally {
       safeClose(hudiClient);
     }
+  }
+
+  @SneakyThrows
+  private static void assertIcebergReferencesExactly(
+      String basePath, List<String> expectedBaseFiles) {
+    Table icebergTable = new HadoopTables(CONFIGURATION).load(basePath);
+    Set<String> referenced = new HashSet<>();
+    try (CloseableIterable<FileScanTask> tasks = icebergTable.newScan().planFiles()) {
+      for (FileScanTask task : tasks) {
+        referenced.add(URI.create(task.file().path().toString()).getPath());
+      }
+    }
+    Set<String> expected =
+        expectedBaseFiles.stream()
+            .map(path -> URI.create(path).getPath())
+            .collect(Collectors.toSet());
+    assertEquals(expected, referenced, "Iceberg must reference exactly the live Hudi base files");
+    for (String path : referenced) {
+      assertTrue(Files.exists(Paths.get(path)), "Iceberg references a missing file: " + path);
+    }
+  }
+
+  private static void assertReconstructedTimeline(
+      String basePath, List<String> expectedCompletedCommits, String rolledBackCommit) {
+    HoodieTableMetaClient metaClient =
+        HoodieTableMetaClient.builder()
+            .setConf(getStorageConf(CONFIGURATION))
+            .setBasePath(basePath)
+            .setLoadActiveTimelineOnLoad(true)
+            .build();
+    HoodieTimeline timeline = metaClient.getActiveTimeline();
+    assertEquals(
+        expectedCompletedCommits,
+        timeline
+            .getCommitsTimeline()
+            .filterCompletedInstants()
+            .getInstantsAsStream()
+            .map(HoodieInstant::requestedTime)
+            .collect(Collectors.toList()));
+    assertEquals(1, timeline.getRollbackTimeline().filterCompletedInstants().countInstants());
+    assertTrue(
+        timeline.filterInflightsAndRequested().empty(),
+        "no instant should be left pending: "
+            + timeline.filterInflightsAndRequested().getInstants());
+    assertFalse(
+        timeline.getInstantsAsStream().anyMatch(i -> rolledBackCommit.equals(i.requestedTime())),
+        "the rolled-back commit must not appear in the timeline in any state");
+  }
+
+  private static void assertArchivalLeftOnlyReachableSnapshots(String basePath) {
+    Table icebergTable = new HadoopTables(CONFIGURATION).load(basePath);
+    Set<Long> ancestorIds = new HashSet<>(SnapshotUtil.currentAncestorIds(icebergTable));
+    int retained = 0;
+    for (Snapshot snapshot : icebergTable.snapshots()) {
+      retained++;
+      assertTrue(
+          ancestorIds.contains(snapshot.snapshotId()),
+          "archival left a snapshot that is not an ancestor of the current one: " + snapshot);
+    }
+    // Six commits and a rollback were made, and the write config keeps at most four commits.
+    assertTrue(retained <= 4, "archival did not expire snapshots, retained " + retained);
   }
 
   private static Stream<Arguments> testsForAllPartitions() {

@@ -33,10 +33,13 @@ import org.apache.hudi.common.HoodieTableFormat;
 import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.TimelineFactory;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
+import org.apache.hudi.common.util.Option;
+import org.apache.hudi.keygen.constant.KeyGeneratorType;
 import org.apache.hudi.metadata.TableMetadataFactory;
 
 import org.apache.xtable.conversion.ConversionTargetFactory;
@@ -55,12 +58,19 @@ import org.apache.xtable.metadata.IcebergMetadataFactory;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.spi.sync.TableFormatSync;
 import org.apache.xtable.timeline.IcebergRollbackExecutor;
 import org.apache.xtable.timeline.IcebergTimelineArchiver;
 import org.apache.xtable.timeline.IcebergTimelineFactory;
 
 public class IcebergTableFormat implements HoodieTableFormat {
+  /**
+   * The partition type a custom key generator records for a field whose value is the partition path
+   * as is. See {@code CustomAvroKeyGenerator.PartitionKeyType} in Hudi.
+   */
+  private static final String CUSTOM_KEY_GENERATOR_SIMPLE_PARTITION_TYPE = "SIMPLE";
+
   private transient TableFormatSync tableFormatSync;
 
   public IcebergTableFormat() {}
@@ -191,18 +201,60 @@ public class IcebergTableFormat implements HoodieTableFormat {
     timelineArchiver.archiveInstants(internalTable, archivedInstants);
   }
 
+  /**
+   * Maps the table's Hudi partition fields to the XTable partition spec. Only identity partitioning
+   * is supported: each field becomes a {@link PartitionTransformType#VALUE} Iceberg partition field
+   * of the source column's type. A timestamp-based key generator, or a custom key generator with a
+   * timestamp-typed field, derives the partition path from a formatted timestamp, and the format
+   * needed to map it back lives in the writer's key generator configuration rather than in {@code
+   * hoodie.properties}, so such tables are rejected rather than exposed with a partition field
+   * whose values do not match the source column.
+   *
+   * @return the spec in the {@code field:VALUE,...} form that {@link HudiSourceConfig} parses, or
+   *     null for an unpartitioned table
+   * @throws UnsupportedOperationException when a partition field is not identity-partitioned
+   */
+  static String partitionFieldSpec(HoodieTableConfig tableConfig) {
+    Option<String[]> partitionFields = tableConfig.getPartitionFields();
+    if (!partitionFields.isPresent() || partitionFields.get().length == 0) {
+      return null;
+    }
+    String keyGeneratorClassName = tableConfig.getKeyGeneratorClassName();
+    KeyGeneratorType keyGeneratorType =
+        keyGeneratorClassName == null
+            ? null
+            : KeyGeneratorType.fromClassName(keyGeneratorClassName);
+    if (keyGeneratorType == KeyGeneratorType.TIMESTAMP
+        || keyGeneratorType == KeyGeneratorType.TIMESTAMP_AVRO) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "The Iceberg table format only supports identity partitioning, but table %s uses the "
+                  + "timestamp-based key generator %s",
+              tableConfig.getTableName(), keyGeneratorClassName));
+    }
+    if (keyGeneratorType == KeyGeneratorType.CUSTOM
+        || keyGeneratorType == KeyGeneratorType.CUSTOM_AVRO) {
+      for (String fieldWithType :
+          tableConfig.getString(HoodieTableConfig.PARTITION_FIELDS).split(",")) {
+        String[] parts = fieldWithType.trim().split(":");
+        if (parts.length > 1
+            && !CUSTOM_KEY_GENERATOR_SIMPLE_PARTITION_TYPE.equalsIgnoreCase(parts[1])) {
+          throw new UnsupportedOperationException(
+              String.format(
+                  "The Iceberg table format only supports identity partitioning, but partition "
+                      + "field %s of table %s has partition type %s",
+                  parts[0], tableConfig.getTableName(), parts[1]));
+        }
+      }
+    }
+    return Arrays.stream(partitionFields.get())
+        .map(field -> field + ":" + PartitionTransformType.VALUE)
+        .collect(Collectors.joining(","));
+  }
+
   private HudiIncrementalTableChangeExtractor getHudiTableExtractor(
       HoodieTableMetaClient metaClient, FileSystemViewManager viewManager) {
-    String partitionSpec =
-        metaClient
-            .getTableConfig()
-            .getPartitionFields()
-            .map(
-                partitionPaths ->
-                    Arrays.stream(partitionPaths)
-                        .map(p -> String.format("%s:VALUE", p))
-                        .collect(Collectors.joining(",")))
-            .orElse(null);
+    String partitionSpec = partitionFieldSpec(metaClient.getTableConfig());
     final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
         HudiSourceConfig.fromPartitionFieldSpecConfig(partitionSpec)
             .loadSourcePartitionSpecExtractor();

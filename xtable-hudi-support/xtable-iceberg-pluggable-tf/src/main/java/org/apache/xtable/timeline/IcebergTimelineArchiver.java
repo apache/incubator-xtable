@@ -19,8 +19,10 @@
 package org.apache.xtable.timeline;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
@@ -35,6 +37,7 @@ import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.util.SnapshotUtil;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,15 +76,14 @@ public class IcebergTimelineArchiver {
       Table table =
           tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
       List<Long> expireSnapshots = new ArrayList<>();
-      // Iceberg does not document an ordering for snapshots(), and stopping at the wrong point
-      // would expire a snapshot a savepoint still needs, so order explicitly.
-      List<Snapshot> snapshotsOldestFirst = new ArrayList<>();
-      table.snapshots().forEach(snapshotsOldestFirst::add);
-      // Sequence numbers are all zero on a format-version 1 table, so fall back to commit time.
-      snapshotsOldestFirst.sort(
-          Comparator.comparingLong(Snapshot::sequenceNumber)
-              .thenComparingLong(Snapshot::timestampMillis));
-      for (Snapshot snapshot : snapshotsOldestFirst) {
+      // The ancestry of the current snapshot is ordered by construction, newest first. Walk it
+      // oldest first so the savepoint check below stops before the snapshots a restore may need.
+      List<Snapshot> ancestorsOldestFirst = new ArrayList<>();
+      SnapshotUtil.currentAncestors(table).forEach(ancestorsOldestFirst::add);
+      Collections.reverse(ancestorsOldestFirst);
+      Set<Long> ancestorIds =
+          ancestorsOldestFirst.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
+      for (Snapshot snapshot : ancestorsOldestFirst) {
         TableSyncMetadata syncMetadata =
             TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
                 .get();
@@ -96,6 +98,13 @@ public class IcebergTimelineArchiver {
           break;
         }
         if (archivedInstants.contains(hoodieInstant)) {
+          expireSnapshots.add(snapshot.snapshotId());
+        }
+      }
+      // A retained snapshot outside the ancestry was left behind by a rollback. Hudi has already
+      // deleted the files it added and no reader can reach it, so it only holds metadata.
+      for (Snapshot snapshot : table.snapshots()) {
+        if (!ancestorIds.contains(snapshot.snapshotId())) {
           expireSnapshots.add(snapshot.snapshotId());
         }
       }
