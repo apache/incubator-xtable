@@ -176,12 +176,15 @@ datasets:
 
 For a Delta source only, `sourceCatalogTableIdentifier` accepts the temporary
 `allowUnsupportedDeletionVectors: "true"` safety override. It should normally be omitted so
-unsupported deletion vectors fail the sync. Enabling it warns and continues without applying the
-deletes, so the target may expose deleted rows. To recover after using the override, first run
-`REORG TABLE <delta_table> APPLY (PURGE)` on the Delta source to rewrite affected files so deleted
-rows are physically removed. After the operation completes, remove the override and rebuild the
-affected targets with a full sync. A full sync before purging is not sufficient because XTable
-cannot apply active deletion vectors. Direct integrations can set the equivalent source property
+unsupported deletion vectors fail a full sync or a newly processed incremental commit. Incremental
+sync does not rescan active files or revisit commits before its saved watermark. Enabling the
+override logs one warning per conversion-source instance and continues without applying the
+deletes, so the target may expose deleted rows. Targets synced from Delta sources containing
+deletion vectors before upgrading to 0.5.0-incubating must be rebuilt with a full sync. If the
+source still has active deletion vectors, first run `REORG TABLE <delta_table> APPLY (PURGE)` and
+wait for it to complete, then remove the override and rebuild the affected targets. A full sync
+before purging is not sufficient because XTable cannot apply active deletion vectors. Direct
+integrations can set the equivalent source property
 `xtable.delta.source.allow_unsupported_deletion_vectors=true`.
 
 :::note Note:

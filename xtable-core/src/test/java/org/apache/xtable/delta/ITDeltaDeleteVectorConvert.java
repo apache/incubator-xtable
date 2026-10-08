@@ -118,6 +118,7 @@ public class ITDeltaDeleteVectorConvert {
     Long timestampBeforeDelete = testSparkDeltaTable.getLastCommitTimestamp();
     testSparkDeltaTable.deleteRows(rows.subList(0, 10));
     Long timestampAfterDelete = testSparkDeltaTable.getLastCommitTimestamp();
+    long deletionVectorVersion = testSparkDeltaTable.getDeltaLog().snapshot().version();
     List<String> activeFilesAfterDelete = testSparkDeltaTable.getAllActiveFiles();
 
     SourceTable strictTableConfig =
@@ -128,10 +129,14 @@ public class ITDeltaDeleteVectorConvert {
             .build();
     assertRejectsDeletionVectors(
         conversionSourceProvider.getConversionSourceInstance(strictTableConfig),
-        timestampAfterDelete);
+        timestampBeforeDelete,
+        timestampAfterDelete,
+        deletionVectorVersion);
     assertRejectsDeletionVectors(
         kernelConversionSourceProvider.getConversionSourceInstance(strictTableConfig),
-        timestampAfterDelete);
+        timestampBeforeDelete,
+        timestampAfterDelete,
+        deletionVectorVersion);
 
     Properties allowUnsupportedDeletionVectors = new Properties();
     allowUnsupportedDeletionVectors.setProperty(
@@ -146,11 +151,21 @@ public class ITDeltaDeleteVectorConvert {
     assertContinuesWithDeletionVectors(
         conversionSourceProvider.getConversionSourceInstance(permissiveTableConfig),
         timestampBeforeDelete,
+        deletionVectorVersion,
         activeFilesAfterDelete);
     assertContinuesWithDeletionVectors(
         kernelConversionSourceProvider.getConversionSourceInstance(permissiveTableConfig),
         timestampBeforeDelete,
+        deletionVectorVersion,
         activeFilesAfterDelete);
+
+    testSparkDeltaTable.insertRows(10);
+    assertProcessesLaterCommitsDespiteOlderDeletionVector(
+        conversionSourceProvider.getConversionSourceInstance(strictTableConfig),
+        timestampAfterDelete);
+    assertProcessesLaterCommitsDespiteOlderDeletionVector(
+        kernelConversionSourceProvider.getConversionSourceInstance(strictTableConfig),
+        timestampAfterDelete);
   }
 
   @Test
@@ -249,30 +264,43 @@ public class ITDeltaDeleteVectorConvert {
   }
 
   private void assertRejectsDeletionVectors(
-      ConversionSource<Long> conversionSource, Long lastSyncTimestamp) {
+      ConversionSource<Long> conversionSource,
+      Long timestampBeforeDelete,
+      Long timestampAfterDelete,
+      long deletionVectorVersion) {
     NotSupportedException fullSyncException =
         assertThrows(NotSupportedException.class, conversionSource::getCurrentSnapshot);
     assertTrue(fullSyncException.getMessage().contains("contains a deletion vector"));
 
+    CommitsBacklog<Long> commitsBacklog =
+        assertDoesNotThrow(
+            () ->
+                conversionSource.getCommitsBacklog(
+                    InstantsForIncrementalSync.builder()
+                        .lastSyncInstant(Instant.ofEpochMilli(timestampBeforeDelete))
+                        .build()));
+    assertTrue(commitsBacklog.getCommitsToProcess().contains(deletionVectorVersion));
+
     NotSupportedException incrementalSyncException =
         assertThrows(
             NotSupportedException.class,
-            () -> {
-              CommitsBacklog<Long> commitsBacklog =
-                  conversionSource.getCommitsBacklog(
-                      InstantsForIncrementalSync.builder()
-                          .lastSyncInstant(Instant.ofEpochMilli(lastSyncTimestamp))
-                          .build());
-              for (Long version : commitsBacklog.getCommitsToProcess()) {
-                conversionSource.getTableChangeForCommit(version);
-              }
-            });
+            () -> conversionSource.getTableChangeForCommit(deletionVectorVersion));
     assertTrue(incrementalSyncException.getMessage().contains("contains a deletion vector"));
+
+    CommitsBacklog<Long> noNewCommits =
+        assertDoesNotThrow(
+            () ->
+                conversionSource.getCommitsBacklog(
+                    InstantsForIncrementalSync.builder()
+                        .lastSyncInstant(Instant.ofEpochMilli(timestampAfterDelete))
+                        .build()));
+    assertTrue(noNewCommits.getCommitsToProcess().isEmpty());
   }
 
   private void assertContinuesWithDeletionVectors(
       ConversionSource<Long> conversionSource,
       Long timestampBeforeDelete,
+      long deletionVectorVersion,
       List<String> expectedActiveFiles) {
     InternalSnapshot internalSnapshot = assertDoesNotThrow(conversionSource::getCurrentSnapshot);
     ValidationTestHelper.validateSnapshot(internalSnapshot, expectedActiveFiles);
@@ -281,12 +309,25 @@ public class ITDeltaDeleteVectorConvert {
             InstantsForIncrementalSync.builder()
                 .lastSyncInstant(Instant.ofEpochMilli(timestampBeforeDelete))
                 .build());
+    assertTrue(commitsBacklog.getCommitsToProcess().contains(deletionVectorVersion));
+    TableChange tableChange =
+        assertDoesNotThrow(() -> conversionSource.getTableChangeForCommit(deletionVectorVersion));
+    assertTrue(tableChange.getFilesDiff().getFilesAdded().isEmpty());
+    assertTrue(tableChange.getFilesDiff().getFilesRemoved().isEmpty());
+  }
+
+  private void assertProcessesLaterCommitsDespiteOlderDeletionVector(
+      ConversionSource<Long> conversionSource, Long timestampAfterDelete) {
+    CommitsBacklog<Long> commitsBacklog =
+        assertDoesNotThrow(
+            () ->
+                conversionSource.getCommitsBacklog(
+                    InstantsForIncrementalSync.builder()
+                        .lastSyncInstant(Instant.ofEpochMilli(timestampAfterDelete))
+                        .build()));
     assertFalse(commitsBacklog.getCommitsToProcess().isEmpty());
     for (Long version : commitsBacklog.getCommitsToProcess()) {
-      TableChange tableChange =
-          assertDoesNotThrow(() -> conversionSource.getTableChangeForCommit(version));
-      assertTrue(tableChange.getFilesDiff().getFilesAdded().isEmpty());
-      assertTrue(tableChange.getFilesDiff().getFilesRemoved().isEmpty());
+      assertDoesNotThrow(() -> conversionSource.getTableChangeForCommit(version));
     }
   }
 

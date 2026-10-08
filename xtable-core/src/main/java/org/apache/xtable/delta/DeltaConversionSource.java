@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,7 +43,6 @@ import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import io.delta.tables.DeltaTable;
@@ -197,7 +195,6 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    validateActiveDeletionVectors(deltaLog.snapshot());
     DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
         deltaLog
             .history()
@@ -208,22 +205,6 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
-  }
-
-  @VisibleForTesting
-  void validateActiveDeletionVectors(Snapshot snapshot) {
-    if (!deletionVectorHandler.isRejecting() || !snapshot.deletionVectorsSupported()) {
-      return;
-    }
-
-    Iterator<AddFile> activeFiles = snapshot.allFiles().toLocalIterator();
-    while (activeFiles.hasNext()) {
-      AddFile addFile = activeFiles.next();
-      if (addFile.deletionVector() != null) {
-        deletionVectorHandler.onDeletionVectorFound(
-            actionsConverter.extractDeletionVectorFile(snapshot, addFile));
-      }
-    }
   }
 
   /*

@@ -20,6 +20,7 @@ package org.apache.xtable.delta;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import lombok.extern.log4j.Log4j2;
@@ -33,6 +34,7 @@ import org.apache.xtable.model.storage.InternalDataFile;
 public final class DeltaDeletionVectorHandler {
   private final boolean allowUnsupportedDeletionVectors;
   private final Consumer<String> warningLogger;
+  private final AtomicBoolean warningLogged = new AtomicBoolean();
 
   public DeltaDeletionVectorHandler(boolean allowUnsupportedDeletionVectors) {
     this(allowUnsupportedDeletionVectors, log::warn);
@@ -46,12 +48,12 @@ public final class DeltaDeletionVectorHandler {
   }
 
   public void onDeletionVectorFound(String dataFilePath) {
-    String message =
-        String.format(
-            "Delta deletion vectors are not supported by XTable conversion targets. "
-                + "Data file %s contains a deletion vector.",
-            dataFilePath);
     if (!allowUnsupportedDeletionVectors) {
+      String message =
+          String.format(
+              "Delta deletion vectors are not supported by XTable conversion targets. "
+                  + "Data file %s contains a deletion vector.",
+              dataFilePath);
       throw new NotSupportedException(
           message
               + " To ignore deletion vectors and continue with potentially inconsistent target "
@@ -59,15 +61,18 @@ public final class DeltaDeletionVectorHandler {
               + DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS
               + "=true.");
     }
-    warningLogger.accept(
-        message
-            + " Continuing because "
-            + DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS
-            + " is enabled. Target tables may contain rows that were deleted from the source.");
-  }
-
-  public boolean isRejecting() {
-    return !allowUnsupportedDeletionVectors;
+    if (warningLogged.compareAndSet(false, true)) {
+      warningLogger.accept(
+          String.format(
+                  "Delta deletion vectors are not supported by XTable conversion targets. "
+                      + "Data file %s contains a deletion vector.",
+                  dataFilePath)
+              + " Continuing because "
+              + DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS
+              + " is enabled. Target tables may contain rows that were deleted from the source.");
+    } else {
+      log.debug("Ignoring deletion vector for data file {}", dataFilePath);
+    }
   }
 
   /**
@@ -87,7 +92,7 @@ public final class DeltaDeletionVectorHandler {
         addedFiles.remove(dataFilePath);
         removedFiles.remove(dataFilePath);
       } else {
-        log.warn(
+        log.debug(
             "No Remove action found for the data file for which deletion vector is added {}. This is unexpected.",
             dataFilePath);
       }
