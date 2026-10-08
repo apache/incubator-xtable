@@ -774,6 +774,55 @@ public class ITConversionController {
     }
   }
 
+  @Test
+  public void testSyncFallsBackToSnapshotWhenCleanDeletesReplacedFileGroupsOfPendingCommit() {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              ImmutableList.of(DELTA, ICEBERG),
+              null,
+              null);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+
+      // Commit A: insert 100 records; sync so the targets reference commitA files.
+      table.insertRecords(100, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, ImmutableList.of(DELTA, ICEBERG), 100);
+
+      // Replace commit B: schedule async clustering over the commitA file groups, but do not run
+      // it yet.
+      String clusteringInstant = table.onlyScheduleClustering();
+
+      // Commit C: insert 20 records and sync. XTable syncs C and records B as a pending commit.
+      table.insertRecords(20, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, ImmutableList.of(DELTA, ICEBERG), 120);
+
+      // B completes after the sync and marks the commitA file groups as replaced.
+      table.completeScheduledClustering(clusteringInstant);
+
+      // CLEAN retains C, so the earliest commit to retain equals the last synced commit and the
+      // next sync stays incremental. B is older than C, so CLEAN physically deletes the replaced
+      // commitA file groups before XTable processes B.
+      table.clean();
+
+      // B is still a pending commit for the targets and is older than the earliest commit to
+      // retain, so the controller falls back to snapshot sync instead of processing B
+      // incrementally against a file system view that no longer has the commitA file groups.
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, ImmutableList.of(DELTA, ICEBERG), 120);
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(value = SyncMode.class)
   public void testSyncWithSingleFormat(SyncMode syncMode) {

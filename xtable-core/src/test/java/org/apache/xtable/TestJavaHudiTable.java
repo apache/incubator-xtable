@@ -292,7 +292,14 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   public void cluster() {
-    String instant = writeClient.scheduleClustering(Option.empty()).get();
+    completeScheduledClustering(onlyScheduleClustering());
+  }
+
+  public String onlyScheduleClustering() {
+    return writeClient.scheduleClustering(Option.empty()).get();
+  }
+
+  public void completeScheduledClustering(String instant) {
     writeClient.cluster(instant, true);
     // Reinitializing as clustering disables auto commit and we want to enable it back.
     writeClient = initJavaWriteClient(schema, typedProperties, null);
