@@ -43,6 +43,7 @@ import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.util.VectorUtils;
 
 import org.apache.xtable.delta.DeltaDeletionVectorHandler;
+import org.apache.xtable.delta.DeltaPathUtils;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
@@ -137,8 +138,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       if (action instanceof AddFile) {
         AddFile addFile = (AddFile) action;
         if (addFile.getDeletionVector().isPresent()) {
-          String dataFilePath =
-              DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath);
+          String dataFilePath = DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.getPath());
           deletionVectorHandler.onDeletionVectorFound(dataFilePath);
           dataFilesWithDeletionVectors.add(dataFilePath);
         }

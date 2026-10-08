@@ -38,6 +38,7 @@ import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.delta.DeltaDeletionVectorHandler;
+import org.apache.xtable.delta.DeltaPathUtils;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -173,7 +174,7 @@ public class DeltaKernelDataFileExtractor {
               new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
           if (deletionVectorHandler != null && addFile.getDeletionVector().isPresent()) {
             deletionVectorHandler.onDeletionVectorFound(
-                DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath));
+                DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.getPath()));
           }
           Map<String, String> partitionValues =
               InternalScanFileUtils.getPartitionValues(scanFileRow);
