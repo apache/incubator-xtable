@@ -40,6 +40,7 @@ import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.util.SnapshotUtil;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +50,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 
+/**
+ * The Hudi active timeline reconstructed from the Iceberg table: an instant counts as completed
+ * only when a snapshot in the current snapshot's ancestry records it, so a rolled-back snapshot
+ * that is still retained in table metadata cannot resurface its instant as completed.
+ */
 public class IcebergActiveTimeline extends ActiveTimelineV2 {
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
@@ -109,7 +115,9 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
     Table icebergTable =
         icebergTableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
     Map<String, HoodieInstant> instantsFromIceberg = new HashMap<>();
-    for (Snapshot snapshot : icebergTable.snapshots()) {
+    // Walk the ancestry rather than snapshots(): a rollback makes the parent current again but the
+    // rolled-back snapshot stays in table metadata until it is expired.
+    for (Snapshot snapshot : SnapshotUtil.currentAncestors(icebergTable)) {
       TableSyncMetadata syncMetadata =
           TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
               .get();

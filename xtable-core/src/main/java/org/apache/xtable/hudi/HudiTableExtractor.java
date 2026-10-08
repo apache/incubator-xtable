@@ -122,11 +122,9 @@ public class HudiTableExtractor {
         .partitioningFields(partitionFields)
         .readSchema(canonicalSchema)
         .latestMetadataPath(metaClient.getMetaPath().toString())
-        // Completion time, not requested time as the timeline-based overload uses. A pluggable
-        // table format is called once an instant completes and orders by completion time, so this
-        // is the clock its incremental-sync decision has to compare against.
-        .latestCommitTime(
-            HudiInstantUtils.parseFromInstantTime(completedInstant.getCompletionTime()))
+        // Both overloads take the sync clock from getSyncInstant, so the pluggable-format path
+        // and the timeline-based path record the same time for the same instant.
+        .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, completedInstant))
         .latestTableOperationIdentifier(generateTableOperationId(completedInstant))
         .build();
   }
