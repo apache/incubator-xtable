@@ -39,7 +39,6 @@ import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.delta.DeltaDeletionVectorHandler;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -83,34 +82,6 @@ public class DeltaKernelDataFileExtractor {
       DeltaDeletionVectorHandler deletionVectorHandler) {
     return new DeltaDataFileIterator(
         deltaSnapshot, table, engine, schema, true, deletionVectorHandler);
-  }
-
-  public void validateDeletionVectors(
-      Snapshot deltaSnapshot,
-      Table table,
-      Engine engine,
-      DeltaDeletionVectorHandler deletionVectorHandler) {
-    String tableBasePath = table.getPath(engine);
-    ScanImpl scan = (ScanImpl) deltaSnapshot.getScanBuilder().build();
-    try (CloseableIterator<FilteredColumnarBatch> scanFiles = scan.getScanFiles(engine, false)) {
-      while (scanFiles.hasNext()) {
-        try (CloseableIterator<Row> rows = scanFiles.next().getRows()) {
-          while (rows.hasNext()) {
-            Row scanFileRow = rows.next();
-            AddFile addFile =
-                new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
-            if (addFile.getDeletionVector().isPresent()) {
-              deletionVectorHandler.onDeletionVectorFound(
-                  DeltaKernelActionsConverter.getFullPathToFile(addFile.getPath(), tableBasePath));
-            }
-          }
-        }
-      }
-    } catch (NotSupportedException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new ReadException("Failed to inspect Delta deletion vectors", e);
-    }
   }
 
   public class DeltaDataFileIterator implements DataFileIterator {

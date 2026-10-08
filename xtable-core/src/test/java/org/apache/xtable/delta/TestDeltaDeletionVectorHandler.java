@@ -43,7 +43,6 @@ public class TestDeltaDeletionVectorHandler {
   public void rejectsDeletionVectorsByDefault() {
     DeltaDeletionVectorHandler handler = new DeltaDeletionVectorHandler(false);
 
-    assertTrue(handler.isRejecting());
     NotSupportedException exception =
         assertThrows(
             NotSupportedException.class, () -> handler.onDeletionVectorFound(DATA_FILE_PATH));
@@ -56,16 +55,22 @@ public class TestDeltaDeletionVectorHandler {
   }
 
   @Test
-  public void warnsAndContinuesWhenExplicitlyAllowed() {
+  public void warnsOnceAndContinuesWhenExplicitlyAllowed() {
     List<String> warnings = new ArrayList<>();
     DeltaDeletionVectorHandler handler = new DeltaDeletionVectorHandler(true, warnings::add);
 
-    assertFalse(handler.isRejecting());
     handler.onDeletionVectorFound(DATA_FILE_PATH);
+    handler.onDeletionVectorFound("file:///table/part-0002.parquet");
+    handler.onDeletionVectorFound("file:///table/part-0003.parquet");
 
     assertEquals(1, warnings.size());
     assertTrue(warnings.get(0).contains(DATA_FILE_PATH));
     assertTrue(warnings.get(0).contains("may contain rows that were deleted"));
+
+    List<String> otherHandlerWarnings = new ArrayList<>();
+    new DeltaDeletionVectorHandler(true, otherHandlerWarnings::add)
+        .onDeletionVectorFound("file:///other-table/part-0001.parquet");
+    assertEquals(1, otherHandlerWarnings.size());
   }
 
   @Test
