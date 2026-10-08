@@ -1,0 +1,170 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
+package org.apache.xtable.hudi;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+import java.util.Optional;
+
+import org.apache.hadoop.conf.Configuration;
+import org.junit.jupiter.api.Test;
+
+import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.model.HoodieWriteStat;
+import org.apache.hudi.common.table.HoodieTableConfig;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
+
+import org.apache.xtable.model.storage.InternalDataFile;
+
+class TestHudiDataFileExtractor {
+
+  @Test
+  void recoverRemovedFile_returnsFileWhenPreviousCommitInTimeline() throws Exception {
+    HudiDataFileExtractor extractor = buildExtractorWithBasePath("file:///tmp/test-table");
+    String partition = "year=2023";
+    String fileId = "fg-1";
+    String prevCommitTime = "20230101000000000";
+    String oldPath = partition + "/" + fileId + "_0-0-0_" + prevCommitTime + ".parquet";
+
+    HoodieInstant prevInstant =
+        new HoodieInstant(
+            HoodieInstant.State.COMPLETED,
+            HoodieTimeline.COMMIT_ACTION,
+            prevCommitTime,
+            InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+    HoodieTimeline timeline = mock(HoodieTimeline.class);
+    when(timeline.getInstants()).thenReturn(Collections.singletonList(prevInstant));
+    when(timeline.readCommitMetadata(prevInstant))
+        .thenReturn(singleStatCommit(partition, fileId, oldPath));
+
+    Optional<InternalDataFile> result =
+        extractor.recoverRemovedFile(
+            timeline, partition, fileId, prevCommitTime, Collections.emptyList());
+
+    assertTrue(result.isPresent());
+    assertEquals(oldPath, result.get().getPhysicalPath());
+  }
+
+  @Test
+  void recoverRemovedFile_returnsEmptyWhenPreviousCommitArchived() {
+    HudiDataFileExtractor extractor = buildExtractorWithBasePath("file:///tmp/test-table");
+
+    HoodieTimeline timeline = mock(HoodieTimeline.class);
+    when(timeline.getInstants()).thenReturn(Collections.emptyList());
+
+    Optional<InternalDataFile> result =
+        extractor.recoverRemovedFile(
+            timeline, "year=2023", "fg-1", "20230101000000000", Collections.emptyList());
+
+    assertFalse(result.isPresent());
+  }
+
+  @Test
+  void recoverRemovedFile_returnsEmptyWhenFileIdNotInPrevCommit() throws Exception {
+    HudiDataFileExtractor extractor = buildExtractorWithBasePath("file:///tmp/test-table");
+    String partition = "year=2023";
+    String prevCommitTime = "20230101000000000";
+
+    HoodieInstant prevInstant =
+        new HoodieInstant(
+            HoodieInstant.State.COMPLETED,
+            HoodieTimeline.COMMIT_ACTION,
+            prevCommitTime,
+            InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+    HoodieTimeline timeline = mock(HoodieTimeline.class);
+    when(timeline.getInstants()).thenReturn(Collections.singletonList(prevInstant));
+    when(timeline.readCommitMetadata(prevInstant))
+        .thenReturn(
+            singleStatCommit(partition, "different-fg", partition + "/different-fg.parquet"));
+
+    Optional<InternalDataFile> result =
+        extractor.recoverRemovedFile(
+            timeline, partition, "fg-1", prevCommitTime, Collections.emptyList());
+
+    assertFalse(result.isPresent());
+  }
+
+  @Test
+  void recoverRemovedFile_readsPreviousCommitMetadataOncePerInstant() throws Exception {
+    HudiDataFileExtractor extractor = buildExtractorWithBasePath("file:///tmp/test-table");
+    String partition = "year=2023";
+    String prevCommitTime = "20230101000000000";
+    String oldPath1 = partition + "/fg-1_0-0-0_" + prevCommitTime + ".parquet";
+    String oldPath2 = partition + "/fg-2_0-0-0_" + prevCommitTime + ".parquet";
+
+    HoodieInstant prevInstant =
+        new HoodieInstant(
+            HoodieInstant.State.COMPLETED,
+            HoodieTimeline.COMMIT_ACTION,
+            prevCommitTime,
+            InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+    HoodieCommitMetadata prevMetadata = singleStatCommit(partition, "fg-1", oldPath1);
+    HoodieWriteStat secondStat = new HoodieWriteStat();
+    secondStat.setFileId("fg-2");
+    secondStat.setPath(oldPath2);
+    prevMetadata.addWriteStat(partition, secondStat);
+    HoodieTimeline timeline = mock(HoodieTimeline.class);
+    when(timeline.getInstants()).thenReturn(Collections.singletonList(prevInstant));
+    when(timeline.readCommitMetadata(prevInstant)).thenReturn(prevMetadata);
+
+    Optional<InternalDataFile> result1 =
+        extractor.recoverRemovedFile(
+            timeline, partition, "fg-1", prevCommitTime, Collections.emptyList());
+    Optional<InternalDataFile> result2 =
+        extractor.recoverRemovedFile(
+            timeline, partition, "fg-2", prevCommitTime, Collections.emptyList());
+
+    assertEquals(oldPath1, result1.get().getPhysicalPath());
+    assertEquals(oldPath2, result2.get().getPhysicalPath());
+    verify(timeline, times(1)).readCommitMetadata(prevInstant);
+  }
+
+  private static HoodieCommitMetadata singleStatCommit(
+      String partition, String fileId, String path) {
+    HoodieWriteStat stat = new HoodieWriteStat();
+    stat.setFileId(fileId);
+    stat.setPath(path);
+    HoodieCommitMetadata metadata = new HoodieCommitMetadata();
+    metadata.addWriteStat(partition, stat);
+    return metadata;
+  }
+
+  private static HudiDataFileExtractor buildExtractorWithBasePath(String basePathStr) {
+    HoodieTableMetaClient metaClient = mock(HoodieTableMetaClient.class);
+    HoodieTableConfig tableConfig = mock(HoodieTableConfig.class);
+    doReturn(new HadoopStorageConfiguration(new Configuration())).when(metaClient).getStorageConf();
+    when(metaClient.getTableConfig()).thenReturn(tableConfig);
+    when(tableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(metaClient.getBasePath()).thenReturn(new StoragePath(basePathStr));
+    return new HudiDataFileExtractor(metaClient, null, null);
+  }
+}
