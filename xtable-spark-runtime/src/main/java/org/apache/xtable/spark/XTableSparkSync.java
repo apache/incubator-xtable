@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
@@ -46,6 +48,9 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.sync.ErrorDetails;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /**
  * {@code spark-submit} entry point for the bundle, the equivalent of {@code RunSync}.
@@ -248,26 +253,67 @@ public final class XTableSparkSync {
       }
 
       XTableSyncService service = new XTableSyncService();
-      int failures = 0;
+      List<TableSyncSpec> specs = new ArrayList<>();
       for (TableSyncSpec.TableSyncSpecBuilder builder : builders) {
-        TableSyncSpec spec = builder.useDeltaKernel(useDeltaKernel).build();
-        try {
-          log.info("Starting XTable sync for {} ({})", spec.getKey(), spec.getBasePath());
-          service.sync(spec, hadoopConf);
-          log.info("Completed XTable sync for {}", spec.getKey());
-        } catch (RuntimeException e) {
-          // One table failing should not abort the rest of the batch; report at the end.
-          failures++;
-          log.error("XTable sync failed for {} ({})", spec.getKey(), spec.getBasePath(), e);
-        }
+        specs.add(builder.useDeltaKernel(useDeltaKernel).build());
       }
+      int failures = syncAll(specs, spec -> service.sync(spec, hadoopConf));
       if (failures > 0) {
         throw new IllegalStateException(
-            failures + " of " + builders.size() + " table sync(s) failed; see logs above");
+            failures + " of " + specs.size() + " table sync(s) failed; see logs above");
       }
     } finally {
       spark.stop();
     }
+  }
+
+  /**
+   * Syncs every spec and returns how many failed. A table fails when its sync throws or when any
+   * target reports a non-SUCCESS status; one failure does not abort the rest of the batch.
+   */
+  // package-private for unit testing
+  static int syncAll(
+      List<TableSyncSpec> specs, Function<TableSyncSpec, Map<String, SyncResult>> syncer) {
+    int failures = 0;
+    for (TableSyncSpec spec : specs) {
+      try {
+        log.info("Starting XTable sync for {} ({})", spec.getKey(), spec.getBasePath());
+        // TableFormatSync reports a target failure as an ERROR status rather than throwing.
+        Map<String, String> failedTargets =
+            syncer.apply(spec).entrySet().stream()
+                .filter(
+                    entry ->
+                        entry.getValue().getTableFormatSyncStatus().getStatusCode()
+                            != SyncStatusCode.SUCCESS)
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> describe(entry.getValue().getTableFormatSyncStatus()),
+                        (a, b) -> a,
+                        TreeMap::new));
+        if (failedTargets.isEmpty()) {
+          log.info("Completed XTable sync for {}", spec.getKey());
+        } else {
+          failures++;
+          log.error(
+              "XTable sync failed for {} ({}) on target(s) {}",
+              spec.getKey(),
+              spec.getBasePath(),
+              failedTargets);
+        }
+      } catch (RuntimeException e) {
+        failures++;
+        log.error("XTable sync failed for {} ({})", spec.getKey(), spec.getBasePath(), e);
+      }
+    }
+    return failures;
+  }
+
+  private static String describe(SyncResult.SyncStatus status) {
+    ErrorDetails details = status.getErrorDetails();
+    return details == null || details.getErrorMessage() == null
+        ? String.valueOf(status.getStatusCode())
+        : status.getStatusCode() + ": " + details.getErrorMessage();
   }
 
   private static void requireOption(CommandLine cmd, String option) {

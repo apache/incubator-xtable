@@ -27,11 +27,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import org.apache.xtable.model.sync.ErrorDetails;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 class XTableSparkSyncTest {
 
@@ -113,6 +122,55 @@ class XTableSparkSyncTest {
   @Test
   void isSparkAtLeast35FalseForNull() {
     assertFalse(XTableSparkSync.isSparkAtLeast35(null));
+  }
+
+  @Test
+  void syncAllCountsReturnedErrorsAndThrownFailuresAndContinuesBatch() {
+    List<TableSyncSpec> specs =
+        Arrays.asList(spec("ok"), spec("target_error"), spec("throws"), spec("ok_after"));
+    List<String> synced = new ArrayList<>();
+    int failures =
+        XTableSparkSync.syncAll(
+            specs,
+            spec -> {
+              synced.add(spec.getKey());
+              Map<String, SyncResult> results = new HashMap<>();
+              results.put("ICEBERG", syncResult(SyncStatusCode.SUCCESS));
+              switch (spec.getKey()) {
+                case "target_error":
+                  results.put("DELTA", syncResult(SyncStatusCode.ERROR));
+                  return results;
+                case "throws":
+                  throw new IllegalStateException("source unreadable");
+                default:
+                  results.put("DELTA", syncResult(SyncStatusCode.SUCCESS));
+                  return results;
+              }
+            });
+    assertEquals(2, failures);
+    assertEquals(Arrays.asList("ok", "target_error", "throws", "ok_after"), synced);
+  }
+
+  private static TableSyncSpec spec(String key) {
+    return TableSyncSpec.builder()
+        .key(key)
+        .basePath("/warehouse/" + key)
+        .sourceFormat("HUDI")
+        .targets(Arrays.asList("ICEBERG", "DELTA"))
+        .build();
+  }
+
+  private static SyncResult syncResult(SyncStatusCode statusCode) {
+    return SyncResult.builder()
+        .tableFormatSyncStatus(
+            SyncResult.SyncStatus.builder()
+                .statusCode(statusCode)
+                .errorDetails(
+                    statusCode == SyncStatusCode.SUCCESS
+                        ? null
+                        : ErrorDetails.builder().errorMessage("commit conflict").build())
+                .build())
+        .build();
   }
 
   private static InputStream yaml(String content) {
