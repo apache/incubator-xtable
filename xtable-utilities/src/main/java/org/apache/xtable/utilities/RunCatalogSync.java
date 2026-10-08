@@ -50,6 +50,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
@@ -60,6 +61,7 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionSourceConfig;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
@@ -160,7 +162,7 @@ public class RunCatalogSync {
                         targetCatalogTableIdentifier.getTableFormat(), sourceTable))
                 .namespace(sourceTable.getNamespace())
                 .formatName(targetCatalogTableIdentifier.getTableFormat())
-                .additionalProperties(sourceTable.getAdditionalProperties())
+                .additionalProperties(getTargetProperties(sourceTable))
                 .build();
         targetTables.add(targetTable);
         if (!targetCatalogs.containsKey(targetTable)) {
@@ -241,7 +243,26 @@ public class RunCatalogSync {
             .put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, tableIdentifier.getPartitionSpec());
       }
     }
+    addDeletionVectorConfig(
+        sourceTable.getAdditionalProperties(),
+        sourceTableIdentifier.getAllowUnsupportedDeletionVectors());
     return sourceTable;
+  }
+
+  private static void addDeletionVectorConfig(
+      Properties sourceProperties, String allowUnsupportedDeletionVectors) {
+    if (allowUnsupportedDeletionVectors != null) {
+      sourceProperties.put(
+          DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS,
+          allowUnsupportedDeletionVectors);
+    }
+  }
+
+  static Properties getTargetProperties(SourceTable sourceTable) {
+    Properties targetProperties = new Properties();
+    targetProperties.putAll(sourceTable.getAdditionalProperties());
+    targetProperties.remove(DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS);
+    return targetProperties;
   }
 
   static String getSourceTableLocation(String targetTableFormat, SourceTable sourceTable) {
@@ -334,6 +355,10 @@ public class RunCatalogSync {
        * not strictly registered in a catalog, as long as the format and location are known
        */
       StorageIdentifier storageIdentifier;
+
+      /** Allows Delta deletion vectors to be ignored during conversion. */
+      @JsonDeserialize(using = StrictBooleanStringDeserializer.class)
+      String allowUnsupportedDeletionVectors;
     }
 
     @Value

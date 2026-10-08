@@ -37,6 +37,9 @@ import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterator;
 
+import org.apache.xtable.delta.DeltaDeletionVectorHandler;
+import org.apache.xtable.delta.DeltaPathUtils;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -69,7 +72,17 @@ public class DeltaKernelDataFileExtractor {
    */
   public DataFileIterator iterator(
       Snapshot deltaSnapshot, Table table, Engine engine, InternalSchema schema) {
-    return new DeltaDataFileIterator(deltaSnapshot, table, engine, schema, true);
+    return new DeltaDataFileIterator(deltaSnapshot, table, engine, schema, true, null);
+  }
+
+  public DataFileIterator iterator(
+      Snapshot deltaSnapshot,
+      Table table,
+      Engine engine,
+      InternalSchema schema,
+      DeltaDeletionVectorHandler deletionVectorHandler) {
+    return new DeltaDataFileIterator(
+        deltaSnapshot, table, engine, schema, true, deletionVectorHandler);
   }
 
   public class DeltaDataFileIterator implements DataFileIterator {
@@ -80,6 +93,7 @@ public class DeltaKernelDataFileExtractor {
     private final List<InternalField> fields;
     private final List<InternalPartitionField> partitionFields;
     private final boolean includeColumnStats;
+    private final DeltaDeletionVectorHandler deletionVectorHandler;
 
     private CloseableIterator<Row> currentFileRows;
     private InternalDataFile nextFile;
@@ -89,8 +103,10 @@ public class DeltaKernelDataFileExtractor {
         Table table,
         Engine engine,
         InternalSchema schema,
-        boolean includeColumnStats) {
+        boolean includeColumnStats,
+        DeltaDeletionVectorHandler deletionVectorHandler) {
       this.includeColumnStats = includeColumnStats;
+      this.deletionVectorHandler = deletionVectorHandler;
       this.table = table;
       this.tableBasePath = table.getPath(engine); // Cache base path once
       this.fields = schema.getFields();
@@ -156,6 +172,10 @@ public class DeltaKernelDataFileExtractor {
           Row scanFileRow = currentFileRows.next();
           AddFile addFile =
               new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
+          if (deletionVectorHandler != null && addFile.getDeletionVector().isPresent()) {
+            deletionVectorHandler.onDeletionVectorFound(
+                DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.getPath()));
+          }
           Map<String, String> partitionValues =
               InternalScanFileUtils.getPartitionValues(scanFileRow);
 
@@ -179,6 +199,9 @@ public class DeltaKernelDataFileExtractor {
           close();
         } catch (Exception closeEx) {
           e.addSuppressed(closeEx);
+        }
+        if (e instanceof NotSupportedException) {
+          throw (NotSupportedException) e;
         }
         throw new RuntimeException("Error while computing next data file", e);
       }
