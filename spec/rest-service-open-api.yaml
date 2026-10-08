@@ -61,7 +61,8 @@ paths:
       summary: Initiate XTable's runSync process to convert a source table format to the requested target table formats.
       description: |
         Reads the source table metadata from storage, converts it to the requested
-        target formats.
+        target formats. *Note* when converting to/from "HUDI", will require the user to set in the request, the following `partition-spec` property 
+        within the `configurations` map.
       operationId: convertTable
       parameters:
         - in: header
@@ -140,11 +141,11 @@ components:
           description: List of desired output table formats (e.g., "ICEBERG", "HUDI", "DELTA")
         configurations:
           type: object
-          description: Additional configuration key/value pairs (e.g., storage credentials or other service configs)
+          description: Additional configuration key/value pairs (e.g. such as 'partition-spec', storage credentials or other service configs).
           additionalProperties:
             type: string
 
-    TargetTable:
+    ConvertedTable:
       type: object
       required:
         - target-format
@@ -158,18 +159,21 @@ components:
           description: Path where the converted metadata was written
         target-schema:
           type: string
-          description: Schema definition of the converted table
+          description: Schema definition of the requested target table format. 
+            If "HUDI" is the `target-format`, the `target-schema` be an avro string representation. 
+            If "ICEBERG" is the `target-format`, the `target-schema` will be a JSON string following Iceberg's REST Catalog spec for `Schema`.
+            if "DELTA" is the `target-format`, the `target-schema` will be be a JSON string following Delta's `StructType`.
 
     ConvertTableResponse:
       type: object
       required:
-        - conversions
+        - converted-tables
       properties:
-        conversions:
+        converted-tables:
           type: array
           description: A list of converted tables, one per requested format
           items:
-            $ref: '#/components/schemas/TargetTable'
+            $ref: '#/components/schemas/ConvertedTable'
 
     SubmittedConversionResponse:
       type: object
