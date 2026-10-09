@@ -599,9 +599,8 @@ public class ITIcebergVariousActions {
   @ParameterizedTest
   @MethodSource("testsForAllPartitions")
   @Disabled(
-      "Savepoint and restore are not represented in Iceberg metadata yet. A savepoint changes no"
-          + " data, so no snapshot records it and the reconstructed timeline reports the completed"
-          + " savepoint instant as inflight. Tracked as a follow-up.")
+      "Restore is not represented in Iceberg metadata yet, so the Iceberg table format refuses it;"
+          + " see ITIcebergUnsupportedOperations. Tracked as a follow-up.")
   public void testsForSavepointRestore(HudiTestUtil.PartitionConfig partitionConfig) {
     String tableName = "test_table_" + UUID.randomUUID();
     HudiConversionSource hudiClient = null;

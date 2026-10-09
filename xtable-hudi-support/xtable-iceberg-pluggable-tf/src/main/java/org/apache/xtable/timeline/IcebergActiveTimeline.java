@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.hudi.avro.model.HoodieRestorePlan;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -70,6 +72,33 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
   @Override
   public HoodieActiveTimeline reload() {
     return new IcebergActiveTimeline(metaClient);
+  }
+
+  /**
+   * Refuses a restore before its plan is written, so a refused restore leaves no pending instant
+   * that would block the next write.
+   */
+  @Override
+  public void saveToRestoreRequested(HoodieInstant instant, HoodieRestorePlan metadata) {
+    throw restoreNotSupported(metaClient.getTableConfig());
+  }
+
+  /** A restore left pending by a native writer is refused before it schedules any rollback. */
+  @Override
+  public HoodieInstant transitionRestoreRequestedToInflight(HoodieInstant requestedInstant) {
+    throw restoreNotSupported(metaClient.getTableConfig());
+  }
+
+  /**
+   * Restore is not represented in Iceberg yet. Hudi runs the rollbacks of a restore with timeline
+   * publishing skipped, so no snapshot would record the files a restore deletes, and the restore
+   * instant itself would be reported as pending forever.
+   */
+  public static UnsupportedOperationException restoreNotSupported(HoodieTableConfig tableConfig) {
+    return new UnsupportedOperationException(
+        String.format(
+            "The Iceberg table format does not support restore yet, so table %s cannot be restored",
+            tableConfig.getTableName()));
   }
 
   /**
