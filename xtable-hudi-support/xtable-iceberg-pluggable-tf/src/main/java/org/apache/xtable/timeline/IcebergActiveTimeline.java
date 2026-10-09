@@ -93,11 +93,20 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
    * Restore is not represented in Iceberg yet. Hudi runs the rollbacks of a restore with timeline
    * publishing skipped, so no snapshot would record the files a restore deletes, and the restore
    * instant itself would be reported as pending forever.
+   *
+   * <p>A restore that is already pending when this fires was scheduled by a writer that loaded the
+   * table without this format on its classpath: Hudi then falls back to the native format without a
+   * warning. The message says so, since that writer's commits never reach Iceberg either, and the
+   * pending restore and rollback instants have to be removed by hand.
    */
   public static UnsupportedOperationException restoreNotSupported(HoodieTableConfig tableConfig) {
     return new UnsupportedOperationException(
         String.format(
-            "The Iceberg table format does not support restore yet, so table %s cannot be restored",
+            "The Iceberg table format does not support restore yet, so table %s cannot be"
+                + " restored. A restore that is already pending was scheduled by a writer that"
+                + " loaded the table without the Iceberg table format on its classpath, in which"
+                + " case Hudi silently used the native format; remove the pending restore and"
+                + " rollback instants from the timeline by hand before writing again",
             tableConfig.getTableName()));
   }
 
