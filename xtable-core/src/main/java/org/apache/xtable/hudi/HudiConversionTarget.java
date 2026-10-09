@@ -18,9 +18,9 @@
  
 package org.apache.xtable.hudi;
 
-import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_COLUMN_STATS;
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX_PREFIX;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.existingIndexVersionOrDefault;
 
 import java.io.IOException;
@@ -47,9 +47,7 @@ import org.apache.hudi.avro.model.HoodieActionInstant;
 import org.apache.hudi.avro.model.HoodieCleanFileInfo;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieCleanerPlan;
-import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
-import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.client.timeline.HoodieTimelineArchiver;
 import org.apache.hudi.client.timeline.TimelineArchivers;
 import org.apache.hudi.common.HoodieCleanStat;
@@ -59,7 +57,7 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
-import org.apache.hudi.common.model.WriteOperationType;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.TableSchemaResolver;
@@ -81,7 +79,6 @@ import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.metadata.MetadataPartitionType;
-import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
 
@@ -92,6 +89,8 @@ import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.exception.UpdateException;
+import org.apache.xtable.hudi.engine.HudiExecutionEngineProvider;
+import org.apache.xtable.hudi.engine.HudiExecutionEngineProviderFactory;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
@@ -119,9 +118,11 @@ public class HudiConversionTarget implements ConversionTarget {
   private CommitState commitState;
   // database to register the target table under, resolved from the target namespace
   private String databaseName;
-  // Hudi table format version to write (6 = legacy 0.x layout, 9 = Hudi 1.x layout), resolved from
-  // the xtable.hudi.target.table_version config; defaults to version 6.
-  private HoodieTableVersion tableVersion = HudiTargetConfig.DEFAULT_TABLE_VERSION;
+  // table version, execution engine and metadata table index settings of the target, resolved from
+  // the xtable.hudi.target.* properties
+  private HudiTargetConfig targetConfig;
+  // engine (Java or Spark) that commits the files and updates the metadata table indexes
+  private HudiExecutionEngineProvider engineProvider;
 
   public HudiConversionTarget() {}
 
@@ -130,20 +131,7 @@ public class HudiConversionTarget implements ConversionTarget {
       TargetTable targetTable,
       Configuration configuration,
       int maxNumDeltaCommitsBeforeCompaction) {
-    this(
-        targetTable.getBasePath(),
-        (int) targetTable.getMetadataRetention().toHours(),
-        maxNumDeltaCommitsBeforeCompaction,
-        BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(getStorageConf(configuration)),
-            new CachingPath(targetTable.getBasePath())),
-        AvroSchemaConverter.getInstance(),
-        HudiTableManager.of(configuration),
-        CommitState::new);
-    this.databaseName = resolveDatabaseName(targetTable);
-    this.tableVersion =
-        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties()).getTableVersion();
-    warnIfExistingTableVersionDiffers();
+    init(targetTable, configuration, maxNumDeltaCommitsBeforeCompaction);
   }
 
   @VisibleForTesting
@@ -151,6 +139,8 @@ public class HudiConversionTarget implements ConversionTarget {
       String tableDataPath,
       int timelineRetentionInHours,
       int maxNumDeltaCommitsBeforeCompaction,
+      HudiTargetConfig targetConfig,
+      HudiExecutionEngineProvider engineProvider,
       BaseFileUpdatesExtractor baseFileUpdatesExtractor,
       AvroSchemaConverter avroSchemaConverter,
       HudiTableManager hudiTableManager,
@@ -160,6 +150,8 @@ public class HudiConversionTarget implements ConversionTarget {
         tableDataPath,
         timelineRetentionInHours,
         maxNumDeltaCommitsBeforeCompaction,
+        targetConfig,
+        engineProvider,
         baseFileUpdatesExtractor,
         avroSchemaConverter,
         hudiTableManager,
@@ -170,6 +162,8 @@ public class HudiConversionTarget implements ConversionTarget {
       String tableDataPath,
       int timelineRetentionInHours,
       int maxNumDeltaCommitsBeforeCompaction,
+      HudiTargetConfig targetConfig,
+      HudiExecutionEngineProvider engineProvider,
       BaseFileUpdatesExtractor baseFileUpdatesExtractor,
       AvroSchemaConverter avroSchemaConverter,
       HudiTableManager hudiTableManager,
@@ -178,6 +172,8 @@ public class HudiConversionTarget implements ConversionTarget {
     this.baseFileUpdatesExtractor = baseFileUpdatesExtractor;
     this.timelineRetentionInHours = timelineRetentionInHours;
     this.maxNumDeltaCommitsBeforeCompaction = maxNumDeltaCommitsBeforeCompaction;
+    this.targetConfig = targetConfig;
+    this.engineProvider = engineProvider;
     this.avroSchemaConverter = avroSchemaConverter;
     this.hudiTableManager = hudiTableManager;
     // create meta client if table already exists
@@ -187,19 +183,29 @@ public class HudiConversionTarget implements ConversionTarget {
 
   @Override
   public void init(TargetTable targetTable, Configuration configuration) {
+    init(targetTable, configuration, HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue());
+  }
+
+  private void init(
+      TargetTable targetTable,
+      Configuration configuration,
+      int maxNumDeltaCommitsBeforeCompaction) {
+    HudiTargetConfig targetConfig =
+        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties());
+    HudiExecutionEngineProvider engineProvider =
+        HudiExecutionEngineProviderFactory.createProvider(targetConfig, configuration);
     _init(
         targetTable.getBasePath(),
         (int) targetTable.getMetadataRetention().toHours(),
-        HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
+        maxNumDeltaCommitsBeforeCompaction,
+        targetConfig,
+        engineProvider,
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(getStorageConf(configuration)),
-            new CachingPath(targetTable.getBasePath())),
+            engineProvider.getEngineContext(), new CachingPath(targetTable.getBasePath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
     this.databaseName = resolveDatabaseName(targetTable);
-    this.tableVersion =
-        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties()).getTableVersion();
     warnIfExistingTableVersionDiffers();
   }
 
@@ -208,6 +214,7 @@ public class HudiConversionTarget implements ConversionTarget {
    * its own version.
    */
   private void warnIfExistingTableVersionDiffers() {
+    HoodieTableVersion tableVersion = targetConfig.getTableVersion();
     metaClient.ifPresent(
         client -> {
           HoodieTableVersion existingVersion = client.getTableConfig().getTableVersion();
@@ -238,7 +245,9 @@ public class HudiConversionTarget implements ConversionTarget {
         HoodieTableMetaClient metaClient,
         String instantTime,
         int timelineRetentionInHours,
-        int maxNumDeltaCommitsBeforeCompaction);
+        int maxNumDeltaCommitsBeforeCompaction,
+        HudiTargetConfig targetConfig,
+        HudiExecutionEngineProvider engineProvider);
   }
 
   @Override
@@ -373,7 +382,7 @@ public class HudiConversionTarget implements ConversionTarget {
       metaClient =
           Optional.of(
               hudiTableManager.initializeHudiTable(
-                  tableDataPath, table, databaseName, tableVersion));
+                  tableDataPath, table, databaseName, targetConfig.getTableVersion()));
     } else {
       // make sure meta client has up-to-date view of the timeline
       getMetaClient().reloadActiveTimeline();
@@ -381,7 +390,12 @@ public class HudiConversionTarget implements ConversionTarget {
     String instant = HudiInstantUtils.convertInstantToCommit(table.getLatestCommitTime());
     this.commitState =
         commitStateCreator.create(
-            getMetaClient(), instant, timelineRetentionInHours, maxNumDeltaCommitsBeforeCompaction);
+            getMetaClient(),
+            instant,
+            timelineRetentionInHours,
+            maxNumDeltaCommitsBeforeCompaction,
+            targetConfig,
+            engineProvider);
   }
 
   @Override
@@ -492,16 +506,22 @@ public class HudiConversionTarget implements ConversionTarget {
     @Setter private TableSyncMetadata tableSyncMetadata;
     @Setter private boolean fileGroupPrefixLayout;
     private Map<String, List<String>> partitionToReplacedFileIds;
+    private final HudiTargetConfig targetConfig;
+    private final HudiExecutionEngineProvider engineProvider;
 
     private CommitState(
         HoodieTableMetaClient metaClient,
         String instantTime,
         int timelineRetentionInHours,
-        int maxNumDeltaCommitsBeforeCompaction) {
+        int maxNumDeltaCommitsBeforeCompaction,
+        HudiTargetConfig targetConfig,
+        HudiExecutionEngineProvider engineProvider) {
       this.metaClient = metaClient;
       this.instantTime = instantTime;
       this.timelineRetentionInHours = timelineRetentionInHours;
       this.maxNumDeltaCommitsBeforeCompaction = maxNumDeltaCommitsBeforeCompaction;
+      this.targetConfig = targetConfig;
+      this.engineProvider = engineProvider;
       this.schema = null;
       this.writeStatuses = Collections.emptyList();
       this.tableSyncMetadata = null;
@@ -525,45 +545,65 @@ public class HudiConversionTarget implements ConversionTarget {
           throw new ReadException("Unable to read Hudi table schema", ex);
         }
       }
+      targetConfig.getSecondaryIndexColumn().ifPresent(this::checkSecondaryIndexColumnUnchanged);
       HoodieWriteConfig writeConfig =
           getWriteConfig(
               schema,
               getNumInstantsToRetain(),
               maxNumDeltaCommitsBeforeCompaction,
-              timelineRetentionInHours);
-      HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getStorageConf());
-      try (HoodieJavaWriteClient<?> writeClient =
-          new HoodieJavaWriteClient<>(engineContext, writeConfig)) {
-        metaClient
-            .getActiveTimeline()
-            .createRequestedCommitWithReplaceMetadata(
-                instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
-        metaClient
-            .getActiveTimeline()
-            .transitionReplaceRequestedToInflight(
-                new HoodieInstant(
-                    HoodieInstant.State.REQUESTED,
-                    HoodieTimeline.REPLACE_COMMIT_ACTION,
-                    instantTime,
-                    InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
-                Option.empty());
-        writeClient.setOperationType(WriteOperationType.UNKNOWN);
-        writeClient.commit(
-            instantTime,
-            writeStatuses,
-            getExtraMetadata(),
-            HoodieTimeline.REPLACE_COMMIT_ACTION,
-            partitionToReplacedFileIds);
-        // if the metaclient was created before the table's first commit, we need to reload it to
-        // pick up the metadata table context
-        if (!metaClient.getTableConfig().isMetadataTableAvailable()) {
-          metaClient = HoodieTableMetaClient.reload(metaClient);
-        }
-        HoodieJavaTable<?> table =
-            HoodieJavaTable.create(writeClient.getConfig(), engineContext, metaClient);
-        // clean up old commits and archive them
-        markInstantsAsCleaned(table, writeClient.getConfig(), engineContext);
-        runArchiver(table, writeClient.getConfig(), engineContext);
+              timelineRetentionInHours,
+              targetConfig.getSecondaryIndexColumn());
+      metaClient
+          .getActiveTimeline()
+          .createRequestedCommitWithReplaceMetadata(
+              instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
+      metaClient
+          .getActiveTimeline()
+          .transitionReplaceRequestedToInflight(
+              new HoodieInstant(
+                  HoodieInstant.State.REQUESTED,
+                  HoodieTimeline.REPLACE_COMMIT_ACTION,
+                  instantTime,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
+              Option.empty());
+      engineProvider.commit(
+          writeConfig,
+          instantTime,
+          writeStatuses,
+          getExtraMetadata(),
+          HoodieTimeline.REPLACE_COMMIT_ACTION,
+          partitionToReplacedFileIds);
+      // if the metaclient was created before the table's first commit, we need to reload it to
+      // pick up the metadata table context
+      if (!metaClient.getTableConfig().isMetadataTableAvailable()) {
+        metaClient = HoodieTableMetaClient.reload(metaClient);
+      }
+      HoodieEngineContext engineContext = engineProvider.getEngineContext();
+      HoodieTable<?, ?, ?, ?> table = engineProvider.createTable(writeConfig, metaClient);
+      // clean up old commits and archive them
+      markInstantsAsCleaned(table, writeConfig, engineContext);
+      runArchiver(table, writeConfig, engineContext);
+    }
+
+    /**
+     * Fails the commit before it starts when an existing metadata table has no secondary index for
+     * {@code column}. The commit that creates the metadata table builds the index, and naming
+     * another column later would leave the existing index without updates.
+     */
+    private void checkSecondaryIndexColumnUnchanged(String column) {
+      metaClient = HoodieTableMetaClient.reload(metaClient);
+      HoodieTableConfig tableConfig = metaClient.getTableConfig();
+      if (tableConfig.isMetadataTableAvailable()
+          && !tableConfig
+              .getMetadataPartitions()
+              .contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + column)) {
+        throw new NotSupportedException(
+            "The Hudi table at "
+                + metaClient.getBasePath()
+                + " has no secondary index for column "
+                + column
+                + ". Changing the secondary index column of an existing table is not supported"
+                + " yet.");
       }
     }
 
@@ -581,7 +621,7 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private void markInstantsAsCleaned(
-        HoodieJavaTable<?> table,
+        HoodieTable<?, ?, ?, ?> table,
         HoodieWriteConfig writeConfig,
         HoodieEngineContext engineContext) {
       CleanPlanner<?, ?, ?, ?> planner = new CleanPlanner<>(engineContext, table, writeConfig);
@@ -719,7 +759,9 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private void runArchiver(
-        HoodieJavaTable<?> table, HoodieWriteConfig config, HoodieEngineContext engineContext) {
+        HoodieTable<?, ?, ?, ?> table,
+        HoodieWriteConfig config,
+        HoodieEngineContext engineContext) {
       // trigger archiver manually, selecting the archiver implementation that matches the table's
       // timeline layout (V1 for table version 6, V2/LSM for table version 9).
       try {
@@ -745,9 +787,44 @@ public class HudiConversionTarget implements ConversionTarget {
         Schema schema,
         int numCommitsToKeep,
         int maxNumDeltaCommitsBeforeCompaction,
-        int timelineRetentionInHours) {
+        int timelineRetentionInHours,
+        Optional<String> secondaryIndexColumn) {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
+      HoodieMetadataConfig.Builder metadataConfigBuilder =
+          HoodieMetadataConfig.newBuilder()
+              .enable(true)
+              .withProperties(properties)
+              // Build the column-stats index for all tables, but not the partition-stats
+              // index. Its generation path rebuilds a file-system view over the committed
+              // external parquet files and groups them by fileId, but XTable's
+              // externally-registered files have non-Hudi names whose fileId cannot be parsed
+              // once the "_hudiext" marker is stripped, which leads to failures on partitioned
+              // tables.
+              .withMetadataIndexColumnStats(true)
+              .withMetadataIndexPartitionStats(false)
+              .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction);
+      // The secondary index maps a column value to the record key, so it needs the global record
+      // index to resolve the record key to a file. Rows without a record key are keyed by
+      // "<file path relative to the table>_<row position>", see
+      // https://github.com/apache/hudi/pull/19869.
+      if (targetConfig.getSecondaryIndexColumn().isPresent()) {
+        metadataConfigBuilder.withEnableGlobalRecordLevelIndex(true);
+      }
+      secondaryIndexColumn.ifPresent(
+          column ->
+              metadataConfigBuilder
+                  .withSecondaryIndexEnabled(true)
+                  .withSecondaryIndexForColumn(column));
+      targetConfig
+          .getRecordIndexMinFileGroupCount()
+          .ifPresent(
+              minFileGroupCount ->
+                  metadataConfigBuilder.withRecordIndexFileGroupCount(
+                      minFileGroupCount, targetConfig.getRecordIndexMaxFileGroupCount().get()));
+      targetConfig
+          .getSecondaryIndexParallelism()
+          .ifPresent(metadataConfigBuilder::withSecondaryIndexParallelism);
       return HoodieWriteConfig.newBuilder()
           // Write at the table's own format version (selected via xtable.hudi.target.table_version,
           // default 6) and disable auto-upgrade so the write client never migrates the table to a
@@ -772,20 +849,10 @@ public class HudiConversionTarget implements ConversionTarget {
                   .cleanerNumHoursRetained(timelineRetentionInHours)
                   .withAutoClean(false)
                   .build())
-          .withMetadataConfig(
-              HoodieMetadataConfig.newBuilder()
-                  .enable(true)
-                  .withProperties(properties)
-                  // Build the column-stats index for all tables, but not the partition-stats
-                  // index. Its generation path rebuilds a file-system view over the committed
-                  // external parquet files and groups them by fileId, but XTable's
-                  // externally-registered files have non-Hudi names whose fileId cannot be parsed
-                  // once the "_hudiext" marker is stripped, which leads to failures on partitioned
-                  // tables.
-                  .withMetadataIndexColumnStats(true)
-                  .withMetadataIndexPartitionStats(false)
-                  .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
-                  .build())
+          // The registered files keep their original names, which are not UUID based Hudi file
+          // ids, so the record index has to store the file id as a plain string.
+          .withWritesFileIdEncoding(1)
+          .withMetadataConfig(metadataConfigBuilder.build())
           .build();
     }
   }
