@@ -30,26 +30,7 @@ public class ConversionServiceConfig {
   @ConfigProperty(name = "xtable.hadoop-config-path", defaultValue = HADOOP_DEFAULTS_XML)
   private String hadoopConfigPath;
 
-  // Kernel is the default Delta source as of https://github.com/apache/incubator-xtable/issues/886.
-  // Set to false to fall back to the Delta Standalone source instead.
-  @ConfigProperty(name = "xtable.delta.source.use_kernel", defaultValue = "true")
-  private boolean deltaSourceUseKernel;
-
-  // Kernel is the default Delta target as of https://github.com/apache/incubator-xtable/issues/886.
-  // Set to false to fall back to the Delta Standalone target instead, e.g. if a conversion relies
-  // on schema evolution against an existing Delta table, which Kernel does not yet support.
-  @ConfigProperty(name = "xtable.delta.target.use_kernel", defaultValue = "true")
-  private boolean deltaTargetUseKernel;
-
   public String getHadoopConfigPath() {
     return hadoopConfigPath;
-  }
-
-  public boolean isDeltaSourceUseKernel() {
-    return deltaSourceUseKernel;
-  }
-
-  public boolean isDeltaTargetUseKernel() {
-    return deltaTargetUseKernel;
   }
 }

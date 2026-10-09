@@ -85,13 +85,10 @@ public class XTableSyncTool extends HoodieSyncTool {
             ? Duration.ofHours(
                 config.getInt(XTableSyncConfig.XTABLE_TARGET_METADATA_RETENTION_HOURS))
             : null;
-    // Pin explicitly rather than relying on DeltaConversionTargetConfig's own default, so this
-    // flag's documented behavior (defaults to Delta Standalone) holds regardless of which
-    // implementation that default currently points at.
     Properties targetProperties = new Properties();
-    targetProperties.setProperty(
-        DeltaConversionTargetConfig.USE_KERNEL,
-        String.valueOf(config.getBooleanOrDefault(XTableSyncConfig.XTABLE_DELTA_USE_KERNEL)));
+    if (config.getBooleanOrDefault(XTableSyncConfig.XTABLE_DELTA_USE_KERNEL)) {
+      targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, Boolean.TRUE.toString());
+    }
     List<TargetTable> targetTables =
         formatsToSync.stream()
             .map(

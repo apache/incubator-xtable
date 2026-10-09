@@ -127,7 +127,7 @@ class TestRunSync {
         "org.apache.xtable.delta.DeltaConversionTarget",
         tfConverters.get(DELTA).getConversionTargetProviderClass());
     Assertions.assertEquals(
-        "org.apache.xtable.kernel.DeltaKernelConversionSourceProvider",
+        "org.apache.xtable.delta.DeltaConversionSourceProvider",
         tfConverters.get(DELTA).getConversionSourceProviderClass());
     Assertions.assertEquals(
         "org.apache.xtable.paimon.PaimonConversionSourceProvider",

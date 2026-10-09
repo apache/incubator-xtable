@@ -96,14 +96,13 @@ public class TestConversionTargetFactory {
   }
 
   @Test
-  public void testDeltaTargetDefaultsToKernel() {
-    // No properties and an empty properties set both resolve to the Delta Kernel target, per
-    // https://github.com/apache/incubator-xtable/issues/886.
+  public void testDeltaTargetDefaultsToStandalone() {
+    // No properties and an empty properties set both resolve to the Delta Standalone target.
     assertInstanceOf(
-        DeltaKernelConversionTarget.class,
+        DeltaConversionTarget.class,
         ConversionTargetFactory.getInstance().createConversionTargetForName(TableFormat.DELTA));
     assertInstanceOf(
-        DeltaKernelConversionTarget.class,
+        DeltaConversionTarget.class,
         ConversionTargetFactory.getInstance()
             .createConversionTargetForName(TableFormat.DELTA, new Properties()));
   }

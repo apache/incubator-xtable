@@ -26,18 +26,15 @@ import lombok.Value;
  * Configuration of the Delta target format for the sync process.
  *
  * <p>Controls which Delta writer implementation backs a Delta {@code ConversionTarget}. By default
- * syncs use the Delta Kernel based {@code DeltaKernelConversionTarget}, per
- * https://github.com/apache/incubator-xtable/issues/886. Setting {@link #USE_KERNEL} to {@code
- * false} in the target table's additional properties falls back to the Delta Standalone based
- * {@link DeltaConversionTarget} instead -- the escape hatch for a regression that only exists on
- * the Kernel path, e.g. schema evolution on an existing table (Kernel fails fast on that rather
- * than silently committing a stale schema; see delta-io/delta#4305).
+ * syncs use the Delta Standalone based {@link DeltaConversionTarget}. Setting {@link #USE_KERNEL}
+ * to {@code true} in the target table's additional properties routes the sync through the Delta
+ * Kernel based {@code DeltaKernelConversionTarget} instead.
  */
 @Value
 public class DeltaConversionTargetConfig {
   /**
-   * When {@code false}, Delta syncs fall back to the Delta Standalone implementation instead of the
-   * default Delta Kernel implementation. Defaults to {@code true}.
+   * When {@code true}, Delta syncs are written using the Delta Kernel implementation instead of the
+   * default Delta Standalone implementation. Defaults to {@code false}.
    */
   public static final String USE_KERNEL = "xtable.delta.target.use_kernel";
 
@@ -45,8 +42,8 @@ public class DeltaConversionTargetConfig {
 
   public static DeltaConversionTargetConfig fromProperties(Properties properties) {
     boolean useKernel =
-        properties == null
-            || Boolean.parseBoolean(properties.getProperty(USE_KERNEL, Boolean.TRUE.toString()));
+        properties != null
+            && Boolean.parseBoolean(properties.getProperty(USE_KERNEL, Boolean.FALSE.toString()));
     return new DeltaConversionTargetConfig(useKernel);
   }
 }

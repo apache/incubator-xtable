@@ -1548,13 +1548,8 @@ public class ITConversionController {
                 formatName -> {
                   TypedProperties targetProperties =
                       hudiTargetProperties(formatName, hudiTargetVersion);
-                  if (formatName.equals(DELTA)) {
-                    // Pin explicitly rather than relying on DeltaConversionTargetConfig's
-                    // default, so the Standalone cases stay Standalone regardless of which
-                    // implementation the default currently points at.
-                    targetProperties.setProperty(
-                        DeltaConversionTargetConfig.USE_KERNEL,
-                        String.valueOf(useDeltaKernelTarget));
+                  if (useDeltaKernelTarget && formatName.equals(DELTA)) {
+                    targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
                   }
                   return TargetTable.builder()
                       .name(tableName)

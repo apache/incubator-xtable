@@ -31,10 +31,7 @@ tableFormatConverters:
       conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
       conversionTargetProviderClass: org.apache.xtable.hudi.HudiConversionTarget
     DELTA:
-      # Kernel is the default Delta source as of https://github.com/apache/incubator-xtable/issues/886.
-      # Override with a --convertersConfig file setting this back to
-      # org.apache.xtable.delta.DeltaConversionSourceProvider to use Delta Standalone instead.
-      conversionSourceProviderClass: org.apache.xtable.kernel.DeltaKernelConversionSourceProvider
+      conversionSourceProviderClass: org.apache.xtable.delta.DeltaConversionSourceProvider
       conversionTargetProviderClass: org.apache.xtable.delta.DeltaConversionTarget
       configuration:
         spark.master: local[2]

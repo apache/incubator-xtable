@@ -74,7 +74,7 @@ public class ConversionTargetFactory {
   /**
    * Resolves the ConversionTarget for the given format, using the target properties to pick between
    * the Delta Standalone and Delta Kernel implementations (both registered under {@link
-   * TableFormat#DELTA}) via {@link DeltaConversionTargetConfig#USE_KERNEL} (default {@code true}).
+   * TableFormat#DELTA}) via {@link DeltaConversionTargetConfig#USE_KERNEL} (default {@code false}).
    * Other formats have a single implementation, so the flag has no effect.
    *
    * @param tableFormatName the target table format name

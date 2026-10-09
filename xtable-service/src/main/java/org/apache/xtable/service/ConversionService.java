@@ -47,11 +47,9 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
-import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergSchemaExtractor;
-import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SparkSchemaExtractor;
@@ -143,13 +141,8 @@ public class ConversionService {
     Map<String, ConversionSourceProvider<?>> sourceProviders = new HashMap<>();
     ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
         new HudiConversionSourceProvider();
-    // Kernel is the default Delta source as of
-    // https://github.com/apache/incubator-xtable/issues/886.
-    // Set xtable.delta.source.use_kernel=false to fall back to Delta Standalone instead.
     ConversionSourceProvider<Long> deltaConversionSourceProvider =
-        serviceConfig.isDeltaSourceUseKernel()
-            ? new DeltaKernelConversionSourceProvider()
-            : new DeltaConversionSourceProvider();
+        new DeltaConversionSourceProvider();
     ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
         new IcebergConversionSourceProvider();
 
@@ -216,23 +209,13 @@ public class ConversionService {
 
     List<TargetTable> targetTables = new ArrayList<>();
     for (String targetFormat : convertTableRequest.getTargetFormats()) {
-      Properties targetProperties = new Properties();
-      targetProperties.putAll(sourceProperties);
-      if (DELTA.equals(targetFormat)) {
-        // Pin explicitly rather than relying on DeltaConversionTargetConfig's own default, so this
-        // flag's behavior holds regardless of which implementation that default currently points
-        // at.
-        targetProperties.setProperty(
-            DeltaConversionTargetConfig.USE_KERNEL,
-            String.valueOf(serviceConfig.isDeltaTargetUseKernel()));
-      }
       TargetTable targetTable =
           TargetTable.builder()
               .name(convertTableRequest.getSourceTableName())
               // set the metadata path to the data path as the default (required by Hudi)
               .basePath(convertTableRequest.getSourceDataPath())
               .formatName(targetFormat)
-              .additionalProperties(targetProperties)
+              .additionalProperties(sourceProperties)
               .build();
       targetTables.add(targetTable);
     }
