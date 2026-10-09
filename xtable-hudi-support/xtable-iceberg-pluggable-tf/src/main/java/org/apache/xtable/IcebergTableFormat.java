@@ -35,8 +35,10 @@ import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.common.HoodieTableFormat;
 import org.apache.hudi.common.config.HoodieConfig;
+import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -75,6 +77,7 @@ import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.spi.sync.TableFormatSync;
+import org.apache.xtable.timeline.IcebergActiveTimeline;
 import org.apache.xtable.timeline.IcebergSnapshotInstants;
 import org.apache.xtable.timeline.IcebergTimelineArchiver;
 import org.apache.xtable.timeline.IcebergTimelineFactory;
@@ -90,8 +93,13 @@ public class IcebergTableFormat implements HoodieTableFormat {
 
   public IcebergTableFormat() {}
 
+  /**
+   * Hudi passes the table's {@code hoodie.properties} here on every meta client load, which is the
+   * earliest point an unsupported table shape can be refused: before any instant exists.
+   */
   @Override
   public void init(Properties properties) {
+    requireCopyOnWrite(new HoodieConfig(TypedProperties.copy(properties)));
     this.tableFormatSync = TableFormatSync.getInstance();
   }
 
@@ -148,13 +156,40 @@ public class IcebergTableFormat implements HoodieTableFormat {
    * whose snapshot removes the rolled-back files and restores the previous file versions, rather
    * than by rewinding snapshot history, which would also hide the clean and rollback instants
    * recorded after the commit and make them pending again.
+   *
+   * <p>A rollback that belongs to a restore is refused here, before Hudi deletes any data file:
+   * Hudi runs those rollbacks without publishing them, so {@link #completedRollback} would never
+   * fire and Iceberg would keep pointing at the deleted files.
    */
   @Override
   public void rollback(
       HoodieInstant completedInstant,
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
-      FileSystemViewManager viewManager) {}
+      FileSystemViewManager viewManager) {
+    if (!metaClient
+        .reloadActiveTimeline()
+        .getRestoreTimeline()
+        .filterInflightsAndRequested()
+        .empty()) {
+      throw IcebergActiveTimeline.restoreNotSupported(metaClient.getTableConfig());
+    }
+  }
+
+  /**
+   * Reached only when a restore rolled back nothing that Iceberg had recorded; see {@link
+   * IcebergActiveTimeline#restoreNotSupported}. Hudi has already completed the restore instant by
+   * now, and without a snapshot the reconstructed timeline reports it pending, so the instant has
+   * to be removed from the timeline by hand before the table accepts writes again.
+   */
+  @Override
+  public void restore(
+      HoodieInstant restoreCompletedInstant,
+      HoodieEngineContext engineContext,
+      HoodieTableMetaClient metaClient,
+      FileSystemViewManager viewManager) {
+    throw IcebergActiveTimeline.restoreNotSupported(metaClient.getTableConfig());
+  }
 
   @Override
   public void completedRollback(
@@ -312,6 +347,25 @@ public class IcebergTableFormat implements HoodieTableFormat {
   }
 
   /**
+   * Only copy-on-write tables are supported. {@link HudiDataFileExtractor} skips log files, so a
+   * deltacommit that writes only log files would publish an empty snapshot and Iceberg readers
+   * would silently miss every update and delete in it.
+   *
+   * @throws UnsupportedOperationException when the table is merge-on-read
+   */
+  static void requireCopyOnWrite(HoodieConfig tableConfig) {
+    String tableType = tableConfig.getStringOrDefault(HoodieTableConfig.TYPE);
+    if (!HoodieTableType.COPY_ON_WRITE.name().equals(tableType)) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "The Iceberg table format only supports %s tables, but table %s is %s",
+              HoodieTableType.COPY_ON_WRITE,
+              tableConfig.getStringOrDefault(HoodieTableConfig.NAME, ""),
+              tableType));
+    }
+  }
+
+  /**
    * Maps the table's Hudi partition fields to the XTable partition spec. Only identity partitioning
    * is supported: each field becomes a {@link PartitionTransformType#VALUE} Iceberg partition field
    * of the source column's type. A timestamp-based key generator, or a custom key generator with a
@@ -364,6 +418,7 @@ public class IcebergTableFormat implements HoodieTableFormat {
 
   private HudiIncrementalTableChangeExtractor getHudiTableExtractor(
       HoodieTableMetaClient metaClient, FileSystemViewManager viewManager) {
+    requireCopyOnWrite(metaClient.getTableConfig());
     String partitionSpec = partitionFieldSpec(metaClient.getTableConfig());
     final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
         HudiSourceConfig.fromPartitionFieldSpecConfig(partitionSpec)

@@ -52,6 +52,10 @@ final class IcebergTableAssertions {
     return new HadoopTables(new Configuration()).load(basePath);
   }
 
+  static boolean icebergTableExists(String basePath) {
+    return new HadoopTables(new Configuration()).exists(basePath);
+  }
+
   /** Iceberg plans exactly the given Hudi base files, and each of them exists on storage. */
   @SneakyThrows
   static void assertIcebergReferencesExactly(String basePath, List<String> expectedBaseFiles) {
