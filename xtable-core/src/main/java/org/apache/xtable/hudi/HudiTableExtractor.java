@@ -34,6 +34,7 @@ import org.apache.avro.Schema;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.schema.HoodieSchemaUtils;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -138,11 +139,22 @@ public class HudiTableExtractor {
               "Commit metadata for instant %s of table %s carries no writer schema",
               commit, metaClient.getTableConfig().getTableName()));
     }
-    boolean withOperationField = false;
+    HoodieTableConfig tableConfig = metaClient.getTableConfig();
     try {
       HoodieSchema writerSchema = HoodieSchema.parse(writerSchemaJson);
-      return schemaExtractor.schema(
-          HoodieSchemaUtils.addMetadataFields(writerSchema, withOperationField).toAvroSchema());
+      // Mirrors TableSchemaResolver, which the timeline-based path uses, so every snapshot of a
+      // table describes it with the same schema: meta fields only when the table populates them,
+      // and partition columns appended when the writer drops them from the data files.
+      HoodieSchema tableSchema =
+          tableConfig.populateMetaFields()
+              ? HoodieSchemaUtils.addMetadataFields(writerSchema, false)
+              : HoodieSchemaUtils.removeMetadataFields(writerSchema);
+      if (tableConfig.shouldDropPartitionColumns()) {
+        tableSchema =
+            TableSchemaResolver.appendPartitionColumns(
+                tableSchema, tableConfig.getPartitionFields());
+      }
+      return schemaExtractor.schema(tableSchema.toAvroSchema());
     } catch (Exception e) {
       throw new SchemaExtractorException(
           String.format(

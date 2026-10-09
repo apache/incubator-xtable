@@ -19,13 +19,16 @@
 package org.apache.xtable.timeline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
+import org.apache.hudi.common.util.Option;
 
 class TestIcebergActiveTimeline {
 
@@ -61,6 +64,43 @@ class TestIcebergActiveTimeline {
         IcebergActiveTimeline.instantKey(completed),
         IcebergActiveTimeline.instantKey(inflight),
         "the same action at the same requested time is one instant regardless of its state");
+  }
+
+  @Test
+  void historyOlderThanTheRetainedSnapshotsOnBothClocksIsTrusted() {
+    HoodieInstant oldestRetained = completed("20260101000000400", "20260101000000500");
+    assertTrue(
+        IcebergActiveTimeline.completedBeforeRetainedHistory(
+            completed("20260101000000100", "20260101000000200"), Option.of(oldestRetained)));
+    // A savepoint snapshot carries the requested time of the commit it keeps.
+    assertTrue(
+        IcebergActiveTimeline.completedBeforeRetainedHistory(
+            completed("20260101000000400", "20260101000000450"), Option.of(oldestRetained)));
+  }
+
+  @Test
+  void aCommitRequestedAfterTheOldestRetainedInstantIsNotHistory() {
+    // Requested after the oldest retained instant but completed before it: a hook that never ran
+    // under a concurrent writer, so it stays pending and is rolled back.
+    HoodieInstant oldestRetained = completed("20260101000000400", "20260101000000500");
+    assertFalse(
+        IcebergActiveTimeline.completedBeforeRetainedHistory(
+            completed("20260101000000401", "20260101000000450"), Option.of(oldestRetained)));
+    assertFalse(
+        IcebergActiveTimeline.completedBeforeRetainedHistory(
+            completed("20260101000000100", "20260101000000600"), Option.of(oldestRetained)));
+    assertFalse(
+        IcebergActiveTimeline.completedBeforeRetainedHistory(
+            completed("20260101000000100", "20260101000000200"), Option.empty()));
+  }
+
+  private static HoodieInstant completed(String requestedTime, String completionTime) {
+    return new HoodieInstant(
+        HoodieInstant.State.COMPLETED,
+        HoodieTimeline.COMMIT_ACTION,
+        requestedTime,
+        completionTime,
+        InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
   }
 
   private static HoodieInstant instant(String action, String requestedTime) {

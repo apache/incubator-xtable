@@ -131,7 +131,25 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
         TableIdentifier.of(metaClient.getTableConfig().getTableName());
     if (!icebergTableManager.tableExists(
         null, tableIdentifier, metaClient.getBasePath().toString())) {
-      return Collections.emptyList();
+      // Before the first commit publishes a snapshot there is no Iceberg table and every Hudi
+      // instant is pending. Completed instants without an Iceberg table mean the Iceberg metadata
+      // is gone, and reading the table as empty would let a writer rebuild it from nothing.
+      List<HoodieInstant> completedInstants =
+          instantsFromHoodieTimeline.stream()
+              .filter(HoodieInstant::isCompleted)
+              .collect(Collectors.toList());
+      if (!completedInstants.isEmpty()) {
+        throw new IllegalStateException(
+            String.format(
+                "Table %s has %d completed instants, the latest %s, but no Iceberg table at %s:"
+                    + " the Iceberg metadata has been removed and has to be restored before the"
+                    + " table can be used",
+                metaClient.getTableConfig().getTableName(),
+                completedInstants.size(),
+                completedInstants.get(completedInstants.size() - 1),
+                metaClient.getBasePath()));
+      }
+      return instantsFromHoodieTimeline;
     }
     Table icebergTable =
         icebergTableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
@@ -145,19 +163,18 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
     // Snapshots older than the oldest retained one have been expired, by the archiver or by an
     // Iceberg expire-snapshots run, so a completed instant older than the oldest recorded instant
     // is history rather than pending work.
-    Option<String> oldestRecordedCompletionTime =
+    Option<HoodieInstant> oldestRecordedInstant =
         ancestors.isEmpty()
             ? Option.empty()
-            : Option.ofNullable(
+            : Option.of(
                 IcebergSnapshotInstants.recordedInstant(
-                        ancestors.get(0), metaClient.getInstantGenerator())
-                    .getCompletionTime());
+                    ancestors.get(0), metaClient.getInstantGenerator()));
     return instantsFromHoodieTimeline.stream()
         .map(
             instant -> {
               if (!instant.isCompleted()
                   || recordedInstantKeys.contains(instantKey(instant))
-                  || completedBeforeRetainedHistory(instant, oldestRecordedCompletionTime)) {
+                  || completedBeforeRetainedHistory(instant, oldestRecordedInstant)) {
                 return instant;
               }
               // Completed in Hudi but not recorded by Iceberg: the write did not finish, so the
@@ -173,13 +190,27 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
         .collect(Collectors.toList());
   }
 
-  private static boolean completedBeforeRetainedHistory(
-      HoodieInstant instant, Option<String> oldestRecordedCompletionTime) {
-    return oldestRecordedCompletionTime.isPresent()
-        && instant.getCompletionTime() != null
+  /**
+   * Whether a completed instant without a snapshot predates the retained Iceberg history on both
+   * clocks. Requested time alone is not enough, and neither is completion time: under concurrent
+   * writers a commit can complete before the oldest retained instant yet be requested after it,
+   * which marks it as one whose hook never ran rather than one whose snapshot was expired, and it
+   * has to stay pending so the next writer rolls it back. A savepoint shares the requested time of
+   * the commit it keeps, so equal requested times count as older.
+   */
+  static boolean completedBeforeRetainedHistory(
+      HoodieInstant instant, Option<HoodieInstant> oldestRecordedInstant) {
+    if (!oldestRecordedInstant.isPresent()
+        || instant.getCompletionTime() == null
+        || oldestRecordedInstant.get().getCompletionTime() == null) {
+      return false;
+    }
+    HoodieInstant oldest = oldestRecordedInstant.get();
+    return InstantComparison.compareTimestamps(
+            instant.requestedTime(),
+            InstantComparison.LESSER_THAN_OR_EQUALS,
+            oldest.requestedTime())
         && InstantComparison.compareTimestamps(
-            instant.getCompletionTime(),
-            InstantComparison.LESSER_THAN,
-            oldestRecordedCompletionTime.get());
+            instant.getCompletionTime(), InstantComparison.LESSER_THAN, oldest.getCompletionTime());
   }
 }
