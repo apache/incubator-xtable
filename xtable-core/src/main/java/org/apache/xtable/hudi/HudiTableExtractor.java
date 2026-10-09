@@ -95,7 +95,7 @@ public class HudiTableExtractor {
         .readSchema(canonicalSchema)
         .latestMetadataPath(metaClient.getMetaPath().toString())
         .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, commit))
-        .latestTableOperationIdentifier(generateTableOperationId(commit))
+        .latestTableOperationIdentifier(tableOperationIdentifier(commit))
         .build();
   }
 
@@ -125,7 +125,7 @@ public class HudiTableExtractor {
         // Both overloads take the sync clock from getSyncInstant, so the pluggable-format path
         // and the timeline-based path record the same time for the same instant.
         .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, completedInstant))
-        .latestTableOperationIdentifier(generateTableOperationId(completedInstant))
+        .latestTableOperationIdentifier(tableOperationIdentifier(completedInstant))
         .build();
   }
 
@@ -180,8 +180,13 @@ public class HudiTableExtractor {
         .collect(Collectors.toList());
   }
 
+  /**
+   * The serialized form of a Hudi instant that {@link
+   * InternalTable#getLatestTableOperationIdentifier()} carries, read back by the pluggable table
+   * format's timeline, archiver and rollback.
+   */
   @SneakyThrows
-  private String generateTableOperationId(HoodieInstant completedInstant) {
+  public static String tableOperationIdentifier(HoodieInstant completedInstant) {
     return MAPPER.writeValueAsString(InstantDTO.fromInstant(completedInstant));
   }
 }

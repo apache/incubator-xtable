@@ -20,9 +20,11 @@ package org.apache.xtable.hudi;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Set;
 
 import lombok.Value;
 
+import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -57,30 +59,59 @@ public class HudiIncrementalTableChangeExtractor {
           dataFileExtractor.getDiffFromCommitMetadata(
               internalTable, commitMetadata, completedInstant);
     }
+    return changesFor(internalTable, dataFilesDiff, completedInstant);
+  }
 
+  /**
+   * The changes a completed rollback makes to the data files, see {@link
+   * HudiDataFileExtractor#getDiffFromRollbackMetadata}.
+   *
+   * @param publishedCommitTimes requested times of the commits the target has recorded
+   */
+  public IncrementalTableChanges extractTableChanges(
+      HoodieRollbackMetadata rollbackMetadata,
+      HoodieInstant rollbackInstant,
+      Set<String> publishedCommitTimes) {
+    return extractTableChanges(
+        rollbackMetadata,
+        rollbackInstant,
+        publishedCommitTimes,
+        tableExtractor.table(metaClient, rollbackInstant));
+  }
+
+  /**
+   * Same as {@link #extractTableChanges(HoodieRollbackMetadata, HoodieInstant, Set)} with the table
+   * description supplied by the caller, for a rollback after which Hudi has no completed commit
+   * left to derive it from.
+   */
+  public IncrementalTableChanges extractTableChanges(
+      HoodieRollbackMetadata rollbackMetadata,
+      HoodieInstant rollbackInstant,
+      Set<String> publishedCommitTimes,
+      InternalTable internalTable) {
+    InternalFilesDiff dataFilesDiff =
+        dataFileExtractor.getDiffFromRollbackMetadata(
+            internalTable, rollbackMetadata, publishedCommitTimes);
+    return changesFor(internalTable, dataFilesDiff, rollbackInstant);
+  }
+
+  /** An instant that changes no data files, such as a clean or a savepoint. */
+  public IncrementalTableChanges extractTableChanges(HoodieInstant completedInstant) {
+    InternalTable internalTable = tableExtractor.table(metaClient, completedInstant);
+    return changesFor(
+        internalTable,
+        InternalFilesDiff.from(Collections.emptyList(), Collections.emptyList()),
+        completedInstant);
+  }
+
+  private static IncrementalTableChanges changesFor(
+      InternalTable internalTable, InternalFilesDiff dataFilesDiff, HoodieInstant instant) {
     Iterator<TableChange> tableChangeIterator =
         Collections.singleton(
                 TableChange.builder()
                     .tableAsOfChange(internalTable)
                     .filesDiff(dataFilesDiff)
-                    .sourceIdentifier(completedInstant.getCompletionTime())
-                    .build())
-            .iterator();
-    return IncrementalTableChanges.builder()
-        .tableChanges(tableChangeIterator)
-        .pendingCommits(Collections.emptyList())
-        .build();
-  }
-
-  public IncrementalTableChanges extractTableChanges(HoodieInstant completedInstant) {
-    InternalTable internalTable = tableExtractor.table(metaClient, completedInstant);
-    Iterator<TableChange> tableChangeIterator =
-        Collections.singleton(
-                TableChange.builder()
-                    .tableAsOfChange(internalTable)
-                    .filesDiff(
-                        InternalFilesDiff.from(Collections.emptyList(), Collections.emptyList()))
-                    .sourceIdentifier(completedInstant.getCompletionTime())
+                    .sourceIdentifier(instant.getCompletionTime())
                     .build())
             .iterator();
     return IncrementalTableChanges.builder()

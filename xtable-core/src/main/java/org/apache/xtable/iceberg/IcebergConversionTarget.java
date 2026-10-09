@@ -18,8 +18,8 @@
  
 package org.apache.xtable.iceberg;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -72,7 +72,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private TableIdentifier tableIdentifier;
   private IcebergCatalogConfig catalogConfig;
   private Configuration configuration;
-  private int snapshotRetentionInHours;
+  private Duration metadataRetention;
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
@@ -117,7 +117,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     String tableName = targetTable.getName();
     this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    this.metadataRetention = targetTable.getMetadataRetention();
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
@@ -289,13 +289,14 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void completeSync() {
-    transaction
-        .expireSnapshots()
-        .expireOlderThan(
-            Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
-        .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
-        .cleanExpiredFiles(true)
-        .commit();
+    if (!metadataRetention.isNegative()) {
+      transaction
+          .expireSnapshots()
+          .expireOlderThan(Instant.now().minus(metadataRetention).toEpochMilli())
+          .deleteWith(this::safeDelete)
+          .cleanExpiredFiles(true)
+          .commit();
+    }
     transaction.commitTransaction();
     resetTransactionState();
   }
@@ -364,17 +365,6 @@ public class IcebergConversionTarget implements ConversionTarget {
       expireSnapshots.expireSnapshotId(snapshotId);
     }
     expireSnapshots.commit();
-    transaction.commitTransaction();
-    resetTransactionState();
-  }
-
-  /**
-   * Makes the given snapshot current and ends the sync. Requires {@link #beginSync} to have run.
-   *
-   * @param snapshotId the snapshot to roll back to, which must be an ancestor of the current one
-   */
-  public void rollbackToSnapshotId(long snapshotId) {
-    table.manageSnapshots().rollbackTo(snapshotId).commit();
     transaction.commitTransaction();
     resetTransactionState();
   }

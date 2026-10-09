@@ -19,12 +19,10 @@
 package org.apache.xtable.timeline;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
@@ -32,31 +30,22 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.util.SnapshotUtil;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.apache.xtable.iceberg.IcebergConversionTarget;
 import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.metadata.TableSyncMetadata;
 
+/**
+ * Expires the Iceberg snapshots whose instants Hudi has archived. Snapshots are expired only from
+ * the oldest end of the current snapshot's ancestry: removing one from the middle would cut the
+ * parent chain and hide every older snapshot from the reconstructed timeline.
+ */
 @Log4j2
 public class IcebergTimelineArchiver {
-  private static final ObjectMapper MAPPER =
-      new ObjectMapper()
-          .registerModule(new JavaTimeModule())
-          .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-          .setSerializationInclusion(JsonInclude.Include.NON_NULL);
-
   private final HoodieTableMetaClient metaClient;
   private final IcebergConversionTarget target;
   private final IcebergTableManager tableManager;
@@ -68,48 +57,41 @@ public class IcebergTimelineArchiver {
         IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
   }
 
-  @SneakyThrows
   public void archiveInstants(InternalTable internalTable, List<HoodieInstant> archivedInstants) {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(metaClient.getTableConfig().getTableName());
-    if (tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
-      Table table =
-          tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
-      List<Long> expireSnapshots = new ArrayList<>();
-      // The ancestry of the current snapshot is ordered by construction, newest first. Walk it
-      // oldest first so the savepoint check below stops before the snapshots a restore may need.
-      List<Snapshot> ancestorsOldestFirst = new ArrayList<>();
-      SnapshotUtil.currentAncestors(table).forEach(ancestorsOldestFirst::add);
-      Collections.reverse(ancestorsOldestFirst);
-      Set<Long> ancestorIds =
-          ancestorsOldestFirst.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
-      for (Snapshot snapshot : ancestorsOldestFirst) {
-        TableSyncMetadata syncMetadata =
-            TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
-                .get();
-        HoodieInstant hoodieInstant =
-            InstantDTO.toInstant(
-                MAPPER.readValue(
-                    syncMetadata.getLatestTableOperationIdentifier(), InstantDTO.class),
-                metaClient.getInstantGenerator());
-        if (HoodieTimeline.SAVEPOINT_ACTION.equals(hoodieInstant.getAction())) {
-          log.info(
-              "Skipping expiring next set of snapshots because of savepoint {}", hoodieInstant);
-          break;
-        }
-        if (archivedInstants.contains(hoodieInstant)) {
-          expireSnapshots.add(snapshot.snapshotId());
-        }
-      }
-      // A retained snapshot outside the ancestry was left behind by a rollback. Hudi has already
-      // deleted the files it added and no reader can reach it, so it only holds metadata.
-      for (Snapshot snapshot : table.snapshots()) {
-        if (!ancestorIds.contains(snapshot.snapshotId())) {
-          expireSnapshots.add(snapshot.snapshotId());
-        }
-      }
-      target.beginSync(internalTable);
-      target.expireSnapshotIds(expireSnapshots);
+    if (!tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
+      return;
     }
+    Table table = tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
+    Set<String> archivedInstantKeys =
+        archivedInstants.stream()
+            .map(IcebergActiveTimeline::instantKey)
+            .collect(Collectors.toSet());
+    Set<String> activeInstantKeys =
+        metaClient
+            .reloadActiveTimeline()
+            .getInstantsAsStream()
+            .map(IcebergActiveTimeline::instantKey)
+            .collect(Collectors.toSet());
+    List<Long> expireSnapshots = new ArrayList<>();
+    for (Snapshot snapshot : IcebergSnapshotInstants.ancestorsOldestFirst(table)) {
+      HoodieInstant hoodieInstant =
+          IcebergSnapshotInstants.recordedInstant(snapshot, metaClient.getInstantGenerator());
+      if (HoodieTimeline.SAVEPOINT_ACTION.equals(hoodieInstant.getAction())) {
+        log.info("Skipping expiring next set of snapshots because of savepoint {}", hoodieInstant);
+        break;
+      }
+      String instantKey = IcebergActiveTimeline.instantKey(hoodieInstant);
+      // A snapshot whose instant is neither being archived nor already gone from the timeline (a
+      // rolled-back commit, or an instant archived behind a savepoint earlier) has to stay, and so
+      // does everything newer.
+      if (!archivedInstantKeys.contains(instantKey) && activeInstantKeys.contains(instantKey)) {
+        break;
+      }
+      expireSnapshots.add(snapshot.snapshotId());
+    }
+    target.beginSync(internalTable);
+    target.expireSnapshotIds(expireSnapshots);
   }
 }

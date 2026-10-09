@@ -19,36 +19,26 @@
 package org.apache.xtable.timeline;
 
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import lombok.SneakyThrows;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.timeline.dto.InstantDTO;
+import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.table.timeline.versioning.v2.ActiveTimelineV2;
 import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
+import org.apache.hudi.common.util.Option;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.util.SnapshotUtil;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.apache.xtable.iceberg.IcebergTableManager;
-import org.apache.xtable.model.metadata.TableSyncMetadata;
 
 /**
  * The Hudi active timeline reconstructed from the Iceberg table: an instant counts as completed
@@ -56,12 +46,6 @@ import org.apache.xtable.model.metadata.TableSyncMetadata;
  * that is still retained in table metadata cannot resurface its instant as completed.
  */
 public class IcebergActiveTimeline extends ActiveTimelineV2 {
-  private static final ObjectMapper MAPPER =
-      new ObjectMapper()
-          .registerModule(new JavaTimeModule())
-          .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-          .setSerializationInclusion(JsonInclude.Include.NON_NULL);
-
   public IcebergActiveTimeline(
       HoodieTableMetaClient metaClient,
       Set<String> includedExtensions,
@@ -97,7 +81,6 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
     return instant.requestedTime() + "." + instant.getAction();
   }
 
-  @SneakyThrows
   protected List<HoodieInstant> getInstantsFromFileSystem(
       HoodieTableMetaClient metaClient,
       Set<String> includedExtensions,
@@ -114,41 +97,51 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
     }
     Table icebergTable =
         icebergTableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
-    Map<String, HoodieInstant> instantsFromIceberg = new HashMap<>();
-    // Walk the ancestry rather than snapshots(): a rollback makes the parent current again but the
-    // rolled-back snapshot stays in table metadata until it is expired.
-    for (Snapshot snapshot : SnapshotUtil.currentAncestors(icebergTable)) {
-      TableSyncMetadata syncMetadata =
-          TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
-              .get();
-      HoodieInstant hoodieInstant =
-          InstantDTO.toInstant(
-              MAPPER.readValue(syncMetadata.getLatestTableOperationIdentifier(), InstantDTO.class),
-              metaClient.getInstantGenerator());
-      instantsFromIceberg.put(instantKey(hoodieInstant), hoodieInstant);
+    List<Snapshot> ancestors = IcebergSnapshotInstants.ancestorsOldestFirst(icebergTable);
+    Set<String> recordedInstantKeys = new HashSet<>();
+    for (Snapshot snapshot : ancestors) {
+      recordedInstantKeys.add(
+          instantKey(
+              IcebergSnapshotInstants.recordedInstant(snapshot, metaClient.getInstantGenerator())));
     }
-    List<HoodieInstant> inflightInstantsInIceberg =
-        instantsFromHoodieTimeline.stream()
-            .filter(hoodieInstant -> !instantsFromIceberg.containsKey(instantKey(hoodieInstant)))
-            .map(
-                instant -> {
-                  if (instant.isCompleted()) {
-                    return new HoodieInstant(
-                        HoodieInstant.State.INFLIGHT,
-                        instant.getAction(),
-                        instant.requestedTime(),
-                        instant.getCompletionTime(),
-                        InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
-                  }
-                  return instant;
-                })
-            .collect(Collectors.toList());
-    List<HoodieInstant> completedInstantsInIceberg =
-        instantsFromIceberg.values().stream()
-            .filter(instantsFromHoodieTimeline::contains)
-            .collect(Collectors.toList());
-    return Stream.concat(completedInstantsInIceberg.stream(), inflightInstantsInIceberg.stream())
+    // Snapshots older than the oldest retained one have been expired, by the archiver or by an
+    // Iceberg expire-snapshots run, so a completed instant older than the oldest recorded instant
+    // is history rather than pending work.
+    Option<String> oldestRecordedCompletionTime =
+        ancestors.isEmpty()
+            ? Option.empty()
+            : Option.ofNullable(
+                IcebergSnapshotInstants.recordedInstant(
+                        ancestors.get(0), metaClient.getInstantGenerator())
+                    .getCompletionTime());
+    return instantsFromHoodieTimeline.stream()
+        .map(
+            instant -> {
+              if (!instant.isCompleted()
+                  || recordedInstantKeys.contains(instantKey(instant))
+                  || completedBeforeRetainedHistory(instant, oldestRecordedCompletionTime)) {
+                return instant;
+              }
+              // Completed in Hudi but not recorded by Iceberg: the write did not finish, so the
+              // next writer rolls it back.
+              return new HoodieInstant(
+                  HoodieInstant.State.INFLIGHT,
+                  instant.getAction(),
+                  instant.requestedTime(),
+                  instant.getCompletionTime(),
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+            })
         .sorted(InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR)
         .collect(Collectors.toList());
+  }
+
+  private static boolean completedBeforeRetainedHistory(
+      HoodieInstant instant, Option<String> oldestRecordedCompletionTime) {
+    return oldestRecordedCompletionTime.isPresent()
+        && instant.getCompletionTime() != null
+        && InstantComparison.compareTimestamps(
+            instant.getCompletionTime(),
+            InstantComparison.LESSER_THAN,
+            oldestRecordedCompletionTime.get());
   }
 }

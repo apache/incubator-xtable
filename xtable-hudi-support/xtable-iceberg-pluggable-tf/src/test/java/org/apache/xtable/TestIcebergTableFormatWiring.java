@@ -25,6 +25,7 @@ import java.util.Properties;
 
 import org.junit.jupiter.api.Test;
 
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.metadata.IcebergMetadataFactory;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.timeline.IcebergTimelineFactory;
@@ -40,6 +41,15 @@ class TestIcebergTableFormatWiring {
   @Test
   void nameMatchesTheValueWrittenToHoodieProperties() {
     assertEquals(TableFormat.ICEBERG, tableFormat().getName());
+  }
+
+  @Test
+  void neverExpiresSnapshotsByAge() {
+    // The reconstructed timeline treats a completed instant without a snapshot as inflight, so
+    // snapshots may only go away when Hudi archives their instants.
+    assertEquals(
+        TargetTable.NO_METADATA_EXPIRY,
+        IcebergTableFormat.targetTable("table", "/base").getMetadataRetention());
   }
 
   @Test
