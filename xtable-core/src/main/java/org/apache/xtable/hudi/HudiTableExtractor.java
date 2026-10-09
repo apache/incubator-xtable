@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.common.model.HoodieCommitMetadata.SCHEMA_KEY;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -25,12 +27,24 @@ import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
+import lombok.SneakyThrows;
+
 import org.apache.avro.Schema;
 
+import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.schema.HoodieSchemaUtils;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 import org.apache.hudi.common.util.Option;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.model.InternalTable;
@@ -47,6 +61,11 @@ import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
  */
 @Singleton
 public class HudiTableExtractor {
+  private static final ObjectMapper MAPPER =
+      new ObjectMapper()
+          .registerModule(new JavaTimeModule())
+          .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+          .setSerializationInclusion(JsonInclude.Include.NON_NULL);
   private final HudiSchemaExtractor schemaExtractor;
   private final SourcePartitionSpecExtractor partitionSpecExtractor;
 
@@ -58,18 +77,7 @@ public class HudiTableExtractor {
   }
 
   public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
-    TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
-    InternalSchema canonicalSchema;
-    Schema avroSchema;
-    try {
-      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
-      canonicalSchema = schemaExtractor.schema(avroSchema);
-    } catch (Exception e) {
-      throw new SchemaExtractorException(
-          String.format(
-              "Failed to convert table %s schema", metaClient.getTableConfig().getTableName()),
-          e);
-    }
+    InternalSchema canonicalSchema = getCanonicalSchemaFromTimeline(metaClient, commit);
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -88,7 +96,89 @@ public class HudiTableExtractor {
         .readSchema(canonicalSchema)
         .latestMetadataPath(metaClient.getMetaPath().toString())
         .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, commit))
+        .latestTableOperationIdentifier(tableOperationIdentifier(commit))
         .build();
+  }
+
+  public InternalTable table(
+      HoodieTableMetaClient metaClient,
+      HoodieCommitMetadata commitMetadata,
+      HoodieInstant completedInstant) {
+    InternalSchema canonicalSchema =
+        getCanonicalSchemaFromCommitMetadata(metaClient, commitMetadata, completedInstant);
+    List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
+    List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
+    if (!recordKeyFields.isEmpty()) {
+      canonicalSchema = canonicalSchema.toBuilder().recordKeyFields(recordKeyFields).build();
+    }
+    DataLayoutStrategy dataLayoutStrategy =
+        partitionFields.size() > 0
+            ? DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES
+            : DataLayoutStrategy.FLAT;
+    return InternalTable.builder()
+        .tableFormat(TableFormat.HUDI)
+        .basePath(metaClient.getBasePath().toString())
+        .name(metaClient.getTableConfig().getTableName())
+        .layoutStrategy(dataLayoutStrategy)
+        .partitioningFields(partitionFields)
+        .readSchema(canonicalSchema)
+        .latestMetadataPath(metaClient.getMetaPath().toString())
+        // Both overloads take the sync clock from getSyncInstant, so the pluggable-format path
+        // and the timeline-based path record the same time for the same instant.
+        .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, completedInstant))
+        .latestTableOperationIdentifier(tableOperationIdentifier(completedInstant))
+        .build();
+  }
+
+  private InternalSchema getCanonicalSchemaFromCommitMetadata(
+      HoodieTableMetaClient metaClient, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
+    String writerSchemaJson = commitMetadata.getExtraMetadata().get(SCHEMA_KEY);
+    if (writerSchemaJson == null) {
+      throw new SchemaExtractorException(
+          String.format(
+              "Commit metadata for instant %s of table %s carries no writer schema",
+              commit, metaClient.getTableConfig().getTableName()));
+    }
+    HoodieTableConfig tableConfig = metaClient.getTableConfig();
+    try {
+      HoodieSchema writerSchema = HoodieSchema.parse(writerSchemaJson);
+      // Mirrors TableSchemaResolver, which the timeline-based path uses, so every snapshot of a
+      // table describes it with the same schema: meta fields only when the table populates them,
+      // and partition columns appended when the writer drops them from the data files.
+      HoodieSchema tableSchema =
+          tableConfig.populateMetaFields()
+              ? HoodieSchemaUtils.addMetadataFields(writerSchema, false)
+              : HoodieSchemaUtils.removeMetadataFields(writerSchema);
+      if (tableConfig.shouldDropPartitionColumns()) {
+        tableSchema =
+            TableSchemaResolver.appendPartitionColumns(
+                tableSchema, tableConfig.getPartitionFields());
+      }
+      return schemaExtractor.schema(tableSchema.toAvroSchema());
+    } catch (Exception e) {
+      throw new SchemaExtractorException(
+          String.format(
+              "Unable to read the writer schema for instant %s of table %s",
+              commit, metaClient.getTableConfig().getTableName()),
+          e);
+    }
+  }
+
+  private InternalSchema getCanonicalSchemaFromTimeline(
+      HoodieTableMetaClient metaClient, HoodieInstant commit) {
+    TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
+    InternalSchema canonicalSchema;
+    Schema avroSchema;
+    try {
+      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
+      canonicalSchema = schemaExtractor.schema(avroSchema);
+    } catch (Exception e) {
+      throw new SchemaExtractorException(
+          String.format(
+              "Failed to convert table %s schema", metaClient.getTableConfig().getTableName()),
+          e);
+    }
+    return canonicalSchema;
   }
 
   private List<InternalField> getRecordKeyFields(
@@ -100,5 +190,15 @@ public class HudiTableExtractor {
     return Arrays.stream(recordKeyFieldNames.get())
         .map(name -> SchemaFieldFinder.getInstance().findFieldByPath(canonicalSchema, name))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * The serialized form of a Hudi instant that {@link
+   * InternalTable#getLatestTableOperationIdentifier()} carries, read back by the pluggable table
+   * format's timeline, archiver and rollback.
+   */
+  @SneakyThrows
+  public static String tableOperationIdentifier(HoodieInstant completedInstant) {
+    return MAPPER.writeValueAsString(InstantDTO.fromInstant(completedInstant));
   }
 }

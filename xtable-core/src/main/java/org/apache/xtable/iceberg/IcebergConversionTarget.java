@@ -18,8 +18,8 @@
  
 package org.apache.xtable.iceberg;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +32,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -71,7 +72,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private TableIdentifier tableIdentifier;
   private IcebergCatalogConfig catalogConfig;
   private Configuration configuration;
-  private int snapshotRetentionInHours;
+  private Duration metadataRetention;
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
@@ -116,7 +117,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     String tableName = targetTable.getName();
     this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    this.metadataRetention = targetTable.getMetadataRetention();
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
@@ -288,17 +289,16 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void completeSync() {
-    transaction
-        .expireSnapshots()
-        .expireOlderThan(
-            Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
-        .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
-        .cleanExpiredFiles(true)
-        .commit();
+    if (!metadataRetention.isNegative()) {
+      transaction
+          .expireSnapshots()
+          .expireOlderThan(Instant.now().minus(metadataRetention).toEpochMilli())
+          .deleteWith(this::safeDelete)
+          .cleanExpiredFiles(true)
+          .commit();
+    }
     transaction.commitTransaction();
-    transaction = null;
-    internalTableState = null;
-    tableSyncMetadata = null;
+    resetTransactionState();
   }
 
   private void safeDelete(String file) {
@@ -345,6 +345,34 @@ public class IcebergConversionTarget implements ConversionTarget {
       }
     }
     return Optional.empty();
+  }
+
+  /**
+   * Expires the given snapshots and ends the sync. Requires {@link #beginSync} to have run. Passing
+   * an empty list is a no-op rather than an empty metadata commit, since callers driven by Hudi
+   * archival reach this on every round.
+   *
+   * @param snapshotIds snapshots to expire
+   */
+  public void expireSnapshotIds(List<Long> snapshotIds) {
+    if (snapshotIds.isEmpty()) {
+      // Nothing to expire, so end the sync without writing a metadata version that changes nothing.
+      resetTransactionState();
+      return;
+    }
+    ExpireSnapshots expireSnapshots = transaction.expireSnapshots().deleteWith(this::safeDelete);
+    for (Long snapshotId : snapshotIds) {
+      expireSnapshots.expireSnapshotId(snapshotId);
+    }
+    expireSnapshots.commit();
+    transaction.commitTransaction();
+    resetTransactionState();
+  }
+
+  private void resetTransactionState() {
+    transaction = null;
+    internalTableState = null;
+    tableSyncMetadata = null;
   }
 
   private void rollbackCorruptCommits() {

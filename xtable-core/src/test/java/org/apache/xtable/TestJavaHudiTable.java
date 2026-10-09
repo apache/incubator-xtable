@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -87,7 +88,29 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public static TestJavaHudiTable forStandardSchema(
       String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
     return new TestJavaHudiTable(
-        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, false);
+        tableName,
+        BASIC_SCHEMA,
+        tempDir,
+        partitionConfig,
+        tableType,
+        null,
+        false,
+        new Properties());
+  }
+
+  /**
+   * Same as {@link #forStandardSchema(String, Path, String, HoodieTableType)}, but persists the
+   * given table-level properties into {@code hoodie.properties}. Use this to set {@code
+   * hoodie.table.format} so that a pluggable table format is active for the table.
+   */
+  public static TestJavaHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Properties tableProperties) {
+    return new TestJavaHudiTable(
+        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, false, tableProperties);
   }
 
   public static TestJavaHudiTable forStandardSchema(
@@ -103,7 +126,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public static TestJavaHudiTable forStandardSchemaWithFieldIds(
       String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
     return new TestJavaHudiTable(
-        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, true);
+        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, true, new Properties());
   }
 
   public static TestJavaHudiTable forStandardSchema(
@@ -113,7 +136,14 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieTableType tableType,
       HoodieArchivalConfig archivalConfig) {
     return new TestJavaHudiTable(
-        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, archivalConfig, false);
+        tableName,
+        BASIC_SCHEMA,
+        tempDir,
+        partitionConfig,
+        tableType,
+        archivalConfig,
+        false,
+        new Properties());
   }
 
   /**
@@ -140,7 +170,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         partitionConfig,
         tableType,
         null,
-        false);
+        false,
+        new Properties());
   }
 
   public static TestJavaHudiTable withAdditionalColumnsAndFieldIds(
@@ -152,7 +183,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         partitionConfig,
         tableType,
         null,
-        true);
+        true,
+        new Properties());
   }
 
   public static TestJavaHudiTable withAdditionalTopLevelField(
@@ -168,7 +200,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         partitionConfig,
         tableType,
         null,
-        false);
+        false,
+        new Properties());
   }
 
   public static TestJavaHudiTable withSchema(
@@ -178,7 +211,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieTableType tableType,
       Schema schema) {
     return new TestJavaHudiTable(
-        tableName, schema, tempDir, partitionConfig, tableType, null, false);
+        tableName, schema, tempDir, partitionConfig, tableType, null, false, new Properties());
   }
 
   public static TestJavaHudiTable withSchema(
@@ -199,7 +232,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       String partitionConfig,
       HoodieTableType hoodieTableType,
       HoodieArchivalConfig archivalConfig,
-      boolean addFieldIds) {
+      boolean addFieldIds,
+      HoodieTableVersion tableVersion) {
     this(
         name,
         schema,
@@ -208,7 +242,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         hoodieTableType,
         archivalConfig,
         addFieldIds,
-        HoodieTableVersion.SIX);
+        tableVersion,
+        new Properties());
   }
 
   private TestJavaHudiTable(
@@ -219,14 +254,43 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieTableType hoodieTableType,
       HoodieArchivalConfig archivalConfig,
       boolean addFieldIds,
-      HoodieTableVersion tableVersion) {
+      Properties tableProperties) {
+    this(
+        name,
+        schema,
+        tempDir,
+        partitionConfig,
+        hoodieTableType,
+        archivalConfig,
+        addFieldIds,
+        HoodieTableVersion.SIX,
+        tableProperties);
+  }
+
+  private TestJavaHudiTable(
+      String name,
+      Schema schema,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType hoodieTableType,
+      HoodieArchivalConfig archivalConfig,
+      boolean addFieldIds,
+      HoodieTableVersion tableVersion,
+      Properties tableProperties) {
     super(name, schema, tempDir, partitionConfig);
-    this.tableVersion = tableVersion;
+    // The caller's table properties win over the module-wide format overrides, which win over the
+    // version the factory asked for.
+    this.tableVersion =
+        tableVersionFrom(tableProperties, tableVersionFrom(tableFormatOverrides(), tableVersion));
     this.conf = new Configuration();
     this.conf.set("parquet.avro.write-old-list-structure", "false");
     this.addFieldIds = addFieldIds;
+    // The caller's properties also override the defaults this class puts in the write config, so a
+    // test can turn off features that its table format does not support, such as the metadata
+    // table.
+    tableProperties.forEach((key, value) -> typedProperties.put(key, value));
     try {
-      this.metaClient = initMetaClient(hoodieTableType, typedProperties);
+      this.metaClient = initMetaClient(hoodieTableType, typedProperties, tableProperties);
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize metaclient for TestJavaHudiTable", ex);
     }
@@ -388,8 +452,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   private HoodieTableMetaClient initMetaClient(
-      HoodieTableType hoodieTableType, TypedProperties keyGenProperties) throws IOException {
-    return getMetaClient(keyGenProperties, hoodieTableType, conf, !addFieldIds);
+      HoodieTableType hoodieTableType, TypedProperties keyGenProperties, Properties tableProperties)
+      throws IOException {
+    return getMetaClient(keyGenProperties, hoodieTableType, conf, !addFieldIds, tableProperties);
   }
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(

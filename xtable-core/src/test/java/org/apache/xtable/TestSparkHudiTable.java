@@ -177,8 +177,9 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       HoodieTableType hoodieTableType,
       HoodieTableVersion tableVersion) {
     super(name, schema, tempDir, partitionConfig);
-    // set the table version before initializing the write/meta clients, which read it
-    this.tableVersion = tableVersion;
+    // Set the table version before initializing the write/meta clients, which read it. The
+    // module-wide format overrides win over the version the factory asked for.
+    this.tableVersion = tableVersionFrom(tableFormatOverrides(), tableVersion);
     // initialize spark session
     this.jsc = jsc;
     this.writeClient = initSparkWriteClient(schema, typedProperties);
