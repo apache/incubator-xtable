@@ -33,22 +33,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import org.apache.iceberg.types.Types;
-
-import org.apache.xtable.hudi.HudiTestUtil;
 
 /**
  * A Hudi rollback is recorded in Iceberg as a forward snapshot, so the Iceberg table has to match
@@ -57,21 +50,6 @@ import org.apache.xtable.hudi.HudiTestUtil;
  */
 class ITIcebergRollbacks {
   @TempDir public static Path tempDir;
-  private static SparkSession sparkSession;
-
-  @BeforeAll
-  static void setupOnce() {
-    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-    sparkSession =
-        SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
-  }
-
-  @AfterAll
-  static void teardown() {
-    if (sparkSession != null) {
-      sparkSession.close();
-    }
-  }
 
   private static TestJavaHudiTable newTable() {
     return TestJavaHudiTable.forStandardSchema(
@@ -97,10 +75,10 @@ class ITIcebergRollbacks {
 
       // The rewritten base file is gone and the version the upsert superseded is live again.
       assertIcebergReferencesExactly(table.getBasePath(), filesAfterInsert);
-      assertEquals(100, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(100, icebergRowCount(table.getBasePath()));
       table.insertRecords(50, true);
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(150, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(150, icebergRowCount(table.getBasePath()));
     }
   }
 
@@ -123,7 +101,7 @@ class ITIcebergRollbacks {
 
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
       assertIcebergReferencesExactly(table.getBasePath(), filesBeforeLastInsert);
-      assertEquals(100, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(100, icebergRowCount(table.getBasePath()));
       HoodieTimeline timeline = reconstructedTimeline(table.getBasePath());
       assertNothingPending(timeline);
       assertEquals(1, timeline.getCleanerTimeline().filterCompletedInstants().countInstants());
@@ -149,7 +127,7 @@ class ITIcebergRollbacks {
       table.rollback(commit2);
 
       assertIcebergReferencesExactly(table.getBasePath(), filesAfterCommit1);
-      assertEquals(100, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(100, icebergRowCount(table.getBasePath()));
       HoodieTimeline timeline = reconstructedTimeline(table.getBasePath());
       assertEquals(Collections.singletonList(commit1), completedCommitTimes(timeline));
       assertEquals(2, timeline.getRollbackTimeline().filterCompletedInstants().countInstants());
@@ -170,11 +148,11 @@ class ITIcebergRollbacks {
 
       assertEquals(schemaBeforeRollback, icebergTable(table.getBasePath()).schema().asStruct());
       assertIcebergReferencesExactly(table.getBasePath(), Collections.emptyList());
-      assertEquals(0, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(0, icebergRowCount(table.getBasePath()));
       String commit2 = table.startCommit();
       table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(30), commit2, true);
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(30, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(30, icebergRowCount(table.getBasePath()));
       assertEquals(
           Arrays.asList(commit2), completedCommitTimes(reconstructedTimeline(table.getBasePath())));
     }

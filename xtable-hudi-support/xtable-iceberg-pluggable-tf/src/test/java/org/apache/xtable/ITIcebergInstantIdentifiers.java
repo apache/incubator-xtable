@@ -149,7 +149,7 @@ class ITIcebergInstantIdentifiers {
               .get()
               .getSourceIdentifier(),
           "the savepoint snapshot is identified by the savepointed commit's requested time");
-      assertEquals(20, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(20, icebergRowCount(table.getBasePath()));
       // The harness fills the nullable column at random, so compare against the Hudi read rather
       // than a fixed count.
       assertEquals(

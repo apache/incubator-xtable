@@ -33,14 +33,16 @@ import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.spark.sql.SparkSession;
 
+import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.data.IcebergGenerics;
+import org.apache.iceberg.data.Record;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.io.CloseableIterable;
 
@@ -75,9 +77,27 @@ final class IcebergTableAssertions {
     }
   }
 
-  /** Rows read through the Iceberg Spark reader, scanning the data files rather than metadata. */
-  static long icebergRowCount(SparkSession sparkSession, String basePath) {
-    return sparkSession.read().format("iceberg").load(basePath).collectAsList().size();
+  /**
+   * Rows read through Iceberg's own reader, which plans and splits the data files the way any
+   * Iceberg engine does and reads them back, rather than trusting the record counts in metadata.
+   *
+   * <p>Only the commit-time column is projected. The generic reader ignores the table's name
+   * mapping, so it resolves Parquet columns by position: top-level columns line up, nested fields
+   * do not and fail with a missing required field. The row count is the same whichever column is
+   * read.
+   */
+  @SneakyThrows
+  static long icebergRowCount(String basePath) {
+    long count = 0;
+    try (CloseableIterable<Record> records =
+        IcebergGenerics.read(icebergTable(basePath))
+            .select(HoodieRecord.COMMIT_TIME_METADATA_FIELD)
+            .build()) {
+      for (Record ignored : records) {
+        count++;
+      }
+    }
+    return count;
   }
 
   static HoodieTimeline reconstructedTimeline(String basePath) {

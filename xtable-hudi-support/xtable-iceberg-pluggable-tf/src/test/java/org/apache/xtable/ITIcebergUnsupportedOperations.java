@@ -37,19 +37,12 @@ import java.util.stream.Stream;
 
 import lombok.SneakyThrows;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.exception.HoodieRestoreException;
-
-import org.apache.xtable.hudi.HudiTestUtil;
 
 /**
  * Operations the Iceberg table format does not support yet have to be refused before they change
@@ -57,21 +50,6 @@ import org.apache.xtable.hudi.HudiTestUtil;
  */
 class ITIcebergUnsupportedOperations {
   @TempDir public static Path tempDir;
-  private static SparkSession sparkSession;
-
-  @BeforeAll
-  static void setupOnce() {
-    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-    sparkSession =
-        SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
-  }
-
-  @AfterAll
-  static void teardown() {
-    if (sparkSession != null) {
-      sparkSession.close();
-    }
-  }
 
   @Test
   void restoreIsRefusedBeforeAnyDataFileIsDeleted() {
@@ -97,7 +75,7 @@ class ITIcebergUnsupportedOperations {
 
       assertIcebergReferencesExactly(table.getBasePath(), filesBeforeRestore);
       assertEquals(filesBeforeRestore, table.getAllLatestBaseFilePaths());
-      assertEquals(150, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(150, icebergRowCount(table.getBasePath()));
       HoodieTimeline timeline = reconstructedTimeline(table.getBasePath());
       assertTrue(timeline.getRestoreTimeline().empty(), "no restore instant may be left behind");
       assertNothingPending(timeline);
@@ -105,7 +83,7 @@ class ITIcebergUnsupportedOperations {
       // The table stays writable.
       table.insertRecords(25, true);
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(175, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(175, icebergRowCount(table.getBasePath()));
     }
   }
 
