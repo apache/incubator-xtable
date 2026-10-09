@@ -21,14 +21,15 @@ package org.apache.xtable.index;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX_PREFIX;
 import static org.apache.spark.sql.functions.col;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
@@ -36,8 +37,6 @@ import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.CatalystTypeConverters;
-import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 
@@ -53,13 +52,11 @@ import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
-import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.Partitioning;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.types.Types;
 
-import scala.Function1;
 import scala.Tuple2;
+
+import com.google.common.base.Preconditions;
 
 import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ConversionConfig;
@@ -69,6 +66,8 @@ import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiTargetConfig;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /**
  * Secondary index for an Iceberg table backed by the Hudi metadata table. The index is built by
@@ -81,6 +80,7 @@ import org.apache.xtable.model.storage.TableFormat;
 public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   private final String tableLocation;
   private final String dataPath;
+  private final SourceTable sourceTable;
   private final Properties targetTableProperties;
   private final SparkSession sparkSession;
   private final JavaSparkContext javaSparkContext;
@@ -88,16 +88,29 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
 
   /**
    * @param icebergTable the table to index
+   * @param sourceTable how XTable loads the table for a sync, because a loaded table does not
+   *     expose the catalog it came from. A table of a catalog sets its catalog config, name and
+   *     namespace, and a table without a catalog config is loaded from its location
    * @param sparkSession the Spark session used to build and query the index
    * @param targetTableProperties additional {@link HudiTargetConfig} properties for the sync, for
    *     example the record index file group counts
    */
   public HudiBackedIcebergSecondaryIndex(
-      Table icebergTable, SparkSession sparkSession, Properties targetTableProperties) {
+      Table icebergTable,
+      SourceTable sourceTable,
+      SparkSession sparkSession,
+      Properties targetTableProperties) {
+    Preconditions.checkArgument(
+        TableFormat.ICEBERG.equals(sourceTable.getFormatName()),
+        "Expected an Iceberg source table but got format %s",
+        sourceTable.getFormatName());
     this.tableLocation = icebergTable.location();
     this.dataPath =
         TableFormatUtils.getTableDataLocation(
             TableFormat.ICEBERG, tableLocation, icebergTable.properties());
+    // the Hudi table lives under the data location, which Iceberg resolves from the table
+    // properties
+    this.sourceTable = sourceTable.toBuilder().dataPath(dataPath).build();
     this.targetTableProperties = targetTableProperties;
     this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
@@ -115,19 +128,28 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     Configuration configuration = javaSparkContext.hadoopConfiguration();
     IcebergConversionSourceProvider sourceProvider = new IcebergConversionSourceProvider();
     sourceProvider.init(configuration);
-    new ConversionController(configuration)
-        .sync(getConversionConfig(icebergTable, columnName), sourceProvider);
+    // the sync reports a failed target in its result instead of throwing
+    SyncResult syncResult =
+        new ConversionController(configuration)
+            .sync(getConversionConfig(icebergTable, columnName), sourceProvider)
+            .get(TableFormat.HUDI);
+    if (syncResult == null
+        || syncResult.getTableFormatSyncStatus() == null
+        || syncResult.getTableFormatSyncStatus().getStatusCode() != SyncStatusCode.SUCCESS) {
+      throw new IllegalStateException(
+          "Failed to sync the secondary index for column "
+              + columnName
+              + " of table "
+              + tableLocation
+              + ": "
+              + (syncResult == null
+                  ? "no sync result for the Hudi target"
+                  : syncResult.getTableFormatSyncStatus()));
+    }
     log.info("Synced secondary index for column {} of table {}", columnName, tableLocation);
   }
 
   private ConversionConfig getConversionConfig(Table icebergTable, String columnName) {
-    SourceTable sourceTable =
-        SourceTable.builder()
-            .name(icebergTable.name())
-            .basePath(tableLocation)
-            .dataPath(dataPath)
-            .formatName(TableFormat.ICEBERG)
-            .build();
     Properties mergedProperties = new Properties();
     mergedProperties.putAll(targetTableProperties);
     mergedProperties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, columnName);
@@ -151,15 +173,11 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
 
   @Override
   public Dataset<Row> lookup(Table icebergTable, Dataset<Row> keys, String columnName) {
-    Types.StructType partitionType = Partitioning.partitionType(icebergTable);
-    PartitionSpec spec = icebergTable.spec();
-    StructType partitionSparkType = IcebergPartitionConverter.toSparkType(partitionType);
     StructType resultSchema =
         new StructType()
             .add(columnName, DataTypes.StringType, false)
             .add(FILE_COLUMN, DataTypes.StringType, false)
-            .add(POSITION_COLUMN, DataTypes.LongType, false)
-            .add(PARTITION_COLUMN, partitionSparkType, true);
+            .add(POSITION_COLUMN, DataTypes.LongType, false);
     // the secondary index stores the values of the indexed column as strings
     JavaRDD<String> secondaryKeys =
         keys.where(col(columnName).isNotNull())
@@ -184,37 +202,31 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
       // capture the field so the closure does not serialize the index instance
       String dataPath = this.dataPath;
       JavaRDD<Row> lookupResults =
-          HoodieJavaPairRDD.getJavaPairRDD(recordKeysBySecondaryKey)
-              .mapPartitions(
-                  recordKeysBySecondaryKeyIterator -> {
-                    Function1<Object, Object> toPartitionRow =
-                        CatalystTypeConverters.createToScalaConverter(partitionSparkType);
-                    List<Row> rows = new ArrayList<>();
-                    while (recordKeysBySecondaryKeyIterator.hasNext()) {
-                      Tuple2<String, String> recordKeyBySecondaryKey =
-                          recordKeysBySecondaryKeyIterator.next();
-                      rows.add(
-                          toLookupResult(
-                              dataPath,
-                              recordKeyBySecondaryKey._1(),
-                              recordKeyBySecondaryKey._2(),
-                              partitionType,
-                              spec,
-                              toPartitionRow));
-                    }
-                    return rows.iterator();
-                  });
+          toJavaPairRDD(recordKeysBySecondaryKey)
+              .map(
+                  recordKeyBySecondaryKey ->
+                      toLookupResult(
+                          dataPath, recordKeyBySecondaryKey._1(), recordKeyBySecondaryKey._2()));
       return sparkSession.createDataFrame(lookupResults, resultSchema);
     }
   }
 
-  private static Row toLookupResult(
-      String dataPath,
-      String secondaryKey,
-      String recordKey,
-      Types.StructType partitionType,
-      PartitionSpec spec,
-      Function1<Object, Object> toPartitionRow) {
+  /**
+   * Hudi returns an RDD backed result for keys in an RDD, but a list backed result when there are
+   * no keys to look up, for example when every key is null.
+   */
+  private JavaPairRDD<String, String> toJavaPairRDD(HoodiePairData<String, String> pairData) {
+    if (pairData instanceof HoodieJavaPairRDD) {
+      return HoodieJavaPairRDD.getJavaPairRDD(pairData);
+    }
+    List<Tuple2<String, String>> pairs =
+        pairData.collectAsList().stream()
+            .map(pair -> new Tuple2<>(pair.getKey(), pair.getValue()))
+            .collect(Collectors.toList());
+    return javaSparkContext.parallelizePairs(pairs);
+  }
+
+  private static Row toLookupResult(String dataPath, String secondaryKey, String recordKey) {
     // record keys generated by Hudi for files without record keys are "<relative path>_<row
     // position>"
     int positionSeparator = recordKey.lastIndexOf('_');
@@ -223,15 +235,9 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
           "Expected a record key of the form <file path>_<row position> but got " + recordKey);
     }
     String relativeFilePath = recordKey.substring(0, positionSeparator);
-    int partitionSeparator = relativeFilePath.lastIndexOf('/');
-    String partitionPath =
-        partitionSeparator == -1 ? "" : relativeFilePath.substring(0, partitionSeparator);
-    InternalRow partitionRow =
-        IcebergPartitionConverter.convertPartitionToInternalRow(partitionPath, partitionType, spec);
     return RowFactory.create(
         secondaryKey,
         dataPath.endsWith("/") ? dataPath + relativeFilePath : dataPath + "/" + relativeFilePath,
-        Long.parseLong(recordKey.substring(positionSeparator + 1)),
-        partitionRow == null ? null : toPartitionRow.apply(partitionRow));
+        Long.parseLong(recordKey.substring(positionSeparator + 1)));
   }
 }

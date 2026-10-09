@@ -36,12 +36,6 @@ public interface Index<T> {
   String POSITION_COLUMN = "_pos";
 
   /**
-   * Result column with the partition values of the row in the table's partition type, or null for
-   * unpartitioned tables.
-   */
-  String PARTITION_COLUMN = "_partition";
-
-  /**
    * Checks whether a secondary index exists for the given column.
    *
    * @param columnName The indexed column
@@ -63,9 +57,10 @@ public interface Index<T> {
    * @param table The table the index belongs to
    * @param keys The values to look up, in the column named {@code columnName}
    * @param columnName The indexed column
-   * @return one row for every key present in the index, with the key in the column named {@code
-   *     columnName} and its location in {@link #FILE_COLUMN}, {@link #POSITION_COLUMN} and {@link
-   *     #PARTITION_COLUMN}
+   * @return one row for every row of the table that holds a key, with the key in the column named
+   *     {@code columnName} and the location of the row in {@link #FILE_COLUMN} and {@link
+   *     #POSITION_COLUMN}. A caller that needs other metadata of the row, such as its partition,
+   *     reads the returned files through the table format.
    */
   Dataset<Row> lookup(T table, Dataset<Row> keys, String columnName);
 }
