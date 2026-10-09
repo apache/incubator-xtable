@@ -29,7 +29,6 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
@@ -78,14 +77,11 @@ public class IcebergTimelineArchiver {
     for (Snapshot snapshot : IcebergSnapshotInstants.ancestorsOldestFirst(table)) {
       HoodieInstant hoodieInstant =
           IcebergSnapshotInstants.recordedInstant(snapshot, metaClient.getInstantGenerator());
-      if (HoodieTimeline.SAVEPOINT_ACTION.equals(hoodieInstant.getAction())) {
-        log.info("Skipping expiring next set of snapshots because of savepoint {}", hoodieInstant);
-        break;
-      }
       String instantKey = IcebergActiveTimeline.instantKey(hoodieInstant);
       // A snapshot whose instant is neither being archived nor already gone from the timeline (a
-      // rolled-back commit, or an instant archived behind a savepoint earlier) has to stay, and so
-      // does everything newer.
+      // rolled-back commit, a deleted savepoint, or an instant archived behind a savepoint earlier)
+      // has to stay, and so does everything newer. An active savepoint is such an instant, so it
+      // keeps itself and everything after it without a special case.
       if (!archivedInstantKeys.contains(instantKey) && activeInstantKeys.contains(instantKey)) {
         break;
       }

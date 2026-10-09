@@ -52,6 +52,7 @@ import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.FileSystemViewStorageType;
@@ -186,9 +187,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   partitionValuesExtractor.extractPartitionValues(
                       table.getPartitioningFields(), partitionPath);
               Map<String, HoodieBaseFile> currentBaseFilesInPartition =
-                  fsView
-                      .getLatestBaseFiles(partitionPath)
-                      .collect(Collectors.toMap(HoodieBaseFile::getFileId, Function.identity()));
+                  previousBaseFileVersions(fsView, partitionPath, commit.requestedTime());
               for (HoodieWriteStat writeStat : writeStats) {
                 if (FSUtils.isLogFile(new StoragePath(writeStat.getPath()))) {
                   continue;
@@ -282,6 +281,28 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
   }
 
+  /**
+   * The latest base file of each file group in the partition other than the files the given commit
+   * wrote, so the result is the same whether or not the view has been synced past that commit.
+   */
+  private static Map<String, HoodieBaseFile> previousBaseFileVersions(
+      SyncableFileSystemView fsView, String partitionPath, String commitTime) {
+    return fsView
+        .getAllBaseFiles(partitionPath)
+        .filter(baseFile -> !commitTime.equals(baseFile.getCommitTime()))
+        .collect(
+            Collectors.toMap(
+                HoodieBaseFile::getFileId,
+                Function.identity(),
+                (first, second) ->
+                    InstantComparison.compareTimestamps(
+                            first.getCommitTime(),
+                            InstantComparison.GREATER_THAN,
+                            second.getCommitTime())
+                        ? first
+                        : second));
+  }
+
   public InternalFilesDiff getDiffFromReplaceCommitMetadata(
       InternalTable table,
       HoodieReplaceCommitMetadata replaceCommitMetadata,
@@ -305,9 +326,17 @@ public class HudiDataFileExtractor implements AutoCloseable {
               filesToRemove.addAll(
                   fileIds.stream()
                       .map(
-                          fileId ->
-                              buildFileWithoutStats(
-                                  partitionValues, currentBaseFilesInPartition.get(fileId)))
+                          fileId -> {
+                            HoodieBaseFile replaced = currentBaseFilesInPartition.get(fileId);
+                            if (replaced == null) {
+                              throw new ReadException(
+                                  String.format(
+                                      "Replaced file group %s in partition %s has no base file in"
+                                          + " the file system view at %s",
+                                      fileId, partitionPath, commit));
+                            }
+                            return buildFileWithoutStats(partitionValues, replaced);
+                          })
                       .collect(Collectors.toList()));
             });
     replaceCommitMetadata
