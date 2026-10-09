@@ -95,7 +95,7 @@ public class HudiInstantUtils {
    * time on table version 8+, so the checkpoints move forward in the same order that the commits
    * are synced, and the requested time on older versions.
    */
-  static Instant getSyncInstant(HoodieTableMetaClient metaClient, HoodieInstant commit) {
+  public static Instant getSyncInstant(HoodieTableMetaClient metaClient, HoodieInstant commit) {
     if (usesCompletionTimeOrdering(metaClient) && commit.getCompletionTime() != null) {
       return parseFromInstantTime(commit.getCompletionTime());
     }

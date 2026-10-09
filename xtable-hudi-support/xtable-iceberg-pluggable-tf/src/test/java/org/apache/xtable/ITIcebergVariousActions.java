@@ -20,6 +20,7 @@ package org.apache.xtable;
 
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+import static org.apache.xtable.IcebergTableAssertions.assertIcebergReferencesExactly;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,10 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.Closeable;
-import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -69,11 +67,9 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
-import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
-import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.util.SnapshotUtil;
 
 import org.apache.xtable.hudi.HudiConversionSource;
@@ -556,9 +552,14 @@ public class ITIcebergVariousActions {
 
       table.cluster();
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+      // Files a replace commit registers have to carry their length, or Iceberg plans no splits
+      // for them and a scan silently returns none of their rows.
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(300, IcebergTableAssertions.icebergRowCount(sparkSession, table.getBasePath()));
 
       table.insertRecords(100, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+      assertEquals(400, IcebergTableAssertions.icebergRowCount(sparkSession, table.getBasePath()));
 
       hudiClient =
           getHudiSourceClient(
@@ -749,26 +750,6 @@ public class ITIcebergVariousActions {
       assertArchivalLeftOnlyReachableSnapshots(table.getBasePath());
     } finally {
       safeClose(hudiClient);
-    }
-  }
-
-  @SneakyThrows
-  private static void assertIcebergReferencesExactly(
-      String basePath, List<String> expectedBaseFiles) {
-    Table icebergTable = new HadoopTables(CONFIGURATION).load(basePath);
-    Set<String> referenced = new HashSet<>();
-    try (CloseableIterable<FileScanTask> tasks = icebergTable.newScan().planFiles()) {
-      for (FileScanTask task : tasks) {
-        referenced.add(URI.create(task.file().path().toString()).getPath());
-      }
-    }
-    Set<String> expected =
-        expectedBaseFiles.stream()
-            .map(path -> URI.create(path).getPath())
-            .collect(Collectors.toSet());
-    assertEquals(expected, referenced, "Iceberg must reference exactly the live Hudi base files");
-    for (String path : referenced) {
-      assertTrue(Files.exists(Paths.get(path)), "Iceberg references a missing file: " + path);
     }
   }
 

@@ -224,6 +224,64 @@ public class HudiDataFileExtractor implements AutoCloseable {
    * Replace-commit counterpart of {@link #getDiffFromCommitMetadata}. Files the replace commit
    * supersedes are reported as removed, files it wrote as added.
    */
+  /**
+   * Derives the file diff a completed rollback produces, from the rollback's own metadata rather
+   * than by comparing timeline states: the base files the rollback deleted leave, and for each file
+   * group they belonged to the previous base file, which the rolled-back commit had superseded and
+   * which is the latest file slice again, comes back. Log files are skipped. Only files of commits
+   * in {@code publishedCommitTimes} are removed, since a commit that never reached the target has
+   * nothing there to remove.
+   *
+   * @param publishedCommitTimes requested times of the commits the target has recorded
+   */
+  public InternalFilesDiff getDiffFromRollbackMetadata(
+      InternalTable table,
+      HoodieRollbackMetadata rollbackMetadata,
+      Set<String> publishedCommitTimes) {
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    // The rollback has just deleted files and removed the instant, so refresh the cached view.
+    fsView.sync();
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    List<InternalDataFile> filesToRemove = new ArrayList<>();
+    rollbackMetadata
+        .getPartitionMetadata()
+        .forEach(
+            (partitionPath, partitionMetadata) -> {
+              List<String> deletedBaseFiles =
+                  partitionMetadata.getSuccessDeleteFiles().stream()
+                      .filter(path -> FSUtils.isBaseFile(new StoragePath(path)))
+                      .filter(
+                          path ->
+                              publishedCommitTimes.contains(
+                                  FSUtils.getCommitTimeWithFullPath(path)))
+                      .collect(Collectors.toList());
+              if (deletedBaseFiles.isEmpty()) {
+                return;
+              }
+              filesToRemove.addAll(
+                  getRemovedFiles(partitionPath, deletedBaseFiles, table.getPartitioningFields()));
+              Set<String> fileIdsRolledBack =
+                  deletedBaseFiles.stream()
+                      .map(path -> FSUtils.getFileIdFromFilePath(new StoragePath(path)))
+                      .collect(Collectors.toSet());
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              fsView
+                  .getLatestBaseFiles(partitionPath)
+                  .filter(baseFile -> fileIdsRolledBack.contains(baseFile.getFileId()))
+                  .forEach(
+                      baseFile ->
+                          filesAddedWithoutStats.add(
+                              buildFileWithoutStats(partitionValues, baseFile)));
+            });
+    List<InternalDataFile> filesAdded =
+        fileStatsExtractor
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+            .collect(Collectors.toList());
+    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
+  }
+
   public InternalFilesDiff getDiffFromReplaceCommitMetadata(
       InternalTable table,
       HoodieReplaceCommitMetadata replaceCommitMetadata,
@@ -231,6 +289,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
     List<InternalDataFile> filesToRemove = new ArrayList<>();
+    Map<String, StoragePathInfo> fullPathInfo =
+        replaceCommitMetadata.getFullPathToInfo(metaClient.getStorage(), basePath.toString());
     replaceCommitMetadata
         .getPartitionToReplaceFileIds()
         .forEach(
@@ -268,7 +328,18 @@ public class HudiDataFileExtractor implements AutoCloseable {
                           baseFileFullPath ->
                               FSUtils.getCommitTimeWithFullPath(baseFileFullPath)
                                   .equals(commit.requestedTime()))
-                      .map(HoodieBaseFile::new)
+                      .map(
+                          baseFileFullPath -> {
+                            // getFullPathToInfo keys the map by the absolute path and carries the
+                            // file length, without which the registered file cannot be scanned
+                            StoragePathInfo pathInfo = fullPathInfo.get(baseFileFullPath);
+                            if (pathInfo == null) {
+                              throw new ReadException(
+                                  "Commit metadata has no file info for base file "
+                                      + baseFileFullPath);
+                            }
+                            return new HoodieBaseFile(pathInfo);
+                          })
                       .map(hoodieBaseFile -> buildFileWithoutStats(partitionValues, hoodieBaseFile))
                       .collect(Collectors.toList()));
             });

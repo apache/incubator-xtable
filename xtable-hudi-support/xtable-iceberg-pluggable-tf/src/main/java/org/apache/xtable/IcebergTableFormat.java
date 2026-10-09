@@ -18,17 +18,21 @@
  
 package org.apache.xtable;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
+import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.common.HoodieTableFormat;
 import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -42,25 +46,36 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.keygen.constant.KeyGeneratorType;
 import org.apache.hudi.metadata.TableMetadataFactory;
 
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.TableIdentifier;
+
 import org.apache.xtable.conversion.ConversionTargetFactory;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.hudi.HudiDataFileExtractor;
 import org.apache.xtable.hudi.HudiFileStatsExtractor;
 import org.apache.xtable.hudi.HudiIncrementalTableChangeExtractor;
+import org.apache.xtable.hudi.HudiInstantUtils;
 import org.apache.xtable.hudi.HudiSchemaExtractor;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.hudi.HudiTableExtractor;
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
+import org.apache.xtable.iceberg.IcebergConversionSource;
 import org.apache.xtable.iceberg.IcebergConversionTarget;
+import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.metadata.IcebergMetadataFactory;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.spi.sync.TableFormatSync;
-import org.apache.xtable.timeline.IcebergRollbackExecutor;
+import org.apache.xtable.timeline.IcebergSnapshotInstants;
 import org.apache.xtable.timeline.IcebergTimelineArchiver;
 import org.apache.xtable.timeline.IcebergTimelineFactory;
 
@@ -127,24 +142,19 @@ public class IcebergTableFormat implements HoodieTableFormat {
     archiveInstants(metaClient, internalTable, archivedInstants.get());
   }
 
+  /**
+   * Iceberg is updated in {@link #completedRollback} instead, once Hudi has deleted the files and
+   * recorded the rollback. A rollback is represented the way Hudi records it, as a forward instant
+   * whose snapshot removes the rolled-back files and restores the previous file versions, rather
+   * than by rewinding snapshot history, which would also hide the clean and rollback instants
+   * recorded after the commit and make them pending again.
+   */
   @Override
   public void rollback(
       HoodieInstant completedInstant,
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
-      FileSystemViewManager viewManager) {
-    HudiIncrementalTableChangeExtractor hudiTableExtractor =
-        getHudiTableExtractor(metaClient, viewManager);
-    InternalTable internalTable =
-        hudiTableExtractor
-            .getTableExtractor()
-            .table(
-                metaClient,
-                metaClient.getActiveTimeline().filterCompletedInstants().lastInstant().get());
-    IcebergRollbackExecutor rollbackExecutor =
-        new IcebergRollbackExecutor(metaClient, getIcebergConversionTarget(metaClient));
-    rollbackExecutor.rollbackSnapshot(internalTable, completedInstant);
-  }
+      FileSystemViewManager viewManager) {}
 
   @Override
   public void completedRollback(
@@ -153,9 +163,80 @@ public class IcebergTableFormat implements HoodieTableFormat {
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
     metaClient.reloadActiveTimeline();
+    HoodieRollbackMetadata rollbackMetadata;
+    try {
+      rollbackMetadata = metaClient.getActiveTimeline().readRollbackMetadata(rollbackInstant);
+    } catch (IOException e) {
+      throw new ReadException("Unable to read rollback metadata for " + rollbackInstant, e);
+    }
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
-    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(rollbackInstant));
+    Set<String> publishedCommitTimes = publishedCommitTimes(metaClient);
+    IncrementalTableChanges changes;
+    if (metaClient.getActiveTimeline().getCommitsTimeline().filterCompletedInstants().empty()) {
+      // Every commit has been rolled back, so Hudi has no commit to take the schema from. The
+      // table itself is unchanged by the rollback, so describe it from the Iceberg table.
+      changes =
+          hudiTableExtractor.extractTableChanges(
+              rollbackMetadata,
+              rollbackInstant,
+              publishedCommitTimes,
+              tableAsRecordedInIceberg(metaClient, rollbackInstant));
+    } else {
+      changes =
+          hudiTableExtractor.extractTableChanges(
+              rollbackMetadata, rollbackInstant, publishedCommitTimes);
+    }
+    completeInstant(metaClient, changes);
+  }
+
+  private InternalTable tableAsRecordedInIceberg(
+      HoodieTableMetaClient metaClient, HoodieInstant instant) {
+    SourceTable icebergTable =
+        SourceTable.builder()
+            .name(metaClient.getTableConfig().getTableName())
+            .formatName(org.apache.xtable.model.storage.TableFormat.ICEBERG)
+            .basePath(metaClient.getBasePath().toString())
+            .build();
+    InternalTable current =
+        IcebergConversionSource.builder()
+            .hadoopConf((Configuration) metaClient.getStorageConf().unwrap())
+            .sourceTableConfig(icebergTable)
+            .build()
+            .getCurrentTable();
+    return current.toBuilder()
+        .tableFormat(org.apache.xtable.model.storage.TableFormat.HUDI)
+        .layoutStrategy(
+            current.getPartitioningFields().isEmpty()
+                ? DataLayoutStrategy.FLAT
+                : DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES)
+        .latestMetadataPath(metaClient.getMetaPath().toString())
+        .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, instant))
+        .latestTableOperationIdentifier(HudiTableExtractor.tableOperationIdentifier(instant))
+        .build();
+  }
+
+  /**
+   * Requested times of the commits recorded in the current Iceberg snapshot's ancestry. A commit
+   * completed in Hudi but never recorded in Iceberg, because the writer died in between, has no
+   * files in Iceberg for its rollback to remove.
+   */
+  private Set<String> publishedCommitTimes(HoodieTableMetaClient metaClient) {
+    IcebergTableManager tableManager =
+        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
+    TableIdentifier tableIdentifier =
+        TableIdentifier.of(metaClient.getTableConfig().getTableName());
+    String basePath = metaClient.getBasePath().toString();
+    if (!tableManager.tableExists(null, tableIdentifier, basePath)) {
+      return Collections.emptySet();
+    }
+    Table table = tableManager.getTable(null, tableIdentifier, basePath);
+    return IcebergSnapshotInstants.ancestorsOldestFirst(table).stream()
+        .map(
+            snapshot ->
+                IcebergSnapshotInstants.recordedInstant(snapshot, metaClient.getInstantGenerator())
+                    .requestedTime())
+        .collect(Collectors.toSet());
   }
 
   @Override
@@ -185,10 +266,39 @@ public class IcebergTableFormat implements HoodieTableFormat {
         target
             .getTableMetadata()
             .orElse(TableSyncMetadata.of(Instant.MIN, Collections.emptyList()));
+    Map<String, List<SyncResult>> results;
     try {
-      tableFormatSync.syncChanges(Collections.singletonMap(target, tableSyncMetadata), changes);
+      results =
+          tableFormatSync.syncChanges(Collections.singletonMap(target, tableSyncMetadata), changes);
     } catch (Exception e) {
       throw new UpdateException("Failed to update iceberg metadata", e);
+    }
+    failUnlessSynced(results);
+  }
+
+  /**
+   * {@link TableFormatSync} reports a failed sync in its result rather than throwing. The Hudi
+   * instant is already complete when a hook runs, so a failure that is not surfaced would leave the
+   * instant without a snapshot, and the next writer would roll it back as if the write had never
+   * succeeded. Failing the hook fails the Hudi operation instead, so the user sees the error and
+   * retries.
+   */
+  static void failUnlessSynced(Map<String, List<SyncResult>> results) {
+    List<SyncResult> icebergResults =
+        results.get(org.apache.xtable.model.storage.TableFormat.ICEBERG);
+    if (icebergResults == null || icebergResults.isEmpty()) {
+      throw new UpdateException(
+          "The Iceberg sync produced no result, so the instant is not recorded in Iceberg");
+    }
+    for (SyncResult result : icebergResults) {
+      SyncResult.SyncStatus status = result.getTableFormatSyncStatus();
+      if (status == null || status.getStatusCode() != SyncStatusCode.SUCCESS) {
+        String detail =
+            status == null || status.getErrorDetails() == null
+                ? "no error details"
+                : status.getErrorDetails().getErrorMessage();
+        throw new UpdateException("Failed to record the instant in Iceberg: " + detail);
+      }
     }
   }
 
@@ -272,13 +382,24 @@ public class IcebergTableFormat implements HoodieTableFormat {
   private IcebergConversionTarget getIcebergConversionTarget(HoodieTableMetaClient metaClient) {
     // TODO: Add iceberg catalog config through user inputs.
     TargetTable targetTable =
-        TargetTable.builder()
-            .name(metaClient.getTableConfig().getTableName())
-            .formatName(org.apache.xtable.model.storage.TableFormat.ICEBERG)
-            .basePath(metaClient.getBasePath().toString())
-            .build();
+        targetTable(
+            metaClient.getTableConfig().getTableName(), metaClient.getBasePath().toString());
     return (IcebergConversionTarget)
         ConversionTargetFactory.getInstance()
             .createForFormat(targetTable, (Configuration) metaClient.getStorageConf().unwrap());
+  }
+
+  /**
+   * Iceberg snapshots are expired only as Hudi archives the instants they record, since the
+   * reconstructed timeline treats a completed instant without a snapshot as inflight; time-based
+   * expiry would otherwise remove snapshots the active timeline still needs.
+   */
+  static TargetTable targetTable(String tableName, String basePath) {
+    return TargetTable.builder()
+        .name(tableName)
+        .formatName(org.apache.xtable.model.storage.TableFormat.ICEBERG)
+        .basePath(basePath)
+        .metadataRetention(TargetTable.NO_METADATA_EXPIRY)
+        .build();
   }
 }
