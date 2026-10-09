@@ -38,8 +38,11 @@ import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.DateType;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampType;
 
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -54,7 +57,10 @@ import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
 
 import scala.Tuple2;
 
@@ -78,6 +84,11 @@ import org.apache.xtable.model.sync.SyncStatusCode;
  * carry no Hudi record keys, the record key of a row is {@code <file path relative to the data
  * location>_<row position>}, which a lookup resolves back to a file path and row position. Hudi
  * requires every data file to be under the data location, so files outside it are not supported.
+ *
+ * <p>Hudi keys the index by the string of Spark's internal value of the column: the day count of a
+ * DATE, the microseconds of a TIMESTAMP and the plain string of other types. A lookup renders its
+ * keys the same way and returns them in the type of the column. Columns of other types, such as
+ * BINARY, UUID or a timestamp without time zone, are not supported.
  */
 @Log4j2
 public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
@@ -93,11 +104,15 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
    */
   public static final String POSITION_COLUMN = "_pos";
 
+  // the key as Hudi renders it in the secondary index
+  private static final String SECONDARY_KEY_COLUMN = "secondary_key";
+
   private final String tableLocation;
   private final String dataPath;
   private final SourceTable sourceTable;
   private final Properties targetTableProperties;
   private final String indexedColumn;
+  private final DataType keyType;
   private final SparkSession sparkSession;
   private final JavaSparkContext javaSparkContext;
   private final HoodieSparkEngineContext engineContext;
@@ -119,8 +134,8 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
       Properties targetTableProperties) {
     Preconditions.checkArgument(
         TableFormat.ICEBERG.equals(sourceTable.getFormatName()),
-        "Expected an Iceberg source table but got format %s",
-        sourceTable.getFormatName());
+        String.format(
+            "Expected an Iceberg source table but got format %s", sourceTable.getFormatName()));
     this.tableLocation = icebergTable.location();
     this.dataPath =
         TableFormatUtils.getTableDataLocation(
@@ -138,6 +153,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
                         "Set "
                             + HudiTargetConfig.SECONDARY_INDEX_COLUMN
                             + " to the column to index"));
+    this.keyType = getKeyType(icebergTable.schema(), indexedColumn);
     this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     this.engineContext = new HoodieSparkEngineContext(javaSparkContext);
@@ -156,6 +172,66 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     indexTargetProperties.setProperty(
         HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(HoodieTableVersion.NINE.versionCode()));
     return indexTargetProperties;
+  }
+
+  /** Returns the Spark type of the indexed column, which decides how Hudi renders its values. */
+  private static DataType getKeyType(Schema schema, String column) {
+    Types.NestedField field = schema.findField(column);
+    Preconditions.checkArgument(
+        field != null, String.format("Column %s is not in the table schema", column));
+    Type type = field.type();
+    switch (type.typeId()) {
+      case STRING:
+        return DataTypes.StringType;
+      case INTEGER:
+        return DataTypes.IntegerType;
+      case LONG:
+        return DataTypes.LongType;
+      case BOOLEAN:
+        return DataTypes.BooleanType;
+      case FLOAT:
+        return DataTypes.FloatType;
+      case DOUBLE:
+        return DataTypes.DoubleType;
+      case DECIMAL:
+        Types.DecimalType decimalType = (Types.DecimalType) type;
+        return DataTypes.createDecimalType(decimalType.precision(), decimalType.scale());
+      case DATE:
+        return DataTypes.DateType;
+      case TIMESTAMP:
+        if (((Types.TimestampType) type).shouldAdjustToUTC()) {
+          return DataTypes.TimestampType;
+        }
+        break;
+      default:
+        break;
+    }
+    // Hudi renders a BINARY, FIXED or UUID value as an object reference, and Spark has no direct
+    // conversion of a timestamp without time zone to its microseconds
+    throw new IllegalArgumentException(
+        String.format("A secondary index on column %s of type %s is not supported", column, type));
+  }
+
+  /** Renders a key of {@link #keyType} the way Hudi renders the value in the secondary index. */
+  private String toSecondaryKey(String key) {
+    if (keyType instanceof DateType) {
+      return "CAST(unix_date(" + key + ") AS STRING)";
+    }
+    if (keyType instanceof TimestampType) {
+      return "CAST(unix_micros(" + key + ") AS STRING)";
+    }
+    return "CAST(" + key + " AS STRING)";
+  }
+
+  /** Reverses {@link #toSecondaryKey} to return a key in the type of the indexed column. */
+  private String fromSecondaryKey(String key) {
+    if (keyType instanceof DateType) {
+      return "date_from_unix_date(CAST(" + key + " AS INT))";
+    }
+    if (keyType instanceof TimestampType) {
+      return "timestamp_micros(CAST(" + key + " AS BIGINT))";
+    }
+    return "CAST(" + key + " AS " + keyType.sql() + ")";
   }
 
   @Override
@@ -243,13 +319,11 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   public Dataset<Row> lookup(Table icebergTable, Dataset<Row> keys, String columnName) {
     Preconditions.checkArgument(
         indexedColumn.equals(columnName),
-        "Column %s is not the indexed column %s",
-        columnName,
-        indexedColumn);
-    // the secondary index stores the values of the indexed column as strings
+        String.format("Column %s is not the indexed column %s", columnName, indexedColumn));
     JavaRDD<String> secondaryKeys =
-        keys.where(col(columnName).isNotNull())
-            .select(col(columnName).cast(DataTypes.StringType))
+        keys.select(col(columnName).cast(keyType).as(SECONDARY_KEY_COLUMN))
+            .where(col(SECONDARY_KEY_COLUMN).isNotNull())
+            .selectExpr(toSecondaryKey(SECONDARY_KEY_COLUMN))
             .as(Encoders.STRING())
             .toJavaRDD();
     HoodieTableMetaClient metaClient = getMetaClient();
@@ -283,10 +357,18 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
                           dataPath, recordKeyBySecondaryKey._1(), recordKeyBySecondaryKey._2()));
       StructType resultSchema =
           new StructType()
-              .add(columnName, DataTypes.StringType, false)
+              .add(SECONDARY_KEY_COLUMN, DataTypes.StringType, false)
               .add(FILE_COLUMN, DataTypes.StringType, false)
               .add(POSITION_COLUMN, DataTypes.LongType, false);
-      return sparkSession.createDataFrame(lookupResults, resultSchema);
+      return sparkSession
+          .createDataFrame(lookupResults, resultSchema)
+          .selectExpr(
+              fromSecondaryKey(SECONDARY_KEY_COLUMN)
+                  + " AS `"
+                  + columnName.replace("`", "``")
+                  + "`",
+              FILE_COLUMN,
+              POSITION_COLUMN);
     }
   }
 
