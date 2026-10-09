@@ -19,7 +19,7 @@
 package org.apache.xtable.hudi;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -47,17 +47,41 @@ public class HudiTargetConfig {
    */
   public static final String EXECUTION_ENGINE = "xtable.hudi.target.execution.engine";
 
-  public static final String EXECUTION_ENGINE_JAVA = "java";
-  public static final String EXECUTION_ENGINE_SPARK = "spark";
+  /** Engines that {@link #EXECUTION_ENGINE} selects. */
+  public enum ExecutionEngine {
+    JAVA,
+    SPARK;
+
+    /** Returns the value of {@link #EXECUTION_ENGINE} that selects this engine. */
+    public String getConfigValue() {
+      return name().toLowerCase(Locale.ROOT);
+    }
+
+    private static ExecutionEngine fromConfigValue(String value) {
+      for (ExecutionEngine engine : values()) {
+        if (engine.getConfigValue().equalsIgnoreCase(value)) {
+          return engine;
+        }
+      }
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsupported Hudi execution engine %s. Only %s are supported via %s.",
+              value,
+              Arrays.stream(values())
+                  .map(ExecutionEngine::getConfigValue)
+                  .collect(Collectors.joining(" and ")),
+              EXECUTION_ENGINE));
+    }
+  }
 
   /**
-   * Comma separated columns to build a Hudi secondary index on, one index per column. Setting it
-   * also enables the global record index, which the secondary index depends on. The indexes are
-   * stored in the Hudi metadata table under the target table path and require table version 9. The
-   * indexes are built when the Hudi table is created; a column added to the list of an existing
-   * table is not indexed yet.
+   * Column to build a Hudi secondary index on. Setting it also enables the global record index,
+   * which the secondary index depends on. Both indexes are stored in the Hudi metadata table under
+   * the target table path and require table version 9. Only one column is supported, and the index
+   * is built when the Hudi metadata table is created; changing the column of an existing table is
+   * not supported yet.
    */
-  public static final String SECONDARY_INDEX_COLUMNS = "xtable.hudi.target.secondary.index.columns";
+  public static final String SECONDARY_INDEX_COLUMN = "xtable.hudi.target.secondary.index.column";
 
   /**
    * Lower and upper bound on the number of file groups of the record index. Both must be set
@@ -76,8 +100,8 @@ public class HudiTargetConfig {
   static final HoodieTableVersion DEFAULT_TABLE_VERSION = HoodieTableVersion.SIX;
 
   HoodieTableVersion tableVersion;
-  boolean sparkEngine;
-  List<String> secondaryIndexColumns;
+  ExecutionEngine executionEngine;
+  Optional<String> secondaryIndexColumn;
   Optional<Integer> recordIndexMinFileGroupCount;
   Optional<Integer> recordIndexMaxFileGroupCount;
   Optional<Integer> secondaryIndexParallelism;
@@ -85,27 +109,24 @@ public class HudiTargetConfig {
   public static HudiTargetConfig fromProperties(Properties properties) {
     Properties targetProperties = properties == null ? new Properties() : properties;
     HoodieTableVersion tableVersion = parseTableVersion(targetProperties);
-    boolean sparkEngine = parseSparkEngine(targetProperties);
-    List<String> secondaryIndexColumns =
-        Arrays.stream(targetProperties.getProperty(SECONDARY_INDEX_COLUMNS, "").split(","))
+    ExecutionEngine executionEngine =
+        ExecutionEngine.fromConfigValue(
+            targetProperties
+                .getProperty(EXECUTION_ENGINE, ExecutionEngine.JAVA.getConfigValue())
+                .trim());
+    Optional<String> secondaryIndexColumn =
+        Optional.ofNullable(targetProperties.getProperty(SECONDARY_INDEX_COLUMN))
             .map(String::trim)
-            .filter(column -> !column.isEmpty())
-            .distinct()
-            .collect(Collectors.toList());
-    if (!secondaryIndexColumns.isEmpty() && tableVersion != HoodieTableVersion.NINE) {
+            .filter(column -> !column.isEmpty());
+    if (secondaryIndexColumn.isPresent() && tableVersion != HoodieTableVersion.NINE) {
       throw new IllegalArgumentException(
           String.format(
               "%s requires Hudi target table version 9, set %s=9.",
-              SECONDARY_INDEX_COLUMNS, HUDI_TABLE_VERSION));
+              SECONDARY_INDEX_COLUMN, HUDI_TABLE_VERSION));
     }
-    if (secondaryIndexColumns.size() > 1 && !sparkEngine) {
-      // Hudi builds the index of the first column in the commit and the others with its indexer.
-      // In Hudi 1.2.1 the Java engine's JavaHoodieMetadataBulkInsertPartitioner writes an index
-      // built from existing files into a single file group, so lookups miss most keys.
+    if (secondaryIndexColumn.filter(column -> column.contains(",")).isPresent()) {
       throw new IllegalArgumentException(
-          String.format(
-              "More than one column in %s requires %s=%s.",
-              SECONDARY_INDEX_COLUMNS, EXECUTION_ENGINE, EXECUTION_ENGINE_SPARK));
+          String.format("%s supports only one column.", SECONDARY_INDEX_COLUMN));
     }
     Optional<Integer> recordIndexMinFileGroupCount =
         parsePositiveInt(targetProperties, RECORD_INDEX_MIN_FILEGROUP_COUNT);
@@ -119,8 +140,8 @@ public class HudiTargetConfig {
     }
     return new HudiTargetConfig(
         tableVersion,
-        sparkEngine,
-        secondaryIndexColumns,
+        executionEngine,
+        secondaryIndexColumn,
         recordIndexMinFileGroupCount,
         recordIndexMaxFileGroupCount,
         parsePositiveInt(targetProperties, SECONDARY_INDEX_PARALLELISM));
@@ -136,20 +157,6 @@ public class HudiTargetConfig {
       throw unsupportedTableVersion(String.valueOf(tableVersion.versionCode()), null);
     }
     return tableVersion;
-  }
-
-  private static boolean parseSparkEngine(Properties properties) {
-    String engine = properties.getProperty(EXECUTION_ENGINE, EXECUTION_ENGINE_JAVA).trim();
-    if (EXECUTION_ENGINE_SPARK.equalsIgnoreCase(engine)) {
-      return true;
-    }
-    if (EXECUTION_ENGINE_JAVA.equalsIgnoreCase(engine)) {
-      return false;
-    }
-    throw new IllegalArgumentException(
-        String.format(
-            "Unsupported Hudi execution engine %s. Only %s and %s are supported via %s.",
-            engine, EXECUTION_ENGINE_JAVA, EXECUTION_ENGINE_SPARK, EXECUTION_ENGINE));
   }
 
   private static Optional<Integer> parsePositiveInt(Properties properties, String key) {

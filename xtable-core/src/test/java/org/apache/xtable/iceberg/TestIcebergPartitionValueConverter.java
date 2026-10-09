@@ -25,14 +25,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.avro.generic.IndexedRecord;
 import org.junit.jupiter.api.Test;
 
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.StructLike;
-import org.apache.iceberg.avro.AvroSchemaUtil;
 import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.model.InternalTable;
@@ -51,19 +49,6 @@ public class TestIcebergPartitionValueConverter {
           Types.NestedField.optional(1, "id", Types.IntegerType.get()),
           Types.NestedField.optional(2, "name", Types.StringType.get()),
           Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()));
-  private static final Schema SCHEMA_WITH_PARTITION =
-      new Schema(
-          Types.NestedField.optional(1, "id", Types.IntegerType.get()),
-          Types.NestedField.optional(2, "name", Types.StringType.get()),
-          Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()),
-          Types.NestedField.optional(4, "birthDate_year", Types.IntegerType.get()));
-  private static final StructLike STRUCT_LIKE_RECORD =
-      Row.of(
-          SCHEMA_WITH_PARTITION,
-          1,
-          "abc",
-          1614556800000L,
-          51 /* Iceberg represents year as diff from 1970 */);
   private static final InternalSchema ONE_SCHEMA =
       IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA);
 
@@ -72,7 +57,7 @@ public class TestIcebergPartitionValueConverter {
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     List<PartitionValue> partitionValues =
         partitionValueConverter.toXTable(
-            buildInternalTable(false), STRUCT_LIKE_RECORD, partitionSpec);
+            buildInternalTable(false), partitionData(partitionSpec), partitionSpec);
     assertTrue(partitionValues.isEmpty());
   }
 
@@ -88,7 +73,7 @@ public class TestIcebergPartitionValueConverter {
     List<PartitionValue> partitionValues =
         partitionValueConverter.toXTable(
             buildInternalTable(true, "name", PartitionTransformType.VALUE),
-            STRUCT_LIKE_RECORD,
+            partitionData(partitionSpec, "abc"),
             partitionSpec);
     assertEquals(1, partitionValues.size());
     assertEquals(expectedPartitionValues, partitionValues);
@@ -137,7 +122,7 @@ public class TestIcebergPartitionValueConverter {
     List<PartitionValue> partitionValues =
         partitionValueConverter.toXTable(
             buildInternalTable(true, "birthDate", PartitionTransformType.YEAR),
-            STRUCT_LIKE_RECORD,
+            partitionData(partitionSpec, 51 /* Iceberg represents year as diff from 1970 */),
             partitionSpec);
     assertEquals(1, partitionValues.size());
     assertEquals(expectedPartitionValues, partitionValues);
@@ -145,13 +130,6 @@ public class TestIcebergPartitionValueConverter {
 
   @Test
   void testToXTableBucketPartitioned() {
-    Schema schemaWithPartition =
-        new Schema(
-            Types.NestedField.optional(1, "id", Types.IntegerType.get()),
-            Types.NestedField.optional(2, "name", Types.StringType.get()),
-            Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()),
-            Types.NestedField.optional(4, "name_bucket", Types.IntegerType.get()));
-    StructLike structLike = Row.of(schemaWithPartition, 1, "abc", 1614556800000L, 5);
     List<PartitionValue> expectedPartitionValues =
         Collections.singletonList(
             PartitionValue.builder()
@@ -162,7 +140,7 @@ public class TestIcebergPartitionValueConverter {
     List<PartitionValue> partitionValues =
         partitionValueConverter.toXTable(
             buildInternalTable(true, "name", PartitionTransformType.BUCKET),
-            structLike,
+            partitionData(partitionSpec, 5),
             partitionSpec);
     assertEquals(1, partitionValues.size());
     assertEquals(expectedPartitionValues, partitionValues);
@@ -196,47 +174,11 @@ public class TestIcebergPartitionValueConverter {
         .build();
   }
 
-  public static class Row implements StructLike, IndexedRecord {
-    public static Row of(Schema schema, Object... values) {
-      return new Row(schema, values);
+  private static StructLike partitionData(PartitionSpec partitionSpec, Object... values) {
+    PartitionData partitionData = new PartitionData(partitionSpec.partitionType());
+    for (int position = 0; position < values.length; position++) {
+      partitionData.set(position, values[position]);
     }
-
-    private final Object[] values;
-    private final Schema schema;
-
-    private Row(Schema schema, Object... values) {
-      this.schema = schema;
-      this.values = values;
-    }
-
-    @Override
-    public int size() {
-      return values.length;
-    }
-
-    @Override
-    public <T> T get(int pos, Class<T> javaClass) {
-      return javaClass.cast(values[pos]);
-    }
-
-    @Override
-    public <T> void set(int pos, T value) {
-      values[pos] = value;
-    }
-
-    @Override
-    public void put(int i, Object v) {
-      values[i] = v;
-    }
-
-    @Override
-    public Object get(int i) {
-      return values[i];
-    }
-
-    @Override
-    public org.apache.avro.Schema getSchema() {
-      return AvroSchemaUtil.convert(schema, "testSchema");
-    }
+    return partitionData;
   }
 }

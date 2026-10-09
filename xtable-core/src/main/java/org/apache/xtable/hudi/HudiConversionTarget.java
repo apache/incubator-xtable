@@ -20,7 +20,6 @@ package org.apache.xtable.hudi;
 
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_COLUMN_STATS;
-import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX_PREFIX;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.existingIndexVersionOrDefault;
 
@@ -48,11 +47,9 @@ import org.apache.hudi.avro.model.HoodieActionInstant;
 import org.apache.hudi.avro.model.HoodieCleanFileInfo;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieCleanerPlan;
-import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.timeline.HoodieTimelineArchiver;
 import org.apache.hudi.client.timeline.TimelineArchivers;
-import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.hudi.common.HoodieCleanStat;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -60,8 +57,7 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
-import org.apache.hudi.common.model.HoodieIndexDefinition;
-import org.apache.hudi.common.model.WriteConcurrencyMode;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.TableSchemaResolver;
@@ -78,7 +74,6 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
-import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
@@ -501,36 +496,6 @@ public class HudiConversionTarget implements ConversionTarget {
     }
   }
 
-  /**
-   * Registers a definition for every secondary index partition that has none. Hudi updates every
-   * secondary index on each commit through its definition, but the commit that creates the metadata
-   * table rewrites the column-stats index definition from a stale view of the definitions, which
-   * drops the secondary index definition registered in the same commit.
-   */
-  static void restoreSecondaryIndexDefinitions(HoodieTableMetaClient metaClient) {
-    metaClient.getTableConfig().getMetadataPartitions().stream()
-        .filter(partition -> partition.startsWith(PARTITION_NAME_SECONDARY_INDEX_PREFIX))
-        .filter(partition -> !metaClient.getIndexForMetadataPartition(partition).isPresent())
-        .forEach(
-            partition -> {
-              log.info("Registering the missing definition of secondary index {}", partition);
-              registerSecondaryIndexDefinition(
-                  metaClient, partition.substring(PARTITION_NAME_SECONDARY_INDEX_PREFIX.length()));
-            });
-  }
-
-  private static void registerSecondaryIndexDefinition(
-      HoodieTableMetaClient metaClient, String column) {
-    String indexName = PARTITION_NAME_SECONDARY_INDEX_PREFIX + column;
-    metaClient.buildIndexDefinition(
-        HoodieIndexDefinition.newBuilder()
-            .withIndexName(indexName)
-            .withIndexType(PARTITION_NAME_SECONDARY_INDEX)
-            .withVersion(existingIndexVersionOrDefault(indexName, metaClient))
-            .withSourceFields(Collections.singletonList(column))
-            .build());
-  }
-
   static class CommitState {
     private HoodieTableMetaClient metaClient;
     @Getter private final String instantTime;
@@ -580,29 +545,14 @@ public class HudiConversionTarget implements ConversionTarget {
           throw new ReadException("Unable to read Hudi table schema", ex);
         }
       }
-      List<String> secondaryIndexColumns = targetConfig.getSecondaryIndexColumns();
-      Optional<String> secondaryIndexColumnToCommit = Optional.empty();
-      List<String> secondaryIndexColumnsToBuild = Collections.emptyList();
-      if (!secondaryIndexColumns.isEmpty()) {
-        metaClient = HoodieTableMetaClient.reload(metaClient);
-        restoreSecondaryIndexDefinitions(metaClient);
-        if (!metaClient.getTableConfig().isMetadataTableAvailable()) {
-          // Hudi builds one secondary index when it creates the metadata table, so the indexer
-          // builds the indexes of the other columns after the commit
-          secondaryIndexColumnToCommit = Optional.of(secondaryIndexColumns.get(0));
-          secondaryIndexColumnsToBuild =
-              secondaryIndexColumns.subList(1, secondaryIndexColumns.size());
-        } else {
-          secondaryIndexColumnToCommit = getIndexedColumnToCommit();
-        }
-      }
+      targetConfig.getSecondaryIndexColumn().ifPresent(this::checkSecondaryIndexColumnUnchanged);
       HoodieWriteConfig writeConfig =
           getWriteConfig(
               schema,
               getNumInstantsToRetain(),
               maxNumDeltaCommitsBeforeCompaction,
               timelineRetentionInHours,
-              secondaryIndexColumnToCommit);
+              targetConfig.getSecondaryIndexColumn());
       metaClient
           .getActiveTimeline()
           .createRequestedCommitWithReplaceMetadata(
@@ -625,16 +575,8 @@ public class HudiConversionTarget implements ConversionTarget {
           partitionToReplacedFileIds);
       // if the metaclient was created before the table's first commit, we need to reload it to
       // pick up the metadata table context
-      if (!metaClient.getTableConfig().isMetadataTableAvailable()
-          || !targetConfig.getSecondaryIndexColumns().isEmpty()) {
+      if (!metaClient.getTableConfig().isMetadataTableAvailable()) {
         metaClient = HoodieTableMetaClient.reload(metaClient);
-      }
-      if (!secondaryIndexColumns.isEmpty()) {
-        restoreSecondaryIndexDefinitions(metaClient);
-      }
-      for (String column : secondaryIndexColumnsToBuild) {
-        log.info("Building the secondary index for column {} with the indexer", column);
-        buildSecondaryIndex(getIndexerWriteConfig(writeConfig, column), column);
       }
       HoodieEngineContext engineContext = engineProvider.getEngineContext();
       HoodieTable<?, ?, ?, ?> table = engineProvider.createTable(writeConfig, metaClient);
@@ -644,89 +586,25 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     /**
-     * Returns the column the commit's metadata config names for an existing metadata table. Hudi
-     * updates every secondary index that has a definition, whichever column the config names, but
-     * naming a column without an index would make the commit build that index.
+     * Fails the commit before it starts when an existing metadata table has no secondary index for
+     * {@code column}. The commit that creates the metadata table builds the index, and naming
+     * another column later would leave the existing index without updates.
      */
-    private Optional<String> getIndexedColumnToCommit() {
-      Set<String> partitions = metaClient.getTableConfig().getMetadataPartitions();
-      List<String> notIndexed =
-          targetConfig.getSecondaryIndexColumns().stream()
-              .filter(
-                  column -> !partitions.contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + column))
-              .collect(Collectors.toList());
-      if (!notIndexed.isEmpty()) {
-        log.warn(
-            "Secondary index columns {} were added to the existing Hudi table at {} and are not"
-                + " indexed. Adding a column to the secondary indexes of an existing table is not"
-                + " supported yet.",
-            notIndexed,
-            metaClient.getBasePath());
-      }
-      return targetConfig.getSecondaryIndexColumns().stream()
-          .filter(column -> !notIndexed.contains(column))
-          .findFirst();
-    }
-
-    /**
-     * Builds the secondary index of {@code column} from the files the table has with Hudi's
-     * indexer, as an {@code indexing} action on the timeline. A failed build is dropped with its
-     * definition, because Hudi builds an index whose definition has no partition on a later commit.
-     */
-    private void buildSecondaryIndex(HoodieWriteConfig indexerWriteConfig, String column) {
-      String indexName = PARTITION_NAME_SECONDARY_INDEX_PREFIX + column;
-      registerSecondaryIndexDefinition(metaClient, column);
-      try (BaseHoodieWriteClient<?, ?, ?, ?> writeClient =
-          engineProvider.createWriteClient(indexerWriteConfig)) {
-        try {
-          Option<String> indexInstant =
-              writeClient.scheduleIndexing(
-                  Collections.singletonList(MetadataPartitionType.SECONDARY_INDEX),
-                  Collections.singletonList(indexName));
-          if (!indexInstant.isPresent()) {
-            throw new UpdateException("Hudi did not schedule the build of index " + indexName);
-          }
-          writeClient.index(indexInstant.get());
-        } catch (RuntimeException e) {
-          dropFailedSecondaryIndex(writeClient, indexName);
-          throw new UpdateException("Failed to build the secondary index of column " + column, e);
-        }
-      }
+    private void checkSecondaryIndexColumnUnchanged(String column) {
       metaClient = HoodieTableMetaClient.reload(metaClient);
-    }
-
-    private void dropFailedSecondaryIndex(
-        BaseHoodieWriteClient<?, ?, ?, ?> writeClient, String indexName) {
-      try {
-        writeClient.dropIndex(Collections.singletonList(indexName));
-      } catch (RuntimeException e) {
-        log.warn("Failed to drop the failed build of secondary index {}", indexName, e);
+      HoodieTableConfig tableConfig = metaClient.getTableConfig();
+      if (tableConfig.isMetadataTableAvailable()
+          && !tableConfig
+              .getMetadataPartitions()
+              .contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + column)) {
+        throw new NotSupportedException(
+            "The Hudi table at "
+                + metaClient.getBasePath()
+                + " has no secondary index for column "
+                + column
+                + ". Changing the secondary index column of an existing table is not supported"
+                + " yet.");
       }
-      metaClient = HoodieTableMetaClient.reload(metaClient);
-      if (metaClient.getIndexForMetadataPartition(indexName).isPresent()) {
-        metaClient.deleteIndexDefinition(indexName);
-      }
-    }
-
-    /**
-     * The commit's write config with the secondary index of {@code column} enabled. The indexer
-     * runs as a table service, which takes a lock even with a single writer.
-     */
-    private HoodieWriteConfig getIndexerWriteConfig(HoodieWriteConfig writeConfig, String column) {
-      HoodieMetadataConfig metadataConfig =
-          HoodieMetadataConfig.newBuilder()
-              .fromProperties(writeConfig.getMetadataConfig().getProps())
-              .withSecondaryIndexEnabled(true)
-              .withSecondaryIndexForColumn(column)
-              .build();
-      // the metadata config carries the commit's concurrency mode, so the lock settings go last
-      return HoodieWriteConfig.newBuilder()
-          .withProperties(writeConfig.getProps())
-          .withMetadataConfig(metadataConfig)
-          .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
-          .withLockConfig(
-              HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
-          .build();
     }
 
     private int getNumInstantsToRetain() {
@@ -930,7 +808,7 @@ public class HudiConversionTarget implements ConversionTarget {
       // index to resolve the record key to a file. Rows without a record key are keyed by
       // "<file path relative to the table>_<row position>", see
       // https://github.com/apache/hudi/pull/19869.
-      if (!targetConfig.getSecondaryIndexColumns().isEmpty()) {
+      if (targetConfig.getSecondaryIndexColumn().isPresent()) {
         metadataConfigBuilder.withEnableGlobalRecordLevelIndex(true);
       }
       secondaryIndexColumn.ifPresent(

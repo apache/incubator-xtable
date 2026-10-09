@@ -44,6 +44,7 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.data.HoodiePairData;
+import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.data.HoodieJavaPairRDD;
@@ -75,15 +76,28 @@ import org.apache.xtable.model.sync.SyncStatusCode;
  * syncing the Iceberg table to Hudi with the record index and a secondary index enabled; the Hudi
  * metadata lives under {@code <data location>/.hoodie/metadata}. Because the Iceberg data files
  * carry no Hudi record keys, the record key of a row is {@code <file path relative to the data
- * location>_<row position>}, which a lookup resolves back to a file path and row position.
+ * location>_<row position>}, which a lookup resolves back to a file path and row position. Hudi
+ * requires every data file to be under the data location, so files outside it are not supported.
  */
 @Log4j2
 public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
+  /**
+   * Lookup result column with the full path of the data file that holds the row, named like
+   * Iceberg's {@code _file} metadata column so the result joins to the table directly.
+   */
+  public static final String FILE_COLUMN = "_file";
+
+  /**
+   * Lookup result column with the zero based position of the row within the file, named like
+   * Iceberg's {@code _pos} metadata column.
+   */
+  public static final String POSITION_COLUMN = "_pos";
+
   private final String tableLocation;
   private final String dataPath;
   private final SourceTable sourceTable;
   private final Properties targetTableProperties;
-  private final List<String> indexedColumns;
+  private final String indexedColumn;
   private final SparkSession sparkSession;
   private final JavaSparkContext javaSparkContext;
   private final HoodieSparkEngineContext engineContext;
@@ -95,7 +109,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
    *     namespace, and a table without a catalog config is loaded from its location
    * @param sparkSession the Spark session used to build and query the index
    * @param targetTableProperties {@link HudiTargetConfig} properties for the sync. {@link
-   *     HudiTargetConfig#SECONDARY_INDEX_COLUMNS} lists the columns to index, and other properties
+   *     HudiTargetConfig#SECONDARY_INDEX_COLUMN} names the column to index, and other properties
    *     such as the record index file group counts are optional
    */
   public HudiBackedIcebergSecondaryIndex(
@@ -114,28 +128,39 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     // the Hudi table lives under the data location, which Iceberg resolves from the table
     // properties
     this.sourceTable = sourceTable.toBuilder().dataPath(dataPath).build();
-    this.targetTableProperties = new Properties();
-    this.targetTableProperties.putAll(targetTableProperties);
-    this.targetTableProperties.setProperty(
-        HudiTargetConfig.EXECUTION_ENGINE, HudiTargetConfig.EXECUTION_ENGINE_SPARK);
-    // the secondary index is only available from Hudi table version 8 onwards
-    this.targetTableProperties.setProperty(
-        HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(HoodieTableVersion.NINE.versionCode()));
-    this.indexedColumns =
-        HudiTargetConfig.fromProperties(this.targetTableProperties).getSecondaryIndexColumns();
-    Preconditions.checkArgument(
-        !indexedColumns.isEmpty(),
-        "Set %s to the columns to index",
-        HudiTargetConfig.SECONDARY_INDEX_COLUMNS);
+    this.targetTableProperties = getIndexTargetProperties(targetTableProperties);
+    this.indexedColumn =
+        HudiTargetConfig.fromProperties(this.targetTableProperties)
+            .getSecondaryIndexColumn()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "Set "
+                            + HudiTargetConfig.SECONDARY_INDEX_COLUMN
+                            + " to the column to index"));
     this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     this.engineContext = new HoodieSparkEngineContext(javaSparkContext);
   }
 
+  /**
+   * Returns the given {@link HudiTargetConfig} properties with the settings the index requires: the
+   * Spark engine and table version 9.
+   */
+  private static Properties getIndexTargetProperties(Properties targetTableProperties) {
+    Properties indexTargetProperties = new Properties();
+    indexTargetProperties.putAll(targetTableProperties);
+    indexTargetProperties.setProperty(
+        HudiTargetConfig.EXECUTION_ENGINE, HudiTargetConfig.ExecutionEngine.SPARK.getConfigValue());
+    // the secondary index is only available from Hudi table version 8 onwards
+    indexTargetProperties.setProperty(
+        HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(HoodieTableVersion.NINE.versionCode()));
+    return indexTargetProperties;
+  }
+
   @Override
   public boolean doesIndexExist(String columnName) {
-    return getCompletedIndexPartitions()
-        .contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
+    return getIndexedColumns().contains(columnName);
   }
 
   @Override
@@ -153,44 +178,45 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
         && (syncResult.getTableFormatSyncStatus() == null
             || syncResult.getTableFormatSyncStatus().getStatusCode() != SyncStatusCode.SUCCESS)) {
       throw new IllegalStateException(
-          "Failed to sync the secondary indexes of columns "
-              + indexedColumns
+          "Failed to sync the secondary index of column "
+              + indexedColumn
               + " of table "
               + tableLocation
               + ": "
-              + syncResult.getTableFormatSyncStatus());
+              + SyncResult.getErrorMessage(syncResult));
     }
-    Set<String> completedPartitions = getCompletedIndexPartitions();
-    List<String> notIndexed =
-        indexedColumns.stream()
-            .filter(
-                column ->
-                    !completedPartitions.contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + column))
-            .collect(Collectors.toList());
-    if (!notIndexed.isEmpty()) {
+    // A sync without a new snapshot returns no result, so check that the index exists.
+    if (!getIndexedColumns().contains(indexedColumn)) {
       throw new IllegalStateException(
-          "The secondary indexes of columns "
-              + notIndexed
+          "The secondary index of column "
+              + indexedColumn
               + " of table "
               + tableLocation
-              + " do not exist. The indexes are built when the index is created, and adding a"
-              + " column to an existing index is not supported yet.");
+              + " does not exist. The index is built by the first sync of a table with a snapshot,"
+              + " and changing the indexed column of an existing index is not supported yet.");
     }
-    log.info(
-        "Synced the secondary indexes of columns {} of table {}", indexedColumns, tableLocation);
+    log.info("Synced the secondary index of column {} of table {}", indexedColumn, tableLocation);
   }
 
-  /**
-   * Returns the metadata table partitions whose build has completed. A partition directory can
-   * exist while the build is in flight or after it failed, so the directory alone does not show
-   * that the index is usable.
-   */
-  private Set<String> getCompletedIndexPartitions() {
+  /** Returns the columns whose index exists, or an empty set when there is no Hudi table yet. */
+  private Set<String> getIndexedColumns() {
     try {
-      return getMetaClient().getTableConfig().getMetadataPartitions();
+      return getIndexedColumns(getMetaClient());
     } catch (TableNotFoundException e) {
       return Collections.emptySet();
     }
+  }
+
+  /**
+   * Returns the columns whose index build has completed. A metadata table partition directory can
+   * exist while the build is in flight or after it failed, so the directory alone does not show
+   * that the index is usable.
+   */
+  private static Set<String> getIndexedColumns(HoodieTableMetaClient metaClient) {
+    return metaClient.getTableConfig().getMetadataPartitions().stream()
+        .filter(partition -> partition.startsWith(PARTITION_NAME_SECONDARY_INDEX_PREFIX))
+        .map(partition -> partition.substring(PARTITION_NAME_SECONDARY_INDEX_PREFIX.length()))
+        .collect(Collectors.toSet());
   }
 
   private HoodieTableMetaClient getMetaClient() {
@@ -216,15 +242,10 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   @Override
   public Dataset<Row> lookup(Table icebergTable, Dataset<Row> keys, String columnName) {
     Preconditions.checkArgument(
-        indexedColumns.contains(columnName),
-        "Column %s is not one of the indexed columns %s",
+        indexedColumn.equals(columnName),
+        "Column %s is not the indexed column %s",
         columnName,
-        indexedColumns);
-    StructType resultSchema =
-        new StructType()
-            .add(columnName, DataTypes.StringType, false)
-            .add(FILE_COLUMN, DataTypes.StringType, false)
-            .add(POSITION_COLUMN, DataTypes.LongType, false);
+        indexedColumn);
     // the secondary index stores the values of the indexed column as strings
     JavaRDD<String> secondaryKeys =
         keys.where(col(columnName).isNotNull())
@@ -232,11 +253,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
             .as(Encoders.STRING())
             .toJavaRDD();
     HoodieTableMetaClient metaClient = getMetaClient();
-    HoodieStorage storage = metaClient.getStorage();
-    if (!metaClient
-        .getTableConfig()
-        .getMetadataPartitions()
-        .contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName)) {
+    if (!getIndexedColumns(metaClient).contains(columnName)) {
       throw new IllegalStateException(
           "The secondary index of column "
               + columnName
@@ -244,14 +261,15 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
               + tableLocation
               + " is not built");
     }
-    HoodieMetadataConfig metadataConfig =
-        HoodieMetadataConfig.newBuilder().enable(true).withSecondaryIndexEnabled(true).build();
+    // The reader only needs the metadata table enabled, and the table config above shows that the
+    // index exists. Without it, the factory returns a file system backed reader without indexes.
+    HoodieMetadataConfig metadataConfig = HoodieMetadataConfig.newBuilder().enable(true).build();
     try (HoodieBackedTableMetadata tableMetadata =
         (HoodieBackedTableMetadata)
             metaClient
                 .getTableFormat()
                 .getMetadataFactory()
-                .create(engineContext, storage, metadataConfig, dataPath)) {
+                .create(engineContext, metaClient.getStorage(), metadataConfig, dataPath)) {
       HoodiePairData<String, String> recordKeysBySecondaryKey =
           tableMetadata.readSecondaryIndexDataTableRecordKeysWithKeys(
               HoodieJavaRDD.of(secondaryKeys), PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
@@ -263,13 +281,20 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
                   recordKeyBySecondaryKey ->
                       toLookupResult(
                           dataPath, recordKeyBySecondaryKey._1(), recordKeyBySecondaryKey._2()));
+      StructType resultSchema =
+          new StructType()
+              .add(columnName, DataTypes.StringType, false)
+              .add(FILE_COLUMN, DataTypes.StringType, false)
+              .add(POSITION_COLUMN, DataTypes.LongType, false);
       return sparkSession.createDataFrame(lookupResults, resultSchema);
     }
   }
 
   /**
    * Hudi returns an RDD backed result for keys in an RDD, but a list backed result when there are
-   * no keys to look up, for example when every key is null.
+   * no keys to look up, for example when every key is null, and when the index has one file group.
+   * For one file group Hudi collects the keys and reads the file group on the driver, so the
+   * matches are collected there as well.
    */
   private JavaPairRDD<String, String> toJavaPairRDD(HoodiePairData<String, String> pairData) {
     if (pairData instanceof HoodieJavaPairRDD) {
@@ -293,7 +318,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     String relativeFilePath = recordKey.substring(0, positionSeparator);
     return RowFactory.create(
         secondaryKey,
-        dataPath.endsWith("/") ? dataPath + relativeFilePath : dataPath + "/" + relativeFilePath,
+        FSUtils.constructAbsolutePath(dataPath, relativeFilePath).toString(),
         Long.parseLong(recordKey.substring(positionSeparator + 1)));
   }
 }

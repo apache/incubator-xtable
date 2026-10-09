@@ -21,7 +21,6 @@ package org.apache.xtable.hudi.engine;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -53,7 +52,4 @@ public interface HudiExecutionEngineProvider {
       Option<Map<String, String>> extraMetadata,
       String commitActionType,
       Map<String, List<String>> partitionToReplacedFileIds);
-
-  /** Creates an engine specific write client, for example to run Hudi's indexer. */
-  BaseHoodieWriteClient<?, ?, ?, ?> createWriteClient(HoodieWriteConfig writeConfig);
 }

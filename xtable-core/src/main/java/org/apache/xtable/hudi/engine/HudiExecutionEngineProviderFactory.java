@@ -33,7 +33,7 @@ public class HudiExecutionEngineProviderFactory {
 
   public static HudiExecutionEngineProvider createProvider(
       HudiTargetConfig targetConfig, Configuration configuration) {
-    if (targetConfig.isSparkEngine()) {
+    if (targetConfig.getExecutionEngine() == HudiTargetConfig.ExecutionEngine.SPARK) {
       return new SparkExecutionEngineProvider(getOrCreateSparkSession(configuration));
     }
     return new JavaExecutionEngineProvider(configuration);

@@ -22,21 +22,14 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 
 /**
- * A secondary index over a table in another format, backed by XTable's Hudi conversion. It maps the
- * values of an indexed column to the data file and row position that holds each value, so an engine
- * can locate the rows to merge or delete without a full table join.
+ * An index over a table that maps the values of a column to the rows that hold them, so an engine
+ * can find those rows without a full table scan or join.
  *
  * @param <T> The table type of the source format (for example an Iceberg {@code Table})
  */
 public interface Index<T> {
-  /** Result column with the full path of the data file that holds the row. */
-  String FILE_COLUMN = "_file";
-
-  /** Result column with the zero based position of the row within the file. */
-  String POSITION_COLUMN = "_pos";
-
   /**
-   * Checks whether a secondary index exists for the given column.
+   * Checks whether the index of the given column exists.
    *
    * @param columnName The indexed column
    * @return true when a build of the index has completed
@@ -44,23 +37,20 @@ public interface Index<T> {
   boolean doesIndexExist(String columnName);
 
   /**
-   * Brings the secondary indexes of the configured columns up to date with the current state of the
-   * table. The indexed columns are part of the index configuration, not of the sync.
+   * Brings the indexes of the configured columns up to date with the current state of the table.
+   * The indexed columns are part of the index configuration, not of the sync.
    *
    * @param table The table to index
    */
   void syncIndex(T table);
 
   /**
-   * Looks up the given keys in the secondary index of a column.
+   * Looks up the given keys in the index of a column.
    *
    * @param table The table the index belongs to
    * @param keys The values to look up, in the column named {@code columnName}
    * @param columnName The indexed column
-   * @return one row for every row of the table that holds a key, with the key in the column named
-   *     {@code columnName} and the location of the row in {@link #FILE_COLUMN} and {@link
-   *     #POSITION_COLUMN}. A caller that needs other metadata of the row, such as its partition,
-   *     reads the returned files through the table format.
+   * @return the matches of the keys. The schema of the result depends on the type of the index.
    */
   Dataset<Row> lookup(T table, Dataset<Row> keys, String columnName);
 }

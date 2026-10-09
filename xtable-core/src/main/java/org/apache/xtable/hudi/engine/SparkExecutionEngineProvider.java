@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
-import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.SparkRDDWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
@@ -78,10 +77,5 @@ public class SparkExecutionEngineProvider implements HudiExecutionEngineProvider
           commitActionType,
           partitionToReplacedFileIds);
     }
-  }
-
-  @Override
-  public BaseHoodieWriteClient<?, ?, ?, ?> createWriteClient(HoodieWriteConfig writeConfig) {
-    return new SparkRDDWriteClient<>(engineContext, writeConfig);
   }
 }
