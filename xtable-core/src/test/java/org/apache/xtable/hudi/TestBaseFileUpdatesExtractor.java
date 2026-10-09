@@ -26,6 +26,8 @@ import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static org.apache.xtable.testutil.ColumnStatMapUtil.getColumnStats;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -44,6 +46,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
@@ -66,6 +70,7 @@ import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 import org.apache.hudi.stats.ValueMetadata;
 import org.apache.hudi.stats.ValueType;
 
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -166,6 +171,30 @@ public class TestBaseFileUpdatesExtractor {
                 partitionPath2,
                 getExpectedColumnStats(fileName2, HoodieIndexVersion.V1)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "file:///tmp/table/outside/file1.parquet",
+        // shares the base path as a string prefix but is a sibling directory
+        "file:///tmp/table/data2/file1.parquet"
+      })
+  void convertDiffRejectsFileOutsideBasePath(String physicalPath) {
+    String tableBasePath = "file:///tmp/table/data";
+    InternalFilesDiff diff =
+        InternalFilesDiff.builder()
+            .filesAdded(
+                Collections.singletonList(createFile(physicalPath, Collections.emptyList())))
+            .filesRemoved(Collections.emptyList())
+            .build();
+    BaseFileUpdatesExtractor extractor =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
+    NotSupportedException exception =
+        assertThrows(
+            NotSupportedException.class,
+            () -> extractor.convertDiff(diff, COMMIT_TIME, HoodieIndexVersion.V1));
+    assertTrue(exception.getMessage().contains("outside the Hudi table base path"));
   }
 
   @Test

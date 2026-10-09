@@ -42,6 +42,7 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DateType;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.types.TimestampType;
 
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
@@ -86,9 +87,9 @@ import org.apache.xtable.model.sync.SyncStatusCode;
  * requires every data file to be under the data location, so files outside it are not supported.
  *
  * <p>Hudi keys the index by the string of Spark's internal value of the column: the day count of a
- * DATE, the microseconds of a TIMESTAMP and the plain string of other types. A lookup renders its
- * keys the same way and returns them in the type of the column. Columns of other types, such as
- * BINARY, UUID or a timestamp without time zone, are not supported.
+ * DATE, the microseconds of a TIMESTAMP (with or without time zone) and the plain string of other
+ * types. A lookup renders its keys the same way and returns them in the type of the column. Columns
+ * of other types, such as BINARY or UUID, are not supported.
  */
 @Log4j2
 public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
@@ -106,6 +107,8 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
 
   // the key as Hudi renders it in the secondary index
   private static final String SECONDARY_KEY_COLUMN = "secondary_key";
+
+  private static final String NTZ_EPOCH = "TIMESTAMP_NTZ'1970-01-01 00:00:00'";
 
   private final String tableLocation;
   private final String dataPath;
@@ -199,15 +202,13 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
       case DATE:
         return DataTypes.DateType;
       case TIMESTAMP:
-        if (((Types.TimestampType) type).shouldAdjustToUTC()) {
-          return DataTypes.TimestampType;
-        }
-        break;
+        return ((Types.TimestampType) type).shouldAdjustToUTC()
+            ? DataTypes.TimestampType
+            : DataTypes.TimestampNTZType;
       default:
         break;
     }
-    // Hudi renders a BINARY, FIXED or UUID value as an object reference, and Spark has no direct
-    // conversion of a timestamp without time zone to its microseconds
+    // Hudi renders a BINARY, FIXED or UUID value as an object reference
     throw new IllegalArgumentException(
         String.format("A secondary index on column %s of type %s is not supported", column, type));
   }
@@ -220,6 +221,10 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     if (keyType instanceof TimestampType) {
       return "CAST(unix_micros(" + key + ") AS STRING)";
     }
+    if (keyType instanceof TimestampNTZType) {
+      // unix_micros takes only a TIMESTAMP, and a cast to one would apply the session time zone
+      return "CAST(timestampdiff(MICROSECOND, " + NTZ_EPOCH + ", " + key + ") AS STRING)";
+    }
     return "CAST(" + key + " AS STRING)";
   }
 
@@ -230,6 +235,13 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     }
     if (keyType instanceof TimestampType) {
       return "timestamp_micros(CAST(" + key + " AS BIGINT))";
+    }
+    if (keyType instanceof TimestampNTZType) {
+      // timestampadd takes an INT count, so add the exact interval between two instants instead
+      return NTZ_EPOCH
+          + " + (timestamp_micros(CAST("
+          + key
+          + " AS BIGINT)) - TIMESTAMP'1970-01-01 00:00:00+00:00')";
     }
     return "CAST(" + key + " AS " + keyType.sql() + ")";
   }
@@ -289,6 +301,11 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
    * that the index is usable.
    */
   private static Set<String> getIndexedColumns(HoodieTableMetaClient metaClient) {
+    // The commit that creates the metadata table marks its partitions complete before the data
+    // commit completes, so the partitions of a table without a completed commit are not an index.
+    if (metaClient.getActiveTimeline().getWriteTimeline().filterCompletedInstants().empty()) {
+      return Collections.emptySet();
+    }
     return metaClient.getTableConfig().getMetadataPartitions().stream()
         .filter(partition -> partition.startsWith(PARTITION_NAME_SECONDARY_INDEX_PREFIX))
         .map(partition -> partition.substring(PARTITION_NAME_SECONDARY_INDEX_PREFIX.length()))

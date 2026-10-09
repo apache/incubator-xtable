@@ -65,6 +65,7 @@ import org.apache.hudi.stats.XTableValueMetadata;
 import com.google.common.base.Preconditions;
 
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
@@ -119,6 +120,9 @@ public class BaseFileUpdatesExtractor {
             meta -> tableMetadata);
     try (SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient)) {
       return extractFromFsView(partitionedDataFiles, commit, fsView, metaClient, metadataConfig);
+    } catch (NotSupportedException ex) {
+      // keep the reason the files cannot be synced visible in the sync result
+      throw ex;
     } catch (Exception ex) {
       throw new ReadException(
           "Failed to extract snapshot changes for Hudi table at " + tableBasePath, ex);
@@ -309,6 +313,23 @@ public class BaseFileUpdatesExtractor {
     return HUDI_BASE_FILE_PATTERN.matcher(fileName).find();
   }
 
+  /**
+   * Returns the path of a data file relative to the table base path. Hudi registers every file by
+   * that path, so a file outside the base path cannot be registered.
+   */
+  private static String getRelativeFilePath(Path tableBasePath, Path filePath) {
+    String basePath = tableBasePath.toUri().getPath();
+    String path = filePath.toUri().getPath();
+    if (!path.startsWith(basePath + "/")) {
+      throw new NotSupportedException(
+          String.format(
+              "Data file %s is outside the Hudi table base path %s. The Hudi target needs every"
+                  + " data file under its base path.",
+              filePath, tableBasePath));
+    }
+    return path.substring(basePath.length() + 1);
+  }
+
   private WriteStatus toWriteStatus(
       Path tableBasePath,
       String commitTime,
@@ -317,11 +338,10 @@ public class BaseFileUpdatesExtractor {
       HoodieIndexVersion indexVersion) {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
+    String filePath = getRelativeFilePath(tableBasePath, path);
     String partitionPath =
         partitionPathOptional.orElseGet(() -> getHudiPartitionPath(tableBasePath, file));
     String fileId = getFileId(file);
-    String filePath =
-        path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
     Optional<String> partitionSubdirectory = file.getPartitionSubdirectory();
     // For files under a partition subdirectory, encode it as the file-group prefix in the marker

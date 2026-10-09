@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -61,6 +63,7 @@ import org.apache.hudi.client.HoodieReadClient;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -169,6 +172,10 @@ public class ITHudiBackedIcebergSecondaryIndex {
     }
   }
 
+  /**
+   * A data file that Hudi cannot read fails the commit after Hudi created the metadata table, which
+   * marks its partitions complete before the commit. The empty index must not count as built.
+   */
   @Test
   void failedInitialSyncThrows() throws Exception {
     String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
@@ -177,28 +184,62 @@ public class ITHudiBackedIcebergSecondaryIndex {
             tableName, null, tempDir, jsc.hadoopConfiguration())) {
       table.insertRows(20);
       Table icebergTable = table.getIcebergTable();
-      // Hudi needs every file under its base path, the data location, so a data file outside it
-      // fails the sync. The Hudi target maps the file under the data location, where Hudi does not
-      // find it.
-      DataFile dataFile =
-          icebergTable.currentSnapshot().addedDataFiles(icebergTable.io()).iterator().next();
-      Path source = new Path(dataFile.location());
-      Path outside = new Path(icebergTable.location(), "outside/" + UUID.randomUUID() + ".parquet");
-      FileSystem fs = source.getFileSystem(jsc.hadoopConfiguration());
-      FileUtil.copy(fs, source, fs, outside, false, jsc.hadoopConfiguration());
-      icebergTable
-          .newAppend()
-          .appendFile(
-              DataFiles.builder(icebergTable.spec())
-                  .copy(dataFile)
-                  .withPath(outside.toString())
-                  .build())
-          .commit();
+      Path corruptFile = new Path(table.getDataPath(), UUID.randomUUID() + ".parquet");
+      try (OutputStream stream =
+          corruptFile.getFileSystem(jsc.hadoopConfiguration()).create(corruptFile)) {
+        stream.write("not a parquet file".getBytes(StandardCharsets.UTF_8));
+      }
+      appendDataFile(icebergTable, corruptFile);
       HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable, INDEXED_COLUMN);
       IllegalStateException exception =
           assertThrows(IllegalStateException.class, () -> index.syncIndex(icebergTable));
       assertTrue(exception.getMessage().contains("Failed to sync"));
+      assertFalse(index.doesIndexExist(INDEXED_COLUMN));
     }
+  }
+
+  /** Hudi needs every file under its base path, the data location. */
+  @Test
+  void dataFileOutsideDataLocationThrows() throws Exception {
+    String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
+    try (TestIcebergTable table =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, null, tempDir, jsc.hadoopConfiguration())) {
+      table.insertRows(20);
+      Table icebergTable = table.getIcebergTable();
+      Path source =
+          new Path(
+              icebergTable
+                  .currentSnapshot()
+                  .addedDataFiles(icebergTable.io())
+                  .iterator()
+                  .next()
+                  .location());
+      Path outside = new Path(icebergTable.location(), "outside/" + UUID.randomUUID() + ".parquet");
+      FileSystem fs = source.getFileSystem(jsc.hadoopConfiguration());
+      FileUtil.copy(fs, source, fs, outside, false, jsc.hadoopConfiguration());
+      appendDataFile(icebergTable, outside);
+      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable, INDEXED_COLUMN);
+      IllegalStateException exception =
+          assertThrows(IllegalStateException.class, () -> index.syncIndex(icebergTable));
+      assertTrue(exception.getMessage().contains("outside the Hudi table base path"));
+      assertFalse(index.doesIndexExist(INDEXED_COLUMN));
+    }
+  }
+
+  /** Registers a file as a data file of an unpartitioned table, without reading it. */
+  private void appendDataFile(Table icebergTable, Path file) throws Exception {
+    long length = file.getFileSystem(jsc.hadoopConfiguration()).getFileStatus(file).getLen();
+    icebergTable
+        .newAppend()
+        .appendFile(
+            DataFiles.builder(icebergTable.spec())
+                .withPath(file.toString())
+                .withFormat(FileFormat.PARQUET)
+                .withFileSizeInBytes(length)
+                .withRecordCount(20)
+                .build())
+        .commit();
   }
 
   /**
@@ -245,7 +286,8 @@ public class ITHudiBackedIcebergSecondaryIndex {
         "float_field",
         "decimal_field",
         "date_nullable_field",
-        "timestamp_micros_nullable_field"
+        "timestamp_micros_nullable_field",
+        "timestamp_local_micros_nullable_field"
       })
   void syncAndLookupNonUniqueColumn(String column) {
     String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
@@ -272,9 +314,9 @@ public class ITHudiBackedIcebergSecondaryIndex {
     }
   }
 
-  /** Hudi renders these values as object references or Spark cannot render them, so they fail. */
+  /** Hudi renders a BINARY value as an object reference, so it cannot be indexed. */
   @ParameterizedTest
-  @ValueSource(strings = {"bytes_field", "timestamp_local_micros_nullable_field", MISSING_COLUMN})
+  @ValueSource(strings = {"bytes_field", MISSING_COLUMN})
   void unsupportedColumnThrows(String column) {
     String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
     try (TestIcebergTable table =
