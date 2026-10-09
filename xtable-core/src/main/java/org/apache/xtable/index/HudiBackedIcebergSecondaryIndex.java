@@ -24,6 +24,7 @@ import static org.apache.spark.sql.functions.col;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
@@ -47,8 +48,8 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.data.HoodieJavaPairRDD;
 import org.apache.hudi.data.HoodieJavaRDD;
+import org.apache.hudi.exception.TableNotFoundException;
 import org.apache.hudi.metadata.HoodieBackedTableMetadata;
-import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
@@ -82,6 +83,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   private final String dataPath;
   private final SourceTable sourceTable;
   private final Properties targetTableProperties;
+  private final List<String> indexedColumns;
   private final SparkSession sparkSession;
   private final JavaSparkContext javaSparkContext;
   private final HoodieSparkEngineContext engineContext;
@@ -92,8 +94,9 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
    *     expose the catalog it came from. A table of a catalog sets its catalog config, name and
    *     namespace, and a table without a catalog config is loaded from its location
    * @param sparkSession the Spark session used to build and query the index
-   * @param targetTableProperties additional {@link HudiTargetConfig} properties for the sync, for
-   *     example the record index file group counts
+   * @param targetTableProperties {@link HudiTargetConfig} properties for the sync. {@link
+   *     HudiTargetConfig#SECONDARY_INDEX_COLUMNS} lists the columns to index, and other properties
+   *     such as the record index file group counts are optional
    */
   public HudiBackedIcebergSecondaryIndex(
       Table icebergTable,
@@ -111,7 +114,19 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     // the Hudi table lives under the data location, which Iceberg resolves from the table
     // properties
     this.sourceTable = sourceTable.toBuilder().dataPath(dataPath).build();
-    this.targetTableProperties = targetTableProperties;
+    this.targetTableProperties = new Properties();
+    this.targetTableProperties.putAll(targetTableProperties);
+    this.targetTableProperties.setProperty(
+        HudiTargetConfig.EXECUTION_ENGINE, HudiTargetConfig.EXECUTION_ENGINE_SPARK);
+    // the secondary index is only available from Hudi table version 8 onwards
+    this.targetTableProperties.setProperty(
+        HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(HoodieTableVersion.NINE.versionCode()));
+    this.indexedColumns =
+        HudiTargetConfig.fromProperties(this.targetTableProperties).getSecondaryIndexColumns();
+    Preconditions.checkArgument(
+        !indexedColumns.isEmpty(),
+        "Set %s to the columns to index",
+        HudiTargetConfig.SECONDARY_INDEX_COLUMNS);
     this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     this.engineContext = new HoodieSparkEngineContext(javaSparkContext);
@@ -119,65 +134,78 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
 
   @Override
   public boolean doesIndexExist(String columnName) {
-    return HoodieTableMetadataUtil.metadataPartitionExists(
-        dataPath, engineContext, PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
+    return getCompletedIndexPartitions()
+        .contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
   }
 
   @Override
-  public void syncIndex(Table icebergTable, String columnName) {
+  public void syncIndex(Table icebergTable) {
     Configuration configuration = javaSparkContext.hadoopConfiguration();
     IcebergConversionSourceProvider sourceProvider = new IcebergConversionSourceProvider();
     sourceProvider.init(configuration);
     // The sync reports a failed target in its result instead of throwing. It returns no result
-    // for the target when the table has no new commits, which only means the index is current
-    // when the index for the column already exists.
+    // for the target when the table has no new commits.
     SyncResult syncResult =
         new ConversionController(configuration)
-            .sync(getConversionConfig(icebergTable, columnName), sourceProvider)
+            .sync(getConversionConfig(icebergTable), sourceProvider)
             .get(TableFormat.HUDI);
-    if (syncResult == null) {
-      if (!doesIndexExist(columnName)) {
-        throw new IllegalStateException(
-            "Failed to sync the secondary index for column "
-                + columnName
-                + " of table "
-                + tableLocation
-                + ": no sync result for the Hudi target and no existing index");
-      }
-      log.info(
-          "Secondary index for column {} of table {} is already up to date",
-          columnName,
-          tableLocation);
-      return;
-    }
-    if (syncResult.getTableFormatSyncStatus() == null
-        || syncResult.getTableFormatSyncStatus().getStatusCode() != SyncStatusCode.SUCCESS) {
+    if (syncResult != null
+        && (syncResult.getTableFormatSyncStatus() == null
+            || syncResult.getTableFormatSyncStatus().getStatusCode() != SyncStatusCode.SUCCESS)) {
       throw new IllegalStateException(
-          "Failed to sync the secondary index for column "
-              + columnName
+          "Failed to sync the secondary indexes of columns "
+              + indexedColumns
               + " of table "
               + tableLocation
               + ": "
               + syncResult.getTableFormatSyncStatus());
     }
-    log.info("Synced secondary index for column {} of table {}", columnName, tableLocation);
+    Set<String> completedPartitions = getCompletedIndexPartitions();
+    List<String> notIndexed =
+        indexedColumns.stream()
+            .filter(
+                column ->
+                    !completedPartitions.contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + column))
+            .collect(Collectors.toList());
+    if (!notIndexed.isEmpty()) {
+      throw new IllegalStateException(
+          "The secondary indexes of columns "
+              + notIndexed
+              + " of table "
+              + tableLocation
+              + " do not exist. The indexes are built when the index is created, and adding a"
+              + " column to an existing index is not supported yet.");
+    }
+    log.info(
+        "Synced the secondary indexes of columns {} of table {}", indexedColumns, tableLocation);
   }
 
-  private ConversionConfig getConversionConfig(Table icebergTable, String columnName) {
-    Properties mergedProperties = new Properties();
-    mergedProperties.putAll(targetTableProperties);
-    mergedProperties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, columnName);
-    mergedProperties.setProperty(
-        HudiTargetConfig.EXECUTION_ENGINE, HudiTargetConfig.EXECUTION_ENGINE_SPARK);
-    // the secondary index is only available from Hudi table version 8 onwards
-    mergedProperties.setProperty(
-        HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(HoodieTableVersion.NINE.versionCode()));
+  /**
+   * Returns the metadata table partitions whose build has completed. A partition directory can
+   * exist while the build is in flight or after it failed, so the directory alone does not show
+   * that the index is usable.
+   */
+  private Set<String> getCompletedIndexPartitions() {
+    try {
+      return getMetaClient().getTableConfig().getMetadataPartitions();
+    } catch (TableNotFoundException e) {
+      return Collections.emptySet();
+    }
+  }
+
+  private HoodieTableMetaClient getMetaClient() {
+    HoodieStorage storage =
+        new HoodieHadoopStorage(dataPath, javaSparkContext.hadoopConfiguration());
+    return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(dataPath).build();
+  }
+
+  private ConversionConfig getConversionConfig(Table icebergTable) {
     TargetTable targetTable =
         TargetTable.builder()
             .name(icebergTable.name())
             .basePath(dataPath)
             .formatName(TableFormat.HUDI)
-            .additionalProperties(mergedProperties)
+            .additionalProperties(targetTableProperties)
             .build();
     return ConversionConfig.builder()
         .sourceTable(sourceTable)
@@ -187,6 +215,11 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
 
   @Override
   public Dataset<Row> lookup(Table icebergTable, Dataset<Row> keys, String columnName) {
+    Preconditions.checkArgument(
+        indexedColumns.contains(columnName),
+        "Column %s is not one of the indexed columns %s",
+        columnName,
+        indexedColumns);
     StructType resultSchema =
         new StructType()
             .add(columnName, DataTypes.StringType, false)
@@ -198,10 +231,19 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
             .select(col(columnName).cast(DataTypes.StringType))
             .as(Encoders.STRING())
             .toJavaRDD();
-    HoodieStorage storage =
-        new HoodieHadoopStorage(dataPath, javaSparkContext.hadoopConfiguration());
-    HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.builder().setStorage(storage).setBasePath(dataPath).build();
+    HoodieTableMetaClient metaClient = getMetaClient();
+    HoodieStorage storage = metaClient.getStorage();
+    if (!metaClient
+        .getTableConfig()
+        .getMetadataPartitions()
+        .contains(PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName)) {
+      throw new IllegalStateException(
+          "The secondary index of column "
+              + columnName
+              + " of table "
+              + tableLocation
+              + " is not built");
+    }
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder().enable(true).withSecondaryIndexEnabled(true).build();
     try (HoodieBackedTableMetadata tableMetadata =

@@ -18,8 +18,11 @@
  
 package org.apache.xtable.hudi;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import lombok.Value;
 
@@ -48,11 +51,13 @@ public class HudiTargetConfig {
   public static final String EXECUTION_ENGINE_SPARK = "spark";
 
   /**
-   * Column to build a Hudi secondary index on. Setting it also enables the global record index,
-   * which the secondary index depends on. Both indexes are stored in the Hudi metadata table under
-   * the target table path and require table version 9.
+   * Comma separated columns to build a Hudi secondary index on, one index per column. Setting it
+   * also enables the global record index, which the secondary index depends on. The indexes are
+   * stored in the Hudi metadata table under the target table path and require table version 9. The
+   * indexes are built when the Hudi table is created; a column added to the list of an existing
+   * table is not indexed yet.
    */
-  public static final String SECONDARY_INDEX_COLUMN = "xtable.hudi.target.secondary.index.column";
+  public static final String SECONDARY_INDEX_COLUMNS = "xtable.hudi.target.secondary.index.columns";
 
   /**
    * Lower and upper bound on the number of file groups of the record index. Both must be set
@@ -72,7 +77,7 @@ public class HudiTargetConfig {
 
   HoodieTableVersion tableVersion;
   boolean sparkEngine;
-  Optional<String> secondaryIndexColumn;
+  List<String> secondaryIndexColumns;
   Optional<Integer> recordIndexMinFileGroupCount;
   Optional<Integer> recordIndexMaxFileGroupCount;
   Optional<Integer> secondaryIndexParallelism;
@@ -81,15 +86,26 @@ public class HudiTargetConfig {
     Properties targetProperties = properties == null ? new Properties() : properties;
     HoodieTableVersion tableVersion = parseTableVersion(targetProperties);
     boolean sparkEngine = parseSparkEngine(targetProperties);
-    Optional<String> secondaryIndexColumn =
-        Optional.ofNullable(targetProperties.getProperty(SECONDARY_INDEX_COLUMN))
+    List<String> secondaryIndexColumns =
+        Arrays.stream(targetProperties.getProperty(SECONDARY_INDEX_COLUMNS, "").split(","))
             .map(String::trim)
-            .filter(column -> !column.isEmpty());
-    if (secondaryIndexColumn.isPresent() && tableVersion != HoodieTableVersion.NINE) {
+            .filter(column -> !column.isEmpty())
+            .distinct()
+            .collect(Collectors.toList());
+    if (!secondaryIndexColumns.isEmpty() && tableVersion != HoodieTableVersion.NINE) {
       throw new IllegalArgumentException(
           String.format(
               "%s requires Hudi target table version 9, set %s=9.",
-              SECONDARY_INDEX_COLUMN, HUDI_TABLE_VERSION));
+              SECONDARY_INDEX_COLUMNS, HUDI_TABLE_VERSION));
+    }
+    if (secondaryIndexColumns.size() > 1 && !sparkEngine) {
+      // Hudi builds the index of the first column in the commit and the others with its indexer.
+      // In Hudi 1.2.1 the Java engine's JavaHoodieMetadataBulkInsertPartitioner writes an index
+      // built from existing files into a single file group, so lookups miss most keys.
+      throw new IllegalArgumentException(
+          String.format(
+              "More than one column in %s requires %s=%s.",
+              SECONDARY_INDEX_COLUMNS, EXECUTION_ENGINE, EXECUTION_ENGINE_SPARK));
     }
     Optional<Integer> recordIndexMinFileGroupCount =
         parsePositiveInt(targetProperties, RECORD_INDEX_MIN_FILEGROUP_COUNT);
@@ -104,7 +120,7 @@ public class HudiTargetConfig {
     return new HudiTargetConfig(
         tableVersion,
         sparkEngine,
-        secondaryIndexColumn,
+        secondaryIndexColumns,
         recordIndexMinFileGroupCount,
         recordIndexMaxFileGroupCount,
         parsePositiveInt(targetProperties, SECONDARY_INDEX_PARALLELISM));

@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
@@ -69,5 +70,10 @@ public class JavaExecutionEngineProvider implements HudiExecutionEngineProvider 
       writeClient.commit(
           instantTime, writeStatuses, extraMetadata, commitActionType, partitionToReplacedFileIds);
     }
+  }
+
+  @Override
+  public BaseHoodieWriteClient<?, ?, ?, ?> createWriteClient(HoodieWriteConfig writeConfig) {
+    return new HoodieJavaWriteClient<>(engineContext, writeConfig);
   }
 }

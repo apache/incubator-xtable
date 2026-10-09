@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -39,7 +41,7 @@ public class TestHudiTargetConfig {
     HudiTargetConfig config = HudiTargetConfig.fromProperties(new Properties());
     assertEquals(HoodieTableVersion.SIX, config.getTableVersion());
     assertFalse(config.isSparkEngine());
-    assertEquals(Optional.empty(), config.getSecondaryIndexColumn());
+    assertEquals(Collections.emptyList(), config.getSecondaryIndexColumns());
     assertEquals(Optional.empty(), config.getRecordIndexMinFileGroupCount());
     assertEquals(Optional.empty(), config.getRecordIndexMaxFileGroupCount());
     assertEquals(Optional.empty(), config.getSecondaryIndexParallelism());
@@ -85,12 +87,13 @@ public class TestHudiTargetConfig {
   void parsesSecondaryIndexSettings() {
     Properties props = new Properties();
     props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
-    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, " id ");
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMNS, " id , name,,id ");
+    props.setProperty(HudiTargetConfig.EXECUTION_ENGINE, HudiTargetConfig.EXECUTION_ENGINE_SPARK);
     props.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "2");
     props.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "4");
     props.setProperty(HudiTargetConfig.SECONDARY_INDEX_PARALLELISM, "8");
     HudiTargetConfig config = HudiTargetConfig.fromProperties(props);
-    assertEquals(Optional.of("id"), config.getSecondaryIndexColumn());
+    assertEquals(Arrays.asList("id", "name"), config.getSecondaryIndexColumns());
     assertEquals(Optional.of(2), config.getRecordIndexMinFileGroupCount());
     assertEquals(Optional.of(4), config.getRecordIndexMaxFileGroupCount());
     assertEquals(Optional.of(8), config.getSecondaryIndexParallelism());
@@ -99,14 +102,29 @@ public class TestHudiTargetConfig {
   @Test
   void ignoresBlankSecondaryIndexColumn() {
     Properties props = new Properties();
-    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "  ");
-    assertFalse(HudiTargetConfig.fromProperties(props).getSecondaryIndexColumn().isPresent());
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMNS, "  , ");
+    assertTrue(HudiTargetConfig.fromProperties(props).getSecondaryIndexColumns().isEmpty());
+  }
+
+  @Test
+  void multipleSecondaryIndexColumnsRequireSparkEngine() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMNS, "id,name");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+    assertTrue(exception.getMessage().contains(HudiTargetConfig.EXECUTION_ENGINE));
+    // one column can still be indexed with the Java engine
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMNS, "id");
+    assertEquals(
+        Collections.singletonList("id"),
+        HudiTargetConfig.fromProperties(props).getSecondaryIndexColumns());
   }
 
   @Test
   void secondaryIndexRequiresTableVersionNine() {
     Properties props = new Properties();
-    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "id");
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMNS, "id");
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
     assertTrue(exception.getMessage().contains(HudiTargetConfig.HUDI_TABLE_VERSION));

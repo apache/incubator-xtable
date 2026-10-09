@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -72,6 +73,7 @@ import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.TestIcebergTable;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.hudi.HudiTargetConfig;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
@@ -84,6 +86,8 @@ public class ITHudiBackedIcebergSecondaryIndex {
   private static final String INDEXED_COLUMN = "id";
   private static final String PARTITION_COLUMN = "level";
   private static final String MISSING_COLUMN = "missing_column";
+  // values of this column repeat across rows and files
+  private static final String SECOND_INDEXED_COLUMN = "string_field";
 
   @TempDir public static java.nio.file.Path tempDir;
 
@@ -122,30 +126,30 @@ public class ITHudiBackedIcebergSecondaryIndex {
             tableName, partitionField, tempDir, jsc.hadoopConfiguration())) {
       List<Record> records = new ArrayList<>(table.insertRows(100));
       Table icebergTable = table.getIcebergTable();
-      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable);
+      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable, INDEXED_COLUMN);
       assertFalse(index.doesIndexExist(INDEXED_COLUMN));
 
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
       assertTrue(index.doesIndexExist(INDEXED_COLUMN));
       assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
       assertNoLookupResults(icebergTable, index, Collections.emptyList());
       assertNoLookupResults(icebergTable, index, Arrays.asList(null, null));
 
       // a sync without a new snapshot has nothing to commit and leaves the index as it is
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
       assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
 
       // a second batch of files is added to the index by an incremental sync
       records.addAll(table.insertRows(50));
       icebergTable.refresh();
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
       assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
 
       // updating rows rewrites the files that hold them, so the index must resolve the updated keys
       // to their new file and row position instead of the ones the previous sync recorded
       table.upsertRows(records.subList(0, 30));
       icebergTable.refresh();
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
       assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
 
       // deleting rows must drop their keys from the index, and must not strand the rows that are
@@ -158,7 +162,7 @@ public class ITHudiBackedIcebergSecondaryIndex {
       table.deleteRows(deletedRecords);
       records.removeAll(deletedRecords);
       icebergTable.refresh();
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
       assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, deletedKeys);
     }
   }
@@ -171,30 +175,108 @@ public class ITHudiBackedIcebergSecondaryIndex {
             tableName, null, tempDir, jsc.hadoopConfiguration())) {
       table.insertRows(20);
       Table icebergTable = table.getIcebergTable();
-      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable);
-      assertThrows(
-          IllegalStateException.class, () -> index.syncIndex(icebergTable, MISSING_COLUMN));
+      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable, MISSING_COLUMN);
+      assertThrows(IllegalStateException.class, () -> index.syncIndex(icebergTable));
     }
   }
 
+  /** The indexes of all configured columns are built together when the index is created. */
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = PARTITION_COLUMN)
+  void syncAndLookupMultipleColumns(String partitionField) {
+    String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
+    try (TestIcebergTable table =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, partitionField, tempDir, jsc.hadoopConfiguration())) {
+      // several snapshots, so the indexed rows are spread over several files
+      List<Record> records = new ArrayList<>(table.insertRows(100));
+      records.addAll(table.insertRows(50));
+      records.addAll(table.insertRows(30));
+      Table icebergTable = table.getIcebergTable();
+      HudiBackedIcebergSecondaryIndex index =
+          newIndexFromLocation(icebergTable, INDEXED_COLUMN + "," + SECOND_INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
+      assertTrue(index.doesIndexExist(INDEXED_COLUMN));
+      assertTrue(index.doesIndexExist(SECOND_INDEXED_COLUMN));
+      assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
+      assertTrue(
+          assertEveryRowIndexed(table.getBasePath(), icebergTable, index, SECOND_INDEXED_COLUMN)
+              > 1,
+          "expected the indexed rows in several files");
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              index.lookup(
+                  icebergTable,
+                  sparkSession
+                      .createDataset(Collections.singletonList("1"), Encoders.STRING())
+                      .toDF("long_field"),
+                  "long_field"));
+
+      // later commits update every index, including updated and deleted rows
+      records.addAll(table.insertRows(40));
+      table.upsertRows(records.subList(0, 20));
+      List<Record> deletedRecords = new ArrayList<>(records.subList(20, 30));
+      table.deleteRows(deletedRecords);
+      icebergTable.refresh();
+      index.syncIndex(icebergTable);
+      assertLookupMatchesIceberg(
+          table.getBasePath(),
+          icebergTable,
+          index,
+          deletedRecords.stream()
+              .map(record -> record.getField(INDEXED_COLUMN).toString())
+              .collect(Collectors.toList()));
+      assertEveryRowIndexed(table.getBasePath(), icebergTable, index, SECOND_INDEXED_COLUMN);
+    }
+  }
+
+  /** Adding a column to an existing index is not supported yet, and keeps the existing indexes. */
   @Test
-  void failedUpdateThrowsAndKeepsTheExistingIndex() {
+  void addingColumnToExistingIndexThrows() {
     String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
     try (TestIcebergTable table =
         TestIcebergTable.forStandardSchemaAndPartitioning(
             tableName, null, tempDir, jsc.hadoopConfiguration())) {
       table.insertRows(20);
       Table icebergTable = table.getIcebergTable();
-      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable);
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
 
-      // the next sync commits the new files, and fails to index a column the table does not have
       table.insertRows(20);
       icebergTable.refresh();
-      assertThrows(
-          IllegalStateException.class, () -> index.syncIndex(icebergTable, MISSING_COLUMN));
+      HudiBackedIcebergSecondaryIndex indexWithAddedColumn =
+          newIndexFromLocation(icebergTable, INDEXED_COLUMN + "," + SECOND_INDEXED_COLUMN);
+      IllegalStateException exception =
+          assertThrows(
+              IllegalStateException.class, () -> indexWithAddedColumn.syncIndex(icebergTable));
+      assertTrue(exception.getMessage().contains("not supported yet"));
+      assertFalse(indexWithAddedColumn.doesIndexExist(SECOND_INDEXED_COLUMN));
+      // the commit still synced the new files into the existing index
+      assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
+    }
+  }
+
+  /** A partition directory alone, as an in flight or failed build leaves, is not an index. */
+  @Test
+  void doesIndexExistIgnoresUnfinishedBuilds() throws Exception {
+    String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
+    try (TestIcebergTable table =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, null, tempDir, jsc.hadoopConfiguration())) {
+      table.insertRows(20);
+      Table icebergTable = table.getIcebergTable();
+      HudiBackedIcebergSecondaryIndex index = newIndexFromLocation(icebergTable, INDEXED_COLUMN);
+      assertFalse(index.doesIndexExist(INDEXED_COLUMN));
+      index.syncIndex(icebergTable);
+      Path unfinishedPartition =
+          new Path(
+              table.getDataPath(), ".hoodie/metadata/secondary_index_" + SECOND_INDEXED_COLUMN);
+      FileSystem fs = unfinishedPartition.getFileSystem(jsc.hadoopConfiguration());
+      assertTrue(fs.mkdirs(unfinishedPartition));
       assertTrue(index.doesIndexExist(INDEXED_COLUMN));
-      assertFalse(index.doesIndexExist(MISSING_COLUMN));
+      assertFalse(index.doesIndexExist(SECOND_INDEXED_COLUMN));
     }
   }
 
@@ -234,14 +316,14 @@ public class ITHudiBackedIcebergSecondaryIndex {
       appendRows(icebergTable, 0, 30);
       HudiBackedIcebergSecondaryIndex index =
           new HudiBackedIcebergSecondaryIndex(
-              icebergTable, sourceTable, sparkSession, new Properties());
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+              icebergTable, sourceTable, sparkSession, indexProperties(INDEXED_COLUMN));
+      index.syncIndex(icebergTable);
       assertLookupMatchesIceberg(
           readIcebergRows(icebergTable), icebergTable, index, Collections.emptyList());
 
       // the incremental sync loads the new snapshot through the catalog as well
       appendRows(icebergTable, 30, 20);
-      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      index.syncIndex(icebergTable);
       assertLookupMatchesIceberg(
           readIcebergRows(icebergTable), icebergTable, index, Collections.emptyList());
     } finally {
@@ -249,8 +331,15 @@ public class ITHudiBackedIcebergSecondaryIndex {
     }
   }
 
+  private static Properties indexProperties(String columns) {
+    Properties properties = new Properties();
+    properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMNS, columns);
+    return properties;
+  }
+
   /** Creates an index for a table that XTable loads from its location, as for a Hadoop catalog. */
-  private static HudiBackedIcebergSecondaryIndex newIndexFromLocation(Table icebergTable) {
+  private static HudiBackedIcebergSecondaryIndex newIndexFromLocation(
+      Table icebergTable, String columns) {
     SourceTable sourceTable =
         SourceTable.builder()
             .name(icebergTable.name())
@@ -258,7 +347,7 @@ public class ITHudiBackedIcebergSecondaryIndex {
             .formatName(TableFormat.ICEBERG)
             .build();
     return new HudiBackedIcebergSecondaryIndex(
-        icebergTable, sourceTable, sparkSession, new Properties());
+        icebergTable, sourceTable, sparkSession, indexProperties(columns));
   }
 
   /** Writes a data file with rows {@code start} to {@code start + count - 1} to the table. */
@@ -387,5 +476,49 @@ public class ITHudiBackedIcebergSecondaryIndex {
           new Path(lookupRow.<String>getAs(Index.FILE_COLUMN)).toUri().getPath());
       assertEquals(expected.getRight(), lookupRow.<Long>getAs(Index.POSITION_COLUMN));
     }
+  }
+
+  /**
+   * Looks up every value of {@code column} in the table and checks that the index returns exactly
+   * the rows Iceberg holds for those values, by file and row position. A value can repeat, so the
+   * rows are compared as sorted lists. Returns the number of files that hold the rows.
+   */
+  private long assertEveryRowIndexed(
+      String basePath, Table icebergTable, HudiBackedIcebergSecondaryIndex index, String column) {
+    Dataset<Row> icebergRows =
+        sparkSession
+            .read()
+            .format("iceberg")
+            .load(basePath)
+            .where(column + " IS NOT NULL")
+            .selectExpr(
+                "CAST(" + column + " AS STRING) AS value",
+                Index.FILE_COLUMN,
+                Index.POSITION_COLUMN);
+    List<String> expected = toSortedLocations(icebergRows);
+    Dataset<Row> keys = icebergRows.select("value").distinct().toDF(column).repartition(2);
+    Dataset<Row> lookupResults = index.lookup(icebergTable, keys, column);
+    List<String> actual =
+        toSortedLocations(
+            lookupResults.selectExpr(
+                "CAST(" + column + " AS STRING) AS value",
+                Index.FILE_COLUMN,
+                Index.POSITION_COLUMN));
+    assertEquals(expected.size(), actual.size());
+    assertEquals(expected, actual);
+    return icebergRows.select(Index.FILE_COLUMN).distinct().count();
+  }
+
+  private static List<String> toSortedLocations(Dataset<Row> rows) {
+    return rows.collectAsList().stream()
+        .map(
+            row ->
+                row.getString(0)
+                    + "|"
+                    + new Path(row.getString(1)).toUri().getPath()
+                    + "|"
+                    + row.getLong(2))
+        .sorted()
+        .collect(Collectors.toList());
   }
 }

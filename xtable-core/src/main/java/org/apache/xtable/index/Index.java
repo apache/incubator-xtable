@@ -39,17 +39,17 @@ public interface Index<T> {
    * Checks whether a secondary index exists for the given column.
    *
    * @param columnName The indexed column
-   * @return true when the index has been built at least once
+   * @return true when a build of the index has completed
    */
   boolean doesIndexExist(String columnName);
 
   /**
-   * Builds or updates the secondary index for the given column from the current state of the table.
+   * Brings the secondary indexes of the configured columns up to date with the current state of the
+   * table. The indexed columns are part of the index configuration, not of the sync.
    *
    * @param table The table to index
-   * @param columnName The column to index
    */
-  void syncIndex(T table, String columnName);
+  void syncIndex(T table);
 
   /**
    * Looks up the given keys in the secondary index of a column.
