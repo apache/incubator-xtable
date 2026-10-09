@@ -30,6 +30,7 @@ import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
@@ -76,7 +77,7 @@ public class HudiIncrementalTableChangeExtractor {
         rollbackMetadata,
         rollbackInstant,
         publishedCommitTimes,
-        tableExtractor.table(metaClient, rollbackInstant));
+        tableAsOfLatestCommit(rollbackInstant));
   }
 
   /**
@@ -97,11 +98,35 @@ public class HudiIncrementalTableChangeExtractor {
 
   /** An instant that changes no data files, such as a clean or a savepoint. */
   public IncrementalTableChanges extractTableChanges(HoodieInstant completedInstant) {
-    InternalTable internalTable = tableExtractor.table(metaClient, completedInstant);
+    InternalTable internalTable = tableAsOfLatestCommit(completedInstant);
     return changesFor(
         internalTable,
         InternalFilesDiff.from(Collections.emptyList(), Collections.emptyList()),
         completedInstant);
+  }
+
+  /**
+   * The table as it stands when an instant that writes no data files completes: the schema is the
+   * latest completed commit's, recorded under the given instant. The instant's own requested time
+   * cannot select the schema, since a savepoint carries the requested time of the commit it keeps,
+   * which is older than the commits that may have evolved the schema since.
+   */
+  private InternalTable tableAsOfLatestCommit(HoodieInstant completedInstant) {
+    HoodieInstant latestCommit =
+        metaClient
+            .getActiveTimeline()
+            .getCommitsTimeline()
+            .filterCompletedInstants()
+            .lastInstant()
+            .orElseThrow(
+                () ->
+                    new ReadException(
+                        "No completed commit to describe the table for " + completedInstant));
+    return tableExtractor.table(metaClient, latestCommit).toBuilder()
+        .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, completedInstant))
+        .latestTableOperationIdentifier(
+            HudiTableExtractor.tableOperationIdentifier(completedInstant))
+        .build();
   }
 
   private static IncrementalTableChanges changesFor(
@@ -111,7 +136,9 @@ public class HudiIncrementalTableChangeExtractor {
                 TableChange.builder()
                     .tableAsOfChange(internalTable)
                     .filesDiff(dataFilesDiff)
-                    .sourceIdentifier(instant.getCompletionTime())
+                    // The same identifier HudiConversionSource#getCommitIdentifier records, so a
+                    // lookup by Hudi commit works whichever path wrote the snapshot.
+                    .sourceIdentifier(instant.requestedTime())
                     .build())
             .iterator();
     return IncrementalTableChanges.builder()
