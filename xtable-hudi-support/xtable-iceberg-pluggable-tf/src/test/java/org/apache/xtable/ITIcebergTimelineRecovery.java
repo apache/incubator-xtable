@@ -34,22 +34,15 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import org.apache.iceberg.Table;
-
-import org.apache.xtable.hudi.HudiTestUtil;
 
 /**
  * Hudi completes an instant before the Iceberg hook runs, so the two can diverge when a writer dies
@@ -58,21 +51,6 @@ import org.apache.xtable.hudi.HudiTestUtil;
  */
 class ITIcebergTimelineRecovery {
   @TempDir public static Path tempDir;
-  private static SparkSession sparkSession;
-
-  @BeforeAll
-  static void setupOnce() {
-    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-    sparkSession =
-        SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
-  }
-
-  @AfterAll
-  static void teardown() {
-    if (sparkSession != null) {
-      sparkSession.close();
-    }
-  }
 
   private static TestJavaHudiTable newTable() {
     return TestJavaHudiTable.forStandardSchema(
@@ -116,7 +94,7 @@ class ITIcebergTimelineRecovery {
       assertEquals(Arrays.asList(commit1, commit2, commit4), completedCommitTimes(after));
       assertNothingPending(after);
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(170, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(170, icebergRowCount(table.getBasePath()));
     }
   }
 
@@ -138,7 +116,7 @@ class ITIcebergTimelineRecovery {
       assertEquals(1, timeline.getCleanerTimeline().filterCompletedInstants().countInstants());
       assertEquals(4, completedCommitTimes(timeline).size());
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(160, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(160, icebergRowCount(table.getBasePath()));
     }
   }
 
@@ -168,7 +146,7 @@ class ITIcebergTimelineRecovery {
       String nextCommit = table.startCommit();
       table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(10), nextCommit, true);
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(50, icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(50, icebergRowCount(table.getBasePath()));
       assertNothingPending(reconstructedTimeline(table.getBasePath()));
     }
   }

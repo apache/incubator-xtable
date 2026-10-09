@@ -555,11 +555,11 @@ public class ITIcebergVariousActions {
       // Files a replace commit registers have to carry their length, or Iceberg plans no splits
       // for them and a scan silently returns none of their rows.
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(300, IcebergTableAssertions.icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(300, IcebergTableAssertions.icebergRowCount(table.getBasePath()));
 
       table.insertRecords(100, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
-      assertEquals(400, IcebergTableAssertions.icebergRowCount(sparkSession, table.getBasePath()));
+      assertEquals(400, IcebergTableAssertions.icebergRowCount(table.getBasePath()));
 
       hudiClient =
           getHudiSourceClient(
