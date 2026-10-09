@@ -131,6 +131,10 @@ public class ITHudiBackedIcebergSecondaryIndex {
       assertNoLookupResults(icebergTable, index, Collections.emptyList());
       assertNoLookupResults(icebergTable, index, Arrays.asList(null, null));
 
+      // a sync without a new snapshot has nothing to commit and leaves the index as it is
+      index.syncIndex(icebergTable, INDEXED_COLUMN);
+      assertLookupMatchesIceberg(table.getBasePath(), icebergTable, index, Collections.emptyList());
+
       // a second batch of files is added to the index by an incremental sync
       records.addAll(table.insertRows(50));
       icebergTable.refresh();

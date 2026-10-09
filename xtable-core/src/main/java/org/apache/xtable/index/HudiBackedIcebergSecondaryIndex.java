@@ -128,13 +128,29 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     Configuration configuration = javaSparkContext.hadoopConfiguration();
     IcebergConversionSourceProvider sourceProvider = new IcebergConversionSourceProvider();
     sourceProvider.init(configuration);
-    // the sync reports a failed target in its result instead of throwing
+    // The sync reports a failed target in its result instead of throwing. It returns no result
+    // for the target when the table has no new commits, which only means the index is current
+    // when the index for the column already exists.
     SyncResult syncResult =
         new ConversionController(configuration)
             .sync(getConversionConfig(icebergTable, columnName), sourceProvider)
             .get(TableFormat.HUDI);
-    if (syncResult == null
-        || syncResult.getTableFormatSyncStatus() == null
+    if (syncResult == null) {
+      if (!doesIndexExist(columnName)) {
+        throw new IllegalStateException(
+            "Failed to sync the secondary index for column "
+                + columnName
+                + " of table "
+                + tableLocation
+                + ": no sync result for the Hudi target and no existing index");
+      }
+      log.info(
+          "Secondary index for column {} of table {} is already up to date",
+          columnName,
+          tableLocation);
+      return;
+    }
+    if (syncResult.getTableFormatSyncStatus() == null
         || syncResult.getTableFormatSyncStatus().getStatusCode() != SyncStatusCode.SUCCESS) {
       throw new IllegalStateException(
           "Failed to sync the secondary index for column "
@@ -142,9 +158,7 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
               + " of table "
               + tableLocation
               + ": "
-              + (syncResult == null
-                  ? "no sync result for the Hudi target"
-                  : syncResult.getTableFormatSyncStatus()));
+              + syncResult.getTableFormatSyncStatus());
     }
     log.info("Synced secondary index for column {} of table {}", columnName, tableLocation);
   }
