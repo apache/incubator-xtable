@@ -288,9 +288,9 @@ public class BaseFileUpdatesExtractor {
             prefix -> {
               Preconditions.checkArgument(
                   partitionPath.endsWith(prefix),
-                  "File %s is not under its partition subdirectory %s",
-                  file.getPhysicalPath(),
-                  prefix);
+                  String.format(
+                      "File %s is not under its partition subdirectory %s",
+                      file.getPhysicalPath(), prefix));
               return prefix.equals(partitionPath)
                   ? ""
                   : partitionPath.substring(0, partitionPath.length() - prefix.length() - 1);
