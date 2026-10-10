@@ -62,8 +62,6 @@ import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 import org.apache.hudi.stats.ValueMetadata;
 import org.apache.hudi.stats.XTableValueMetadata;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalType;
@@ -286,18 +284,18 @@ public class BaseFileUpdatesExtractor {
     return file.getPartitionSubdirectory()
         .map(
             prefix -> {
-              Preconditions.checkArgument(
-                  partitionPath.endsWith(prefix),
-                  "File %s is not under its partition subdirectory %s",
-                  file.getPhysicalPath(),
-                  prefix);
+              if (!partitionPath.endsWith(prefix)) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "File %s is not under its partition subdirectory %s",
+                        file.getPhysicalPath(), prefix));
+              }
               return prefix.equals(partitionPath)
                   ? ""
                   : partitionPath.substring(0, partitionPath.length() - prefix.length() - 1);
             })
         .orElse(partitionPath);
   }
-
   /**
    * Checks if the file was created by Hudi. Assumes Hudi is creating files with the default fileId
    * length and format
