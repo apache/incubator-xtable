@@ -379,19 +379,19 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   private Optional<HoodieCommitMetadata> readCommitMetadata(
       HoodieTimeline timeline, String commitTime) {
-    Optional<HoodieInstant> instant =
-        timeline.getInstants().stream()
-            .filter(hoodieInstant -> commitTime.equals(hoodieInstant.requestedTime()))
-            .findFirst();
-    if (!instant.isPresent()) {
-      return Optional.empty();
-    }
-    try {
-      return Optional.of(timeline.readCommitMetadata(instant.get()));
-    } catch (IOException e) {
-      log.warn("Unable to read previous commit {} to recover removed files", commitTime, e);
-      return Optional.empty();
-    }
+    return timeline.getInstants().stream()
+        .filter(hoodieInstant -> commitTime.equals(hoodieInstant.requestedTime()))
+        .findFirst()
+        .flatMap(
+            instant -> {
+              try {
+                return Optional.of(timeline.readCommitMetadata(instant));
+              } catch (IOException e) {
+                log.warn(
+                    "Unable to read previous commit {} to recover removed files", commitTime, e);
+                return Optional.empty();
+              }
+            });
   }
 
   private AddedAndRemovedFiles getUpdatesToPartitionForReplaceCommit(
