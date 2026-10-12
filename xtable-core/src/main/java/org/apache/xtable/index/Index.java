@@ -25,7 +25,7 @@ import org.apache.spark.sql.Row;
  * An index over a table that maps the values of a column to the rows that hold them, so an engine
  * can find those rows without a full table scan or join.
  *
- * @param <T> The table type of the source format (for example an Iceberg {@code Table})
+ * @param <T> The type that identifies the indexed table
  */
 public interface Index<T> {
   /**

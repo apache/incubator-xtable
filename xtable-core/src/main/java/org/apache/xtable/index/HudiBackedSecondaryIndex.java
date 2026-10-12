@@ -21,7 +21,10 @@ package org.apache.xtable.index;
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX_PREFIX;
 import static org.apache.spark.sql.functions.col;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -58,33 +61,39 @@ import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.types.Type;
-import org.apache.iceberg.types.Types;
-
 import scala.Tuple2;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
+import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiTargetConfig;
-import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncStatusCode;
+import org.apache.xtable.schema.SparkSchemaExtractor;
+import org.apache.xtable.spi.extractor.ConversionSource;
 
 /**
- * Secondary index for an Iceberg table backed by the Hudi metadata table. The index is built by
- * syncing the Iceberg table to Hudi with the record index and a secondary index enabled; the Hudi
- * metadata lives under {@code <data location>/.hoodie/metadata}. Because the Iceberg data files
- * carry no Hudi record keys, the record key of a row is {@code <file path relative to the data
- * location>_<row position>}, which a lookup resolves back to a file path and row position. Hudi
- * requires every data file to be under the data location, so files outside it are not supported.
+ * Secondary index for a table of any source format that XTable reads, backed by the Hudi metadata
+ * table. The index is built by syncing the table to Hudi with the record index and a secondary
+ * index enabled; the Hudi metadata lives under {@code <data path>/.hoodie/metadata}, where the data
+ * path is {@link SourceTable#getDataPath()}. Because the data files carry no Hudi record keys, the
+ * record key of a row is {@code <file path relative to the data path>_<row position>}, which a
+ * lookup resolves back to a file path and row position. Hudi requires every data file to be under
+ * the data path, so files outside it are not supported.
+ *
+ * <p>The parts that depend on the source format are parameters: the {@link
+ * ConversionSourceProvider} reads the table, its schema gives the type of the indexed column, and
+ * the caller sets the data path of the {@link SourceTable}, for example with {@link
+ * org.apache.xtable.catalog.TableFormatUtils#getTableDataLocation} for an Iceberg table. Hudi
+ * tables are not supported as a source, because they have their own metadata table.
  *
  * <p>Hudi keys the index by the string of Spark's internal value of the column: the day count of a
  * DATE, the microseconds of a TIMESTAMP (with or without time zone) and the plain string of other
@@ -92,15 +101,15 @@ import org.apache.xtable.model.sync.SyncStatusCode;
  * of other types, such as BINARY or UUID, are not supported.
  */
 @Log4j2
-public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
+public class HudiBackedSecondaryIndex implements Index<SourceTable> {
   /**
-   * Lookup result column with the full path of the data file that holds the row, named like
-   * Iceberg's {@code _file} metadata column so the result joins to the table directly.
+   * Lookup result column with the full path of the data file that holds the row. The name matches
+   * Iceberg's {@code _file} metadata column, so the result joins to an Iceberg table directly.
    */
   public static final String FILE_COLUMN = "_file";
 
   /**
-   * Lookup result column with the zero based position of the row within the file, named like
+   * Lookup result column with the zero based position of the row within the file. The name matches
    * Iceberg's {@code _pos} metadata column.
    */
   public static final String POSITION_COLUMN = "_pos";
@@ -110,9 +119,24 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
 
   private static final String NTZ_EPOCH = "TIMESTAMP_NTZ'1970-01-01 00:00:00'";
 
+  // types whose values Hudi renders as their plain string, a day count or microseconds
+  private static final Set<InternalType> SUPPORTED_KEY_TYPES =
+      EnumSet.of(
+          InternalType.STRING,
+          InternalType.INT,
+          InternalType.LONG,
+          InternalType.BOOLEAN,
+          InternalType.FLOAT,
+          InternalType.DOUBLE,
+          InternalType.DECIMAL,
+          InternalType.DATE,
+          InternalType.TIMESTAMP,
+          InternalType.TIMESTAMP_NTZ);
+
   private final String tableLocation;
   private final String dataPath;
   private final SourceTable sourceTable;
+  private final ConversionSourceProvider<?> sourceProvider;
   private final Properties targetTableProperties;
   private final String indexedColumn;
   private final DataType keyType;
@@ -121,31 +145,26 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   private final HoodieSparkEngineContext engineContext;
 
   /**
-   * @param icebergTable the table to index
-   * @param sourceTable how XTable loads the table for a sync, because a loaded table does not
-   *     expose the catalog it came from. A table of a catalog sets its catalog config, name and
-   *     namespace, and a table without a catalog config is loaded from its location
+   * @param sourceTable the table to index. A table of a catalog sets its catalog config, name and
+   *     namespace. The Hudi table is created under its data path
+   * @param sourceProvider the provider of the conversion source for the format of the table. The
+   *     index initializes it with the Hadoop configuration of the Spark session
    * @param sparkSession the Spark session used to build and query the index
    * @param targetTableProperties {@link HudiTargetConfig} properties for the sync. {@link
    *     HudiTargetConfig#SECONDARY_INDEX_COLUMN} names the column to index, and other properties
    *     such as the record index file group counts are optional
    */
-  public HudiBackedIcebergSecondaryIndex(
-      Table icebergTable,
+  public HudiBackedSecondaryIndex(
       SourceTable sourceTable,
+      ConversionSourceProvider<?> sourceProvider,
       SparkSession sparkSession,
       Properties targetTableProperties) {
     Preconditions.checkArgument(
-        TableFormat.ICEBERG.equals(sourceTable.getFormatName()),
-        String.format(
-            "Expected an Iceberg source table but got format %s", sourceTable.getFormatName()));
-    this.tableLocation = icebergTable.location();
-    this.dataPath =
-        TableFormatUtils.getTableDataLocation(
-            TableFormat.ICEBERG, tableLocation, icebergTable.properties());
-    // the Hudi table lives under the data location, which Iceberg resolves from the table
-    // properties
-    this.sourceTable = sourceTable.toBuilder().dataPath(dataPath).build();
+        !TableFormat.HUDI.equals(sourceTable.getFormatName()),
+        "A Hudi table has its own metadata table and cannot be the source of the index");
+    this.sourceTable = sourceTable;
+    this.tableLocation = sourceTable.getBasePath();
+    this.dataPath = sourceTable.getDataPath();
     this.targetTableProperties = getIndexTargetProperties(targetTableProperties);
     this.indexedColumn =
         HudiTargetConfig.fromProperties(this.targetTableProperties)
@@ -156,10 +175,12 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
                         "Set "
                             + HudiTargetConfig.SECONDARY_INDEX_COLUMN
                             + " to the column to index"));
-    this.keyType = getKeyType(icebergTable.schema(), indexedColumn);
     this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     this.engineContext = new HoodieSparkEngineContext(javaSparkContext);
+    this.sourceProvider = sourceProvider;
+    sourceProvider.init(javaSparkContext.hadoopConfiguration());
+    this.keyType = getKeyType(readSchema(), indexedColumn);
   }
 
   /**
@@ -177,40 +198,39 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     return indexTargetProperties;
   }
 
-  /** Returns the Spark type of the indexed column, which decides how Hudi renders its values. */
-  private static DataType getKeyType(Schema schema, String column) {
-    Types.NestedField field = schema.findField(column);
-    Preconditions.checkArgument(
-        field != null, String.format("Column %s is not in the table schema", column));
-    Type type = field.type();
-    switch (type.typeId()) {
-      case STRING:
-        return DataTypes.StringType;
-      case INTEGER:
-        return DataTypes.IntegerType;
-      case LONG:
-        return DataTypes.LongType;
-      case BOOLEAN:
-        return DataTypes.BooleanType;
-      case FLOAT:
-        return DataTypes.FloatType;
-      case DOUBLE:
-        return DataTypes.DoubleType;
-      case DECIMAL:
-        Types.DecimalType decimalType = (Types.DecimalType) type;
-        return DataTypes.createDecimalType(decimalType.precision(), decimalType.scale());
-      case DATE:
-        return DataTypes.DateType;
-      case TIMESTAMP:
-        return ((Types.TimestampType) type).shouldAdjustToUTC()
-            ? DataTypes.TimestampType
-            : DataTypes.TimestampNTZType;
-      default:
-        break;
+  /** Reads the current schema of the source table through its conversion source. */
+  private InternalSchema readSchema() {
+    try (ConversionSource<?> conversionSource =
+        sourceProvider.getConversionSourceInstance(sourceTable)) {
+      return conversionSource.getCurrentTable().getReadSchema();
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          "Failed to close the conversion source of " + tableLocation, e);
     }
+  }
+
+  /** Returns the Spark type of the indexed column, which decides how Hudi renders its values. */
+  private static DataType getKeyType(InternalSchema schema, String column) {
+    InternalField field =
+        schema.getAllFields().stream()
+            .filter(candidate -> candidate.getPath().equals(column))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Column %s is not in the table schema", column)));
+    InternalType type = field.getSchema().getDataType();
     // Hudi renders a BINARY, FIXED or UUID value as an object reference
-    throw new IllegalArgumentException(
+    Preconditions.checkArgument(
+        SUPPORTED_KEY_TYPES.contains(type),
         String.format("A secondary index on column %s of type %s is not supported", column, type));
+    InternalSchema keySchema =
+        InternalSchema.builder()
+            .name("key")
+            .dataType(InternalType.RECORD)
+            .fields(Collections.singletonList(field))
+            .build();
+    return SparkSchemaExtractor.getInstance().fromInternalSchema(keySchema).fields()[0].dataType();
   }
 
   /** Renders a key of {@link #keyType} the way Hudi renders the value in the secondary index. */
@@ -252,15 +272,14 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   }
 
   @Override
-  public void syncIndex(Table icebergTable) {
+  public void syncIndex(SourceTable table) {
+    checkIndexedTable(table);
     Configuration configuration = javaSparkContext.hadoopConfiguration();
-    IcebergConversionSourceProvider sourceProvider = new IcebergConversionSourceProvider();
-    sourceProvider.init(configuration);
     // The sync reports a failed target in its result instead of throwing. It returns no result
     // for the target when the table has no new commits.
     SyncResult syncResult =
         new ConversionController(configuration)
-            .sync(getConversionConfig(icebergTable), sourceProvider)
+            .sync(getConversionConfig(), sourceProvider)
             .get(TableFormat.HUDI);
     if (syncResult != null
         && (syncResult.getTableFormatSyncStatus() == null
@@ -318,10 +337,18 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
     return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(dataPath).build();
   }
 
-  private ConversionConfig getConversionConfig(Table icebergTable) {
+  /** Checks that a table passed to the index is the table it was created for. */
+  private void checkIndexedTable(SourceTable table) {
+    Preconditions.checkArgument(
+        tableLocation.equals(table.getBasePath()),
+        String.format(
+            "The index belongs to table %s but got table %s", tableLocation, table.getBasePath()));
+  }
+
+  private ConversionConfig getConversionConfig() {
     TargetTable targetTable =
         TargetTable.builder()
-            .name(icebergTable.name())
+            .name(sourceTable.getName())
             .basePath(dataPath)
             .formatName(TableFormat.HUDI)
             .additionalProperties(targetTableProperties)
@@ -333,7 +360,8 @@ public class HudiBackedIcebergSecondaryIndex implements Index<Table> {
   }
 
   @Override
-  public Dataset<Row> lookup(Table icebergTable, Dataset<Row> keys, String columnName) {
+  public Dataset<Row> lookup(SourceTable table, Dataset<Row> keys, String columnName) {
+    checkIndexedTable(table);
     Preconditions.checkArgument(
         indexedColumn.equals(columnName),
         String.format("Column %s is not the indexed column %s", columnName, indexedColumn));
