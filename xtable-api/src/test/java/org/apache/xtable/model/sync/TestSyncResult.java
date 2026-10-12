@@ -36,14 +36,16 @@ public class TestSyncResult {
                         ErrorDetails.create(new IllegalStateException("boom"), "sync failed"))
                     .build())
             .build();
-    assertEquals("boom", SyncResult.getErrorMessage(syncResult));
+    assertEquals("boom", syncResult.getErrorMessage());
   }
 
   @Test
   void getErrorMessageIsNullWithoutErrorDetails() {
-    assertNull(SyncResult.getErrorMessage(SyncResult.builder().build()));
+    assertNull(SyncResult.builder().build().getErrorMessage());
     assertNull(
-        SyncResult.getErrorMessage(
-            SyncResult.builder().tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS).build()));
+        SyncResult.builder()
+            .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)
+            .build()
+            .getErrorMessage());
   }
 }

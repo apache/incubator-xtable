@@ -18,16 +18,16 @@
  
 package org.apache.xtable.index;
 
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-
 /**
- * An index over a table that maps the values of a column to the rows that hold them, so an engine
- * can find those rows without a full table scan or join.
+ * Reads an index that an {@link IndexWriter} maintains, so an engine can find the rows that hold
+ * given values of a column without a full table scan or join. The key and result types depend on
+ * the engine that runs the lookup, for example a Spark {@code Dataset<Row>}.
  *
  * @param <T> The type that identifies the indexed table
+ * @param <K> The type of the keys to look up
+ * @param <R> The type of the lookup result
  */
-public interface Index<T> {
+public interface IndexReader<T, K, R> {
   /**
    * Checks whether the index of the given column exists.
    *
@@ -37,14 +37,6 @@ public interface Index<T> {
   boolean doesIndexExist(String columnName);
 
   /**
-   * Brings the indexes of the configured columns up to date with the current state of the table.
-   * The indexed columns are part of the index configuration, not of the sync.
-   *
-   * @param table The table to index
-   */
-  void syncIndex(T table);
-
-  /**
    * Looks up the given keys in the index of a column.
    *
    * @param table The table the index belongs to
@@ -52,5 +44,5 @@ public interface Index<T> {
    * @param columnName The indexed column
    * @return the matches of the keys. The schema of the result depends on the type of the index.
    */
-  Dataset<Row> lookup(T table, Dataset<Row> keys, String columnName);
+  R lookup(T table, K keys, String columnName);
 }

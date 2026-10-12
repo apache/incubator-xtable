@@ -51,15 +51,14 @@ public class SyncResult {
   @Builder.Default List<CatalogSyncStatus> catalogSyncStatusList = Collections.emptyList();
 
   /**
-   * Returns the error message of the table format sync of the given result, or null when the sync
-   * reported no error details.
+   * Returns the error message of the table format sync, or null when the sync reported no error
+   * details.
    */
-  public static String getErrorMessage(SyncResult syncResult) {
-    SyncStatus syncStatus = syncResult.getTableFormatSyncStatus();
-    if (syncStatus == null || syncStatus.getErrorDetails() == null) {
+  public String getErrorMessage() {
+    if (tableFormatSyncStatus == null || tableFormatSyncStatus.getErrorDetails() == null) {
       return null;
     }
-    return syncStatus.getErrorDetails().getErrorMessage();
+    return tableFormatSyncStatus.getErrorDetails().getErrorMessage();
   }
 
   /** Represents the status of a Sync operation. */
