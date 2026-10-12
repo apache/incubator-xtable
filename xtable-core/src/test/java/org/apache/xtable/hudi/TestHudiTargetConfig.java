@@ -138,6 +138,25 @@ public class TestHudiTargetConfig {
   }
 
   @Test
+  void rejectsNonNumericIndexSetting() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_PARALLELISM, "abc");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+    assertTrue(exception.getMessage().contains(HudiTargetConfig.SECONDARY_INDEX_PARALLELISM));
+  }
+
+  @Test
+  void rejectsMinFileGroupCountAboveMax() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "4");
+    props.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "2");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+    assertTrue(exception.getMessage().contains(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT));
+  }
+
+  @Test
   void rejectsNonNumericAndUnknownVersions() {
     for (String value : new String[] {"abc", "42"}) {
       Properties props = new Properties();

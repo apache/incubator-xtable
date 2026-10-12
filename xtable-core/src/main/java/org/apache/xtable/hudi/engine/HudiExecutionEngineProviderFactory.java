@@ -41,7 +41,8 @@ public class HudiExecutionEngineProviderFactory {
 
   /**
    * Reuses the active Spark session when the sync runs inside a Spark application, otherwise starts
-   * a session that carries the Hadoop configuration of the sync.
+   * a session that carries the Hadoop configuration of the sync. Keys that start with {@code
+   * spark}, such as {@code spark.master}, are passed to Spark as they are.
    */
   private static SparkSession getOrCreateSparkSession(Configuration configuration) {
     SparkSession.Builder builder = SparkSession.builder();
@@ -49,7 +50,12 @@ public class HudiExecutionEngineProviderFactory {
         && !SparkSession.getDefaultSession().isDefined()) {
       builder.appName("xtable").config("spark.serializer", KryoSerializer.class.getName());
       configuration.forEach(
-          entry -> builder.config("spark.hadoop." + entry.getKey(), entry.getValue()));
+          entry ->
+              builder.config(
+                  entry.getKey().startsWith("spark")
+                      ? entry.getKey()
+                      : "spark.hadoop." + entry.getKey(),
+                  entry.getValue()));
     }
     return builder.getOrCreate();
   }

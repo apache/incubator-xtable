@@ -51,6 +51,7 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
@@ -199,11 +200,13 @@ public class ITHudiBackedSecondaryIndex {
     HudiBackedSecondaryIndexWriter index = newIndexWriter(sourceTable, INDEXED_COLUMN);
     index.syncIndex(sourceTable);
     assertLookupMatches(readDeltaRows(basePath), sourceTable, Collections.emptyList());
+    assertLookupJoinsDeltaRows(basePath, sourceTable);
 
     // a second batch of files is added to the index by an incremental sync
     appendDeltaRows(basePath, partitionField, 60, 40);
     index.syncIndex(sourceTable);
     assertLookupMatches(readDeltaRows(basePath), sourceTable, Collections.emptyList());
+    assertLookupJoinsDeltaRows(basePath, sourceTable);
 
     // updates and deletes rewrite files, so the index must follow the rows to their new positions
     DeltaTable deltaTable = DeltaTable.forPath(sparkSession, basePath);
@@ -213,6 +216,40 @@ public class ITHudiBackedSecondaryIndex {
     List<String> deletedKeys =
         IntStream.range(10, 20).mapToObj(row -> "key-" + row).collect(Collectors.toList());
     assertLookupMatches(readDeltaRows(basePath), sourceTable, deletedKeys);
+    assertLookupJoinsDeltaRows(basePath, sourceTable);
+  }
+
+  /**
+   * Joins the lookup result to the Delta table on {@code input_file_name()} and the row key, and
+   * checks that every row of the table is matched, so {@code _file} joins to the files that Spark
+   * reads without normalizing either path.
+   */
+  private void assertLookupJoinsDeltaRows(String basePath, SourceTable sourceTable) {
+    Dataset<Row> tableRows =
+        sparkSession
+            .read()
+            .format("delta")
+            .load(basePath)
+            .select(
+                functions.col(INDEXED_COLUMN).as("table_key"),
+                functions.input_file_name().as("table_file"));
+    Dataset<Row> keys = tableRows.select(functions.col("table_key").as(INDEXED_COLUMN));
+    Dataset<Row> lookupResults =
+        newIndexReader(sourceTable).lookup(sourceTable, keys, INDEXED_COLUMN);
+    long joinedRows =
+        tableRows
+            .join(
+                lookupResults,
+                tableRows
+                    .col("table_key")
+                    .equalTo(lookupResults.col(INDEXED_COLUMN))
+                    .and(
+                        tableRows
+                            .col("table_file")
+                            .equalTo(
+                                lookupResults.col(HudiBackedSecondaryIndexReader.FILE_COLUMN))))
+            .count();
+    assertEquals(tableRows.count(), joinedRows);
   }
 
   /** Writes rows {@code start} to {@code start + count - 1} to a Delta table in two files. */

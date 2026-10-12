@@ -138,6 +138,13 @@ public class HudiTargetConfig {
               "%s and %s must be set together.",
               RECORD_INDEX_MIN_FILEGROUP_COUNT, RECORD_INDEX_MAX_FILEGROUP_COUNT));
     }
+    if (recordIndexMinFileGroupCount.isPresent()
+        && recordIndexMinFileGroupCount.get() > recordIndexMaxFileGroupCount.get()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s must not be greater than %s.",
+              RECORD_INDEX_MIN_FILEGROUP_COUNT, RECORD_INDEX_MAX_FILEGROUP_COUNT));
+    }
     return new HudiTargetConfig(
         tableVersion,
         executionEngine,
@@ -164,7 +171,13 @@ public class HudiTargetConfig {
     if (configured == null || configured.trim().isEmpty()) {
       return Optional.empty();
     }
-    int value = Integer.parseInt(configured.trim());
+    int value;
+    try {
+      value = Integer.parseInt(configured.trim());
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a positive integer but was %s.", key, configured), e);
+    }
     if (value <= 0) {
       throw new IllegalArgumentException(
           String.format("%s must be a positive integer but was %s.", key, configured));

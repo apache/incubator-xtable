@@ -50,7 +50,9 @@ import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.metadata.HoodieIndexVersion;
+import org.apache.hudi.storage.StoragePath;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
@@ -361,6 +363,54 @@ public class TestHudiConversionTarget {
     // validate that replace metadata is set in commitState
     verify(mockCommitState).setReplaceMetadata(output);
     verify(mockCommitState).setFileGroupPrefixLayout(true);
+  }
+
+  @Test
+  void writeConfigWithoutSecondaryIndex() {
+    HoodieWriteConfig writeConfig = getCommitStateWriteConfig(new Properties());
+    assertEquals(HoodieTableVersion.NINE, writeConfig.getWriteVersion());
+    assertTrue(writeConfig.getMetadataConfig().isEnabled());
+    assertTrue(writeConfig.getMetadataConfig().isColumnStatsIndexEnabled());
+    assertFalse(writeConfig.getMetadataConfig().isPartitionStatsIndexEnabled());
+    assertFalse(writeConfig.getMetadataConfig().isGlobalRecordLevelIndexEnabled());
+    assertFalse(writeConfig.getMetadataConfig().isSecondaryIndexEnabled());
+    assertEquals(1, writeConfig.getWritesFileIdEncoding());
+  }
+
+  @Test
+  void writeConfigWithSecondaryIndex() {
+    Properties properties = new Properties();
+    properties.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "email");
+    properties.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "2");
+    properties.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "4");
+    properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_PARALLELISM, "8");
+    HoodieWriteConfig writeConfig = getCommitStateWriteConfig(properties);
+    assertTrue(writeConfig.getMetadataConfig().isGlobalRecordLevelIndexEnabled());
+    assertTrue(writeConfig.getMetadataConfig().isSecondaryIndexEnabled());
+    assertEquals("email", writeConfig.getMetadataConfig().getSecondaryIndexColumn());
+    assertEquals(2, writeConfig.getMetadataConfig().getGlobalRecordLevelIndexMinFileGroupCount());
+    assertEquals(4, writeConfig.getMetadataConfig().getGlobalRecordLevelIndexMaxFileGroupCount());
+    assertEquals(8, writeConfig.getMetadataConfig().getSecondaryIndexParallelism());
+    assertEquals(1, writeConfig.getWritesFileIdEncoding());
+  }
+
+  private static HoodieWriteConfig getCommitStateWriteConfig(Properties targetProperties) {
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(BASE_PATH));
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.NINE);
+    when(mockTableConfig.populateMetaFields()).thenReturn(false);
+    HudiConversionTarget.CommitState commitState =
+        new HudiConversionTarget.CommitState(
+            mockMetaClient,
+            COMMIT,
+            RETENTION_IN_HOURS,
+            MAX_DELTA_COMMITS,
+            HudiTargetConfig.fromProperties(targetProperties),
+            mock(HudiExecutionEngineProvider.class));
+    return commitState.getWriteConfig(null, 10, MAX_DELTA_COMMITS, RETENTION_IN_HOURS);
   }
 
   @Test

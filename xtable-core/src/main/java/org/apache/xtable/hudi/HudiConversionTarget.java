@@ -509,7 +509,8 @@ public class HudiConversionTarget implements ConversionTarget {
     private final HudiTargetConfig targetConfig;
     private final HudiExecutionEngineProvider engineProvider;
 
-    private CommitState(
+    @VisibleForTesting
+    CommitState(
         HoodieTableMetaClient metaClient,
         String instantTime,
         int timelineRetentionInHours,
@@ -551,8 +552,7 @@ public class HudiConversionTarget implements ConversionTarget {
               schema,
               getNumInstantsToRetain(),
               maxNumDeltaCommitsBeforeCompaction,
-              timelineRetentionInHours,
-              targetConfig.getSecondaryIndexColumn());
+              timelineRetentionInHours);
       metaClient
           .getActiveTimeline()
           .createRequestedCommitWithReplaceMetadata(
@@ -783,12 +783,12 @@ public class HudiConversionTarget implements ConversionTarget {
       return Option.of(extraMetadata);
     }
 
-    private HoodieWriteConfig getWriteConfig(
+    @VisibleForTesting
+    HoodieWriteConfig getWriteConfig(
         Schema schema,
         int numCommitsToKeep,
         int maxNumDeltaCommitsBeforeCompaction,
-        int timelineRetentionInHours,
-        Optional<String> secondaryIndexColumn) {
+        int timelineRetentionInHours) {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
       HoodieMetadataConfig.Builder metadataConfigBuilder =
@@ -808,14 +808,14 @@ public class HudiConversionTarget implements ConversionTarget {
       // index to resolve the record key to a file. Rows without a record key are keyed by
       // "<file path relative to the table>_<row position>", see
       // https://github.com/apache/hudi/pull/19869.
-      if (targetConfig.getSecondaryIndexColumn().isPresent()) {
-        metadataConfigBuilder.withEnableGlobalRecordLevelIndex(true);
-      }
-      secondaryIndexColumn.ifPresent(
-          column ->
-              metadataConfigBuilder
-                  .withSecondaryIndexEnabled(true)
-                  .withSecondaryIndexForColumn(column));
+      targetConfig
+          .getSecondaryIndexColumn()
+          .ifPresent(
+              column ->
+                  metadataConfigBuilder
+                      .withEnableGlobalRecordLevelIndex(true)
+                      .withSecondaryIndexEnabled(true)
+                      .withSecondaryIndexForColumn(column));
       targetConfig
           .getRecordIndexMinFileGroupCount()
           .ifPresent(
