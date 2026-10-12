@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -49,10 +50,13 @@ import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.metadata.HoodieIndexVersion;
+import org.apache.hudi.storage.StoragePath;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.hudi.engine.HudiExecutionEngineProvider;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
@@ -74,6 +78,8 @@ public class TestHudiConversionTarget {
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1598644800000L);
   private static final String COMMIT = "20200828200000000";
   private static final String BASE_PATH = "test-base-path";
+  private static final HudiTargetConfig TARGET_CONFIG =
+      HudiTargetConfig.fromProperties(new Properties());
   private static final InternalTable TABLE =
       InternalTable.builder()
           .name("table")
@@ -87,6 +93,8 @@ public class TestHudiConversionTarget {
   private final HudiTableManager mockHudiTableManager = mock(HudiTableManager.class);
   private final HudiConversionTarget.CommitStateCreator mockCommitStateCreator =
       mock(HudiConversionTarget.CommitStateCreator.class);
+  private final HudiExecutionEngineProvider mockEngineProvider =
+      mock(HudiExecutionEngineProvider.class);
 
   private HudiConversionTarget getTargetClient(HoodieTableMetaClient mockMetaClient) {
     when(mockHudiTableManager.loadTableMetaClientIfExists(BASE_PATH))
@@ -95,6 +103,8 @@ public class TestHudiConversionTarget {
         BASE_PATH,
         RETENTION_IN_HOURS,
         MAX_DELTA_COMMITS,
+        TARGET_CONFIG,
+        mockEngineProvider,
         mockBaseFileUpdatesExtractor,
         mockAvroSchemaConverter,
         mockHudiTableManager,
@@ -356,6 +366,54 @@ public class TestHudiConversionTarget {
   }
 
   @Test
+  void writeConfigWithoutSecondaryIndex() {
+    HoodieWriteConfig writeConfig = getCommitStateWriteConfig(new Properties());
+    assertEquals(HoodieTableVersion.NINE, writeConfig.getWriteVersion());
+    assertTrue(writeConfig.getMetadataConfig().isEnabled());
+    assertTrue(writeConfig.getMetadataConfig().isColumnStatsIndexEnabled());
+    assertFalse(writeConfig.getMetadataConfig().isPartitionStatsIndexEnabled());
+    assertFalse(writeConfig.getMetadataConfig().isGlobalRecordLevelIndexEnabled());
+    assertFalse(writeConfig.getMetadataConfig().isSecondaryIndexEnabled());
+    assertEquals(1, writeConfig.getWritesFileIdEncoding());
+  }
+
+  @Test
+  void writeConfigWithSecondaryIndex() {
+    Properties properties = new Properties();
+    properties.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "email");
+    properties.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "2");
+    properties.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "4");
+    properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_PARALLELISM, "8");
+    HoodieWriteConfig writeConfig = getCommitStateWriteConfig(properties);
+    assertTrue(writeConfig.getMetadataConfig().isGlobalRecordLevelIndexEnabled());
+    assertTrue(writeConfig.getMetadataConfig().isSecondaryIndexEnabled());
+    assertEquals("email", writeConfig.getMetadataConfig().getSecondaryIndexColumn());
+    assertEquals(2, writeConfig.getMetadataConfig().getGlobalRecordLevelIndexMinFileGroupCount());
+    assertEquals(4, writeConfig.getMetadataConfig().getGlobalRecordLevelIndexMaxFileGroupCount());
+    assertEquals(8, writeConfig.getMetadataConfig().getSecondaryIndexParallelism());
+    assertEquals(1, writeConfig.getWritesFileIdEncoding());
+  }
+
+  private static HoodieWriteConfig getCommitStateWriteConfig(Properties targetProperties) {
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(BASE_PATH));
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.NINE);
+    when(mockTableConfig.populateMetaFields()).thenReturn(false);
+    HudiConversionTarget.CommitState commitState =
+        new HudiConversionTarget.CommitState(
+            mockMetaClient,
+            COMMIT,
+            RETENTION_IN_HOURS,
+            MAX_DELTA_COMMITS,
+            HudiTargetConfig.fromProperties(targetProperties),
+            mock(HudiExecutionEngineProvider.class));
+    return commitState.getWriteConfig(null, 10, MAX_DELTA_COMMITS, RETENTION_IN_HOURS);
+  }
+
+  @Test
   void beginSyncForExistingTable() {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HudiConversionTarget targetClient = getTargetClient(mockMetaClient);
@@ -365,7 +423,13 @@ public class TestHudiConversionTarget {
     verify(mockMetaClient).reloadActiveTimeline();
     // verify existing meta client is used to create commit state
     verify(mockCommitStateCreator)
-        .create(mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS);
+        .create(
+            mockMetaClient,
+            COMMIT,
+            RETENTION_IN_HOURS,
+            MAX_DELTA_COMMITS,
+            TARGET_CONFIG,
+            mockEngineProvider);
   }
 
   private Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
@@ -380,7 +444,12 @@ public class TestHudiConversionTarget {
         .thenReturn(mockMetaClient);
     HudiConversionTarget.CommitState mockCommitState = mock(HudiConversionTarget.CommitState.class);
     when(mockCommitStateCreator.create(
-            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS))
+            mockMetaClient,
+            COMMIT,
+            RETENTION_IN_HOURS,
+            MAX_DELTA_COMMITS,
+            TARGET_CONFIG,
+            mockEngineProvider))
         .thenReturn(mockCommitState);
     targetClient.beginSync(TABLE);
     return Pair.of(mockCommitState, mockMetaClient);
