@@ -30,6 +30,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -50,12 +52,19 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.spark.SparkSchemaUtil;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.hudi.HudiTestUtil;
@@ -122,6 +131,94 @@ class ITXTableSparkRuntimeBundle {
       orderByColumn = table.getOrderByColumn();
     }
 
+    List<String> syncArgs = new ArrayList<>();
+    syncArgs.add("--basepath");
+    syncArgs.add(basePath);
+    syncArgs.add("--datapath");
+    syncArgs.add(dataPath);
+    syncArgs.add("--sourceformat");
+    syncArgs.add(sourceFormat);
+    syncArgs.add("--targets");
+    syncArgs.add(targetFormat);
+    syncArgs.add("--tablename");
+    syncArgs.add(tableName);
+    if (partitionSpec != null) {
+      syncArgs.add("--partitionspec");
+      syncArgs.add(partitionSpec);
+    }
+    String output = runBundleSync(sparkHome, syncArgs);
+
+    assertDatasetEquivalence(
+        sourceFormat, targetFormat, basePath, dataPath, columns, orderByColumn, output);
+  }
+
+  /**
+   * Iceberg keeps its metadata at the base path but writes data files to a separate {@code
+   * write.data.path}. The Hudi target goes to the data path, so {@code .hoodie} lands next to the
+   * Iceberg data files and nothing is written under the Iceberg base path.
+   */
+  @Test
+  void icebergWithSeparateDataPathSyncsToHudi() throws Exception {
+    String sparkHome = System.getenv("SPARK_HOME");
+    assumeTrue(sparkHome != null && !sparkHome.trim().isEmpty(), "SPARK_HOME is not set");
+
+    String tableName = "iceberg_split_paths_to_hudi";
+    Path metadataDir = tempDir.resolve(tableName + "_metadata");
+    Path dataDir = tempDir.resolve("separate_data").resolve(tableName);
+    String basePath = metadataDir.toUri().toString();
+    String dataPath = dataDir.toUri().toString();
+
+    Dataset<Row> rows =
+        sparkSession
+            .range(100)
+            .selectExpr(
+                "concat('id-', lpad(cast(id AS string), 3, '0')) AS id",
+                "element_at(array('INFO', 'WARN', 'ERROR'), cast(id % 3 + 1 AS int)) AS level",
+                "cast(id AS double) * 1.5 AS amount",
+                "date_add(date '2026-01-01', cast(id AS int)) AS event_date");
+    Schema schema = SparkSchemaUtil.convert(rows.schema());
+    new HadoopTables(jsc.hadoopConfiguration())
+        .create(
+            schema,
+            PartitionSpec.builderFor(schema).identity("level").build(),
+            Collections.singletonMap(TableProperties.WRITE_DATA_LOCATION, dataPath),
+            basePath);
+    rows.write().format("iceberg").mode("append").save(basePath);
+    assertTrue(countParquetFiles(dataDir) > 0, "Iceberg did not write data files to " + dataDir);
+    assertEquals(0, countParquetFiles(metadataDir), "Iceberg wrote data files under the base path");
+
+    List<String> syncArgs =
+        Arrays.asList(
+            "--basepath",
+            basePath,
+            "--datapath",
+            dataPath,
+            "--sourceformat",
+            "ICEBERG",
+            "--targets",
+            "HUDI",
+            "--tablename",
+            tableName);
+    String output = runBundleSync(sparkHome, syncArgs);
+
+    assertTrue(
+        Files.isDirectory(dataDir.resolve(".hoodie")),
+        "Hudi metadata is not at the data path. spark-submit output:\n" + output);
+    assertTrue(
+        !Files.exists(metadataDir.resolve(".hoodie")),
+        "Hudi metadata was written to the base path");
+    assertDatasetEquivalence(
+        "ICEBERG",
+        "HUDI",
+        basePath,
+        dataPath,
+        Arrays.asList("id", "level", "amount", "event_date"),
+        "id",
+        output);
+  }
+
+  /** Runs {@code XTableSparkSync} from the bundle through spark-submit and returns its output. */
+  private String runBundleSync(String sparkHome, List<String> syncArgs) throws Exception {
     File bundleJar = findBundleJar();
     File sparkSubmit = new File(sparkHome, "bin/spark-submit");
     assertTrue(sparkSubmit.canExecute(), "spark-submit not executable at " + sparkSubmit);
@@ -140,20 +237,7 @@ class ITXTableSparkRuntimeBundle {
     command.add("--class");
     command.add("org.apache.xtable.spark.XTableSparkSync");
     command.add(bundleJar.getAbsolutePath());
-    command.add("--basepath");
-    command.add(basePath);
-    command.add("--datapath");
-    command.add(dataPath);
-    command.add("--sourceformat");
-    command.add(sourceFormat);
-    command.add("--targets");
-    command.add(targetFormat);
-    command.add("--tablename");
-    command.add(tableName);
-    if (partitionSpec != null) {
-      command.add("--partitionspec");
-      command.add(partitionSpec);
-    }
+    command.addAll(syncArgs);
 
     ProcessBuilder pb = new ProcessBuilder(command);
     pb.environment().put("SPARK_LOCAL_IP", "127.0.0.1");
@@ -178,9 +262,16 @@ class ITXTableSparkRuntimeBundle {
       output = outputBuffer.toString();
     }
     assertEquals(0, process.exitValue(), "spark-submit failed. Output:\n" + output);
+    return output;
+  }
 
-    assertDatasetEquivalence(
-        sourceFormat, targetFormat, basePath, dataPath, columns, orderByColumn, output);
+  private static long countParquetFiles(Path dir) throws IOException {
+    if (!Files.isDirectory(dir)) {
+      return 0;
+    }
+    try (Stream<Path> files = Files.walk(dir)) {
+      return files.filter(f -> f.toString().endsWith(".parquet")).count();
+    }
   }
 
   /** Reads the source and the target back through Spark and asserts the scalar columns match. */
