@@ -22,16 +22,32 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.ArrayType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,7 +67,7 @@ import org.apache.xtable.hudi.HudiTestUtil;
  */
 class ITXTableSparkRuntimeBundle {
 
-  @TempDir static java.nio.file.Path tempDir;
+  @TempDir static Path tempDir;
 
   private static SparkSession sparkSession;
   private static JavaSparkContext jsc;
@@ -203,23 +219,21 @@ class ITXTableSparkRuntimeBundle {
 
   // Drops nested columns (covered by ITConversionController) and local timestamps (HUDI-7088).
   private static List<String> comparableColumns(Dataset<Row> source, List<String> columns) {
-    java.util.Set<String> excluded = new java.util.HashSet<>();
-    for (org.apache.spark.sql.types.StructField field : source.schema().fields()) {
-      org.apache.spark.sql.types.DataType type = field.dataType();
-      if (type instanceof org.apache.spark.sql.types.StructType
-          || type instanceof org.apache.spark.sql.types.ArrayType
-          || type instanceof org.apache.spark.sql.types.MapType) {
+    Set<String> excluded = new HashSet<>();
+    for (StructField field : source.schema().fields()) {
+      DataType type = field.dataType();
+      if (type instanceof StructType || type instanceof ArrayType || type instanceof MapType) {
         excluded.add(field.name());
       }
     }
     return columns.stream()
         .filter(c -> !excluded.contains(c))
         .filter(c -> !c.startsWith("timestamp_local_"))
-        .collect(java.util.stream.Collectors.toList());
+        .collect(Collectors.toList());
   }
 
-  private static java.util.Map<String, String> readOptions(String format) {
-    java.util.Map<String, String> options = new java.util.HashMap<>();
+  private static Map<String, String> readOptions(String format) {
+    Map<String, String> options = new HashMap<>();
     if ("HUDI".equalsIgnoreCase(format)) {
       options.put("hoodie.metadata.enable", "true");
       options.put("hoodie.datasource.read.extract.partition.values.from.path", "true");
@@ -237,11 +251,7 @@ class ITXTableSparkRuntimeBundle {
         "engine classpath not built at "
             + cpFile.getAbsolutePath()
             + " (dependency:build-classpath)");
-    String cp =
-        new String(
-                java.nio.file.Files.readAllBytes(cpFile.toPath()),
-                java.nio.charset.StandardCharsets.UTF_8)
-            .trim();
+    String cp = new String(Files.readAllBytes(cpFile.toPath()), StandardCharsets.UTF_8).trim();
     assertTrue(!cp.isEmpty(), "engine classpath file is empty");
     return cp;
   }
@@ -267,17 +277,16 @@ class ITXTableSparkRuntimeBundle {
   }
 
   private static void readOutputInto(Process process, StringBuilder sb) {
-    try (java.io.BufferedReader reader =
-        new java.io.BufferedReader(
-            new java.io.InputStreamReader(
-                process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+    try (BufferedReader reader =
+        new BufferedReader(
+            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
         synchronized (sb) {
           sb.append(line).append(System.lineSeparator());
         }
       }
-    } catch (java.io.IOException e) {
+    } catch (IOException e) {
       // Closed on timeout; the output so far is still reported.
     }
   }

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,6 +45,12 @@ import org.apache.spark.sql.SparkSession;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableSet;
 
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.ErrorDetails;
@@ -82,18 +87,17 @@ public final class XTableSparkSync {
    */
   // package-private for unit testing
   static final Set<String> SUPPORTED_SOURCE_FORMATS =
-      new LinkedHashSet<>(
-          Arrays.asList(
-              TableFormat.HUDI,
-              TableFormat.ICEBERG,
-              TableFormat.DELTA,
-              TableFormat.PAIMON,
-              TableFormat.PARQUET));
+      ImmutableSet.of(
+          TableFormat.HUDI,
+          TableFormat.ICEBERG,
+          TableFormat.DELTA,
+          TableFormat.PAIMON,
+          TableFormat.PARQUET);
 
   /** Formats usable as --targets. Paimon and Parquet are source-only. */
   // package-private for unit testing
   static final Set<String> SUPPORTED_TARGET_FORMATS =
-      new LinkedHashSet<>(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG, TableFormat.DELTA));
+      ImmutableSet.of(TableFormat.HUDI, TableFormat.ICEBERG, TableFormat.DELTA);
 
   private static final Options OPTIONS =
       new Options()
@@ -348,64 +352,61 @@ public final class XTableSparkSync {
     }
   }
 
-  // SafeConstructor builds only maps, lists and scalars. package-private for unit testing.
-  @SuppressWarnings("unchecked")
+  /**
+   * SafeConstructor builds only maps, lists and scalars, and Jackson binds them to {@link
+   * DatasetConfig}. Uses snakeyaml because Spark does not always ship jackson-dataformat-yaml.
+   */
+  // package-private for unit testing
   static DatasetConfig parseDatasetConfig(InputStream in) {
     Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(in);
     if (!(loaded instanceof Map)) {
       throw new IllegalArgumentException("--datasetconfig is empty or not a YAML mapping");
     }
-    Map<String, Object> root = (Map<String, Object>) loaded;
+    DatasetConfig config;
+    try {
+      config = DATASET_CONFIG_MAPPER.convertValue(loaded, DatasetConfig.class);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("--datasetconfig is invalid: " + e.getMessage(), e);
+    }
 
-    DatasetConfig config = new DatasetConfig();
-    config.sourceFormat = requireString(root, "sourceFormat").trim().toUpperCase(Locale.ROOT);
+    config.sourceFormat =
+        requireField(config.sourceFormat, "sourceFormat").trim().toUpperCase(Locale.ROOT);
     validateFormat(SOURCE_FORMAT, config.sourceFormat, SUPPORTED_SOURCE_FORMATS);
 
-    Object targetsRaw = root.get("targetFormats");
-    if (!(targetsRaw instanceof List) || ((List<?>) targetsRaw).isEmpty()) {
+    if (config.targetFormats == null || config.targetFormats.isEmpty()) {
       throw new IllegalArgumentException(
           "--datasetconfig 'targetFormats' must be a non-empty list");
     }
     config.targetFormats =
-        ((List<Object>) targetsRaw)
-            .stream()
-                .map(String::valueOf)
-                .map(s -> s.trim().toUpperCase(Locale.ROOT))
-                .collect(Collectors.toList());
+        config.targetFormats.stream()
+            .map(t -> String.valueOf(t).trim().toUpperCase(Locale.ROOT))
+            .collect(Collectors.toList());
     config.targetFormats.forEach(t -> validateFormat(TARGETS, t, SUPPORTED_TARGET_FORMATS));
 
-    Object datasetsRaw = root.get("datasets");
-    if (!(datasetsRaw instanceof List) || ((List<?>) datasetsRaw).isEmpty()) {
+    if (config.datasets == null || config.datasets.isEmpty()) {
       throw new IllegalArgumentException("--datasetconfig 'datasets' must be a non-empty list");
     }
-    config.datasets = new ArrayList<>();
-    for (Object entry : (List<Object>) datasetsRaw) {
-      if (!(entry instanceof Map)) {
+    for (DatasetConfig.Table table : config.datasets) {
+      if (table == null) {
         throw new IllegalArgumentException("--datasetconfig 'datasets' entries must be mappings");
       }
-      Map<String, Object> raw = (Map<String, Object>) entry;
-      DatasetConfig.Table table = new DatasetConfig.Table();
-      table.tableBasePath = requireString(raw, "tableBasePath");
-      table.tableDataPath = asString(raw.get("tableDataPath"));
-      table.tableName = asString(raw.get("tableName"));
-      table.partitionSpec = asString(raw.get("partitionSpec"));
-      table.namespace = asString(raw.get("namespace"));
-      config.datasets.add(table);
+      requireField(table.tableBasePath, "tableBasePath");
     }
     return config;
   }
 
-  private static String requireString(Map<String, Object> map, String key) {
-    String value = asString(map.get(key));
+  private static String requireField(String value, String key) {
     if (value == null || value.trim().isEmpty()) {
       throw new IllegalArgumentException("--datasetconfig is missing required field '" + key + "'");
     }
     return value;
   }
 
-  private static String asString(Object value) {
-    return value == null ? null : String.valueOf(value);
-  }
+  // Reads the package-private fields. Unknown keys are ignored, as before.
+  private static final ObjectMapper DATASET_CONFIG_MAPPER =
+      new ObjectMapper()
+          .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+          .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
   /** Parsed {@code --datasetconfig}; mirrors the RunSync dataset YAML so configs are shareable. */
   static final class DatasetConfig {

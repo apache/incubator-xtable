@@ -102,11 +102,7 @@ public class ConversionTargetFactory {
       } catch (ServiceConfigurationError | LinkageError error) {
         // The target's engine is not on the classpath. Skip it; if it is the requested format,
         // the NotSupportedException below reports it.
-        log.warn(
-            "Skipping a ConversionTarget whose engine is not on the classpath ({}: {})",
-            error.getClass().getName(),
-            error.getMessage(),
-            error);
+        log.warn("Skipping a ConversionTarget whose engine is not on the classpath", error);
         continue;
       }
       if (target.getTableFormat().equalsIgnoreCase(tableFormatName)
