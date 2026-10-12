@@ -96,6 +96,7 @@ class ITXTableSparkRuntimeBundle {
     return Stream.of(
         Arguments.of("HUDI", "ICEBERG", "level:VALUE"),
         Arguments.of("ICEBERG", "HUDI", null),
+        Arguments.of("ICEBERG", "DELTA", null),
         Arguments.of("HUDI", "DELTA", "level:VALUE"),
         Arguments.of("DELTA", "HUDI", null));
   }
@@ -200,12 +201,14 @@ class ITXTableSparkRuntimeBundle {
             .orderBy(orderByColumn);
     String[] projection = comparableColumns(source, columns).toArray(new String[0]);
     List<String> sourceRows = source.selectExpr(projection).toJSON().collectAsList();
+    // Same target location as XTableSyncService.
+    String targetPath = "HUDI".equalsIgnoreCase(targetFormat) ? dataPath : basePath;
     List<String> targetRows =
         sparkSession
             .read()
             .options(readOptions(targetFormat))
             .format(targetFormat.toLowerCase())
-            .load(dataPath)
+            .load(targetPath)
             .orderBy(orderByColumn)
             .selectExpr(projection)
             .toJSON()

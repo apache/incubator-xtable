@@ -59,7 +59,6 @@ public class XTableSyncService {
     if (spec.getPartitionSpec() != null && !spec.getPartitionSpec().isEmpty()) {
       sourceProperties.put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, spec.getPartitionSpec());
     }
-    // Targets write their metadata next to the data files, e.g. <basePath>/data for Iceberg.
     String dataPath =
         spec.getDataPath() != null && !spec.getDataPath().isEmpty()
             ? spec.getDataPath()
@@ -84,9 +83,15 @@ public class XTableSyncService {
                     targetProperties.setProperty(
                         DeltaConversionTargetConfig.USE_KERNEL, Boolean.TRUE.toString());
                   }
+                  // Hudi resolves partitions relative to its base path, so a Hudi target sits
+                  // at the data path. Other targets sit at the table root.
+                  String targetPath =
+                      TableFormat.HUDI.equalsIgnoreCase(targetFormat)
+                          ? dataPath
+                          : spec.getBasePath();
                   return TargetTable.builder()
                       .name(spec.getKey())
-                      .basePath(dataPath)
+                      .basePath(targetPath)
                       .namespace(spec.getNamespace())
                       .formatName(targetFormat)
                       .additionalProperties(targetProperties)
