@@ -253,7 +253,8 @@ public class TestDeltaKernelSync {
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2, dataFile3)));
 
     // Verify partition columns are set
-    Table deltaTable = Table.forPath(engine, basePath.toString());
+    Table deltaTable =
+        Table.forPath(engine, DeltaKernelUtils.normalizeTablePath(basePath.toString()));
     Snapshot snapshot = deltaTable.getLatestSnapshot(engine);
     SnapshotImpl snapshotImpl = (SnapshotImpl) snapshot;
     Set<String> partitionColumns = snapshotImpl.getMetadata().getPartitionColNames();
@@ -335,7 +336,8 @@ public class TestDeltaKernelSync {
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2, dataFile3)));
 
     // Verify partition columns
-    Table deltaTable = Table.forPath(engine, basePath.toString());
+    Table deltaTable =
+        Table.forPath(engine, DeltaKernelUtils.normalizeTablePath(basePath.toString()));
     Snapshot snapshot = deltaTable.getLatestSnapshot(engine);
     SnapshotImpl snapshotImpl = (SnapshotImpl) snapshot;
     Set<String> partitionColumns = snapshotImpl.getMetadata().getPartitionColNames();
@@ -429,7 +431,7 @@ public class TestDeltaKernelSync {
 
   private void validateDeltaTable(Path basePath, Set<InternalDataFile> expectedFiles)
       throws IOException {
-    Table table = Table.forPath(engine, basePath.toString());
+    Table table = Table.forPath(engine, DeltaKernelUtils.normalizeTablePath(basePath.toString()));
     assertNotNull(table);
 
     Snapshot snapshot = table.getLatestSnapshot(engine);
