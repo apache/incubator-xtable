@@ -185,8 +185,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
     List<InternalDataFile> filesToRemove = new ArrayList<>();
+    StoragePath qualifiedBasePath = qualifiedBasePath();
     Map<String, StoragePathInfo> fullPathInfo =
-        commitMetadata.getFullPathToInfo(metaClient.getStorage(), basePath.toString());
+        commitMetadata.getFullPathToInfo(metaClient.getStorage(), qualifiedBasePath.toString());
     commitMetadata
         .getPartitionToWriteStats()
         .forEach(
@@ -201,7 +202,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   continue;
                 }
                 StoragePath baseFileFullPath =
-                    FSUtils.constructAbsolutePath(metaClient.getBasePath(), writeStat.getPath());
+                    FSUtils.constructAbsolutePath(qualifiedBasePath, writeStat.getPath());
                 if (FSUtils.getCommitTimeWithFullPath(baseFileFullPath.toString())
                     .equals(commit.requestedTime())) {
                   // getFullPathToInfo keys the map by the absolute path, not the file name
@@ -286,6 +287,17 @@ public class HudiDataFileExtractor implements AutoCloseable {
   }
 
   /**
+   * The base path qualified with the storage scheme and authority, so the paths of the files a
+   * commit wrote match the paths the file system view lists for the files it superseded. A table
+   * created from a plain local path has an unqualified base path, and Iceberg ignores a delete
+   * whose path differs from the one the file was added under, which would leave both versions of a
+   * rewritten file group in the Iceberg table.
+   */
+  private StoragePath qualifiedBasePath() {
+    return metaClient.getBasePath().makeQualified(metaClient.getStorage().getUri());
+  }
+
+  /**
    * The latest base file of each file group in the partition other than the files the given commit
    * wrote, so the result is the same whether or not the view has been synced past that commit.
    */
@@ -318,8 +330,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
     List<InternalDataFile> filesToRemove = new ArrayList<>();
+    StoragePath qualifiedBasePath = qualifiedBasePath();
     Map<String, StoragePathInfo> fullPathInfo =
-        replaceCommitMetadata.getFullPathToInfo(metaClient.getStorage(), basePath.toString());
+        replaceCommitMetadata.getFullPathToInfo(
+            metaClient.getStorage(), qualifiedBasePath.toString());
     replaceCommitMetadata
         .getPartitionToReplaceFileIds()
         .forEach(
@@ -358,8 +372,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   writeStats.stream()
                       .map(
                           writeStat ->
-                              FSUtils.constructAbsolutePath(
-                                      metaClient.getBasePath(), writeStat.getPath())
+                              FSUtils.constructAbsolutePath(qualifiedBasePath, writeStat.getPath())
                                   .toString())
                       .filter(
                           baseFileFullPath ->
@@ -500,11 +513,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<InternalPartitionField> partitioningFields) {
     List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
+    // Rollback metadata records the paths as the writer spelled them, which under a plain base
+    // path means without a scheme, while the files were added to the target under the qualified
+    // form; the qualified base path always has a scheme to supply.
+    URI basePathUri = qualifiedBasePath().toUri();
     return deletedPaths.stream()
         .map(
             path -> {
               try {
-                URI basePathUri = basePath.toUri();
                 if (path.startsWith(basePathUri.getScheme())) {
                   return path;
                 }

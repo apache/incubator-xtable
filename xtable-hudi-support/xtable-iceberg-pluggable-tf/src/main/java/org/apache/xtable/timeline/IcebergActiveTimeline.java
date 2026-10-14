@@ -18,10 +18,13 @@
  
 package org.apache.xtable.timeline;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -31,10 +34,13 @@ import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.table.timeline.versioning.v2.ActiveTimelineV2;
 import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.storage.StoragePath;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
@@ -48,6 +54,15 @@ import org.apache.xtable.iceberg.IcebergTableManager;
  * that is still retained in table metadata cannot resurface its instant as completed.
  */
 public class IcebergActiveTimeline extends ActiveTimelineV2 {
+  /** The actions that write data files and so publish a snapshot of their own. */
+  private static final Set<String> COMMIT_ACTIONS =
+      new HashSet<>(
+          Arrays.asList(
+              HoodieTimeline.COMMIT_ACTION,
+              HoodieTimeline.DELTA_COMMIT_ACTION,
+              HoodieTimeline.REPLACE_COMMIT_ACTION,
+              HoodieTimeline.CLUSTERING_ACTION));
+
   public IcebergActiveTimeline(
       HoodieTableMetaClient metaClient,
       Set<String> includedExtensions,
@@ -131,25 +146,11 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
         TableIdentifier.of(metaClient.getTableConfig().getTableName());
     if (!icebergTableManager.tableExists(
         null, tableIdentifier, metaClient.getBasePath().toString())) {
-      // Before the first commit publishes a snapshot there is no Iceberg table and every Hudi
-      // instant is pending. Completed instants without an Iceberg table mean the Iceberg metadata
-      // is gone, and reading the table as empty would let a writer rebuild it from nothing.
-      List<HoodieInstant> completedInstants =
-          instantsFromHoodieTimeline.stream()
-              .filter(HoodieInstant::isCompleted)
-              .collect(Collectors.toList());
-      if (!completedInstants.isEmpty()) {
-        throw new IllegalStateException(
-            String.format(
-                "Table %s has %d completed instants, the latest %s, but no Iceberg table at %s:"
-                    + " the Iceberg metadata has been removed and has to be restored before the"
-                    + " table can be used",
-                metaClient.getTableConfig().getTableName(),
-                completedInstants.size(),
-                completedInstants.get(completedInstants.size() - 1),
-                metaClient.getBasePath()));
-      }
-      return instantsFromHoodieTimeline;
+      return instantsBeforeTheFirstSnapshot(
+          metaClient.getTableConfig().getTableName(),
+          metaClient.getBasePath(),
+          instantsFromHoodieTimeline,
+          instant -> hasMarkers(metaClient, instant));
     }
     Table icebergTable =
         icebergTableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
@@ -179,15 +180,76 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
               }
               // Completed in Hudi but not recorded by Iceberg: the write did not finish, so the
               // next writer rolls it back.
-              return new HoodieInstant(
-                  HoodieInstant.State.INFLIGHT,
-                  instant.getAction(),
-                  instant.requestedTime(),
-                  instant.getCompletionTime(),
-                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+              return asPending(instant);
             })
         .sorted(InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * The timeline while no Iceberg table exists. Hudi completes a commit before the hook publishes
+   * its snapshot and deletes the commit's markers only after that, so a single completed commit
+   * that still has markers is the first write publishing its snapshot, or one whose publish failed,
+   * and is reported pending like any commit Iceberg has not recorded: the embedded timeline server
+   * rebuilding its view while the hook runs then sees no committed files, and the next writer rolls
+   * back a failed publish through those markers. A completed commit without markers finished its
+   * publish, and under the single writer this format supports a second commit can only complete
+   * after the first was recorded, so either without an Iceberg table means the Iceberg metadata is
+   * gone, or the commits were written by a writer without this format on its classpath; reading the
+   * table as empty would let a writer rebuild it from nothing. Instants of other actions, such as
+   * the rollback of a failed first publish, record nothing before the first snapshot and stay as
+   * Hudi reports them; once the first snapshot lands they predate it on both clocks and count as
+   * history.
+   *
+   * @param hasMarkers whether the commit's marker directory still exists
+   */
+  static List<HoodieInstant> instantsBeforeTheFirstSnapshot(
+      String tableName,
+      StoragePath basePath,
+      List<HoodieInstant> instants,
+      Predicate<HoodieInstant> hasMarkers) {
+    List<HoodieInstant> completedCommits =
+        instants.stream()
+            .filter(HoodieInstant::isCompleted)
+            .filter(instant -> COMMIT_ACTIONS.contains(instant.getAction()))
+            .collect(Collectors.toList());
+    if (completedCommits.size() > 1
+        || (completedCommits.size() == 1 && !hasMarkers.test(completedCommits.get(0)))) {
+      throw new IllegalStateException(
+          String.format(
+              "Table %s has %d completed commit(s), the latest %s%s, but no Iceberg table at %s:"
+                  + " the Iceberg metadata has been removed, or the commits were written without"
+                  + " the Iceberg table format on the classpath, and it has to be restored before"
+                  + " the table can be used",
+              tableName,
+              completedCommits.size(),
+              completedCommits.get(completedCommits.size() - 1),
+              completedCommits.size() == 1 ? " with its markers already deleted" : "",
+              basePath));
+    }
+    return instants.stream()
+        .map(instant -> completedCommits.contains(instant) ? asPending(instant) : instant)
+        .sorted(InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR)
+        .collect(Collectors.toList());
+  }
+
+  private static boolean hasMarkers(HoodieTableMetaClient metaClient, HoodieInstant instant) {
+    StoragePath markerDirectory =
+        new StoragePath(metaClient.getMarkerFolderPath(instant.requestedTime()));
+    try {
+      return metaClient.getStorage().exists(markerDirectory);
+    } catch (IOException e) {
+      throw new HoodieIOException("Unable to check the markers of " + instant, e);
+    }
+  }
+
+  private static HoodieInstant asPending(HoodieInstant instant) {
+    return new HoodieInstant(
+        HoodieInstant.State.INFLIGHT,
+        instant.getAction(),
+        instant.requestedTime(),
+        instant.getCompletionTime(),
+        InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
   }
 
   /**

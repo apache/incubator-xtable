@@ -198,6 +198,12 @@ public class IcebergTableFormat implements HoodieTableFormat {
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
     metaClient.reloadActiveTimeline();
+    if (!icebergTableExists(metaClient)) {
+      // The rollback undid a first commit whose snapshot never landed. Iceberg recorded nothing to
+      // remove and has no table to record the rollback in; the reconstructed timeline reports the
+      // rollback completed until the first snapshot lands, and as history after that.
+      return;
+    }
     HoodieRollbackMetadata rollbackMetadata;
     try {
       rollbackMetadata = metaClient.getActiveTimeline().readRollbackMetadata(rollbackInstant);
@@ -251,21 +257,30 @@ public class IcebergTableFormat implements HoodieTableFormat {
         .build();
   }
 
+  private static boolean icebergTableExists(HoodieTableMetaClient metaClient) {
+    return IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap())
+        .tableExists(
+            null,
+            TableIdentifier.of(metaClient.getTableConfig().getTableName()),
+            metaClient.getBasePath().toString());
+  }
+
   /**
    * Requested times of the commits recorded in the current Iceberg snapshot's ancestry. A commit
    * completed in Hudi but never recorded in Iceberg, because the writer died in between, has no
    * files in Iceberg for its rollback to remove.
    */
   private Set<String> publishedCommitTimes(HoodieTableMetaClient metaClient) {
-    IcebergTableManager tableManager =
-        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(metaClient.getTableConfig().getTableName());
-    String basePath = metaClient.getBasePath().toString();
-    if (!tableManager.tableExists(null, tableIdentifier, basePath)) {
+    if (!icebergTableExists(metaClient)) {
       return Collections.emptySet();
     }
-    Table table = tableManager.getTable(null, tableIdentifier, basePath);
+    IcebergTableManager tableManager =
+        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
+    Table table =
+        tableManager.getTable(
+            null,
+            TableIdentifier.of(metaClient.getTableConfig().getTableName()),
+            metaClient.getBasePath().toString());
     return IcebergSnapshotInstants.ancestorsOldestFirst(table).stream()
         .map(
             snapshot ->

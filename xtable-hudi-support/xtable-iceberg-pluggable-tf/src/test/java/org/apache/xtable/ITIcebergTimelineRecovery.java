@@ -25,13 +25,21 @@ import static org.apache.xtable.IcebergTableAssertions.icebergRowCount;
 import static org.apache.xtable.IcebergTableAssertions.icebergTable;
 import static org.apache.xtable.IcebergTableAssertions.reconstructedTimeline;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.junit.jupiter.api.Test;
@@ -61,6 +69,71 @@ class ITIcebergTimelineRecovery {
   private static void dropLatestSnapshot(String basePath) {
     Table table = icebergTable(basePath);
     table.manageSnapshots().rollbackTo(table.currentSnapshot().parentId()).commit();
+  }
+
+  @Test
+  void firstCommitWhosePublishFailedIsRolledBackBeforeTheIcebergTableExists() throws IOException {
+    try (TestJavaHudiTable table = newTable()) {
+      Path tableDirectory = Paths.get(URI.create(table.getBasePath()));
+      // A file where Iceberg wants its metadata directory makes the first publish fail after Hudi
+      // has completed the commit, which leaves the commit's markers in place.
+      Files.createFile(tableDirectory.resolve("metadata"));
+      String commit1 = table.startCommit();
+      assertThrows(
+          Exception.class,
+          () ->
+              table.insertRecordsWithCommitAlreadyStarted(
+                  table.generateRecords(100), commit1, true));
+      Files.delete(tableDirectory.resolve("metadata"));
+      // Hudi completed the commit natively and, with postCommit never reached, kept its markers.
+      try (Stream<Path> instants =
+          Files.list(tableDirectory.resolve(".hoodie").resolve("timeline"))) {
+        assertTrue(
+            instants
+                .map(path -> path.getFileName().toString())
+                .anyMatch(name -> name.startsWith(commit1 + "_") && name.endsWith(".commit")),
+            "the failed publish must leave a natively completed commit behind");
+      }
+      assertTrue(
+          Files.isDirectory(tableDirectory.resolve(".hoodie").resolve(".temp").resolve(commit1)),
+          "the failed publish must leave the commit's markers behind");
+
+      HoodieTimeline before = reconstructedTimeline(table.getBasePath());
+      assertEquals(Collections.emptyList(), completedCommitTimes(before));
+      assertTrue(
+          before
+              .filterInflightsAndRequested()
+              .getInstantsAsStream()
+              .anyMatch(instant -> commit1.equals(instant.requestedTime())),
+          "the first commit without a snapshot must be reported as pending");
+
+      // The rollback runs while there is still no Iceberg table to record it in.
+      table.getWriteClient().rollback(commit1);
+      HoodieTimeline rolledBack = reconstructedTimeline(table.getBasePath());
+      assertNothingPending(rolledBack);
+      assertEquals(Collections.emptyList(), completedCommitTimes(rolledBack));
+      assertEquals(
+          1,
+          rolledBack.getRollbackTimeline().filterCompletedInstants().countInstants(),
+          "the rollback stays completed with no Iceberg table to record it");
+      try (Stream<Path> files = Files.list(tableDirectory)) {
+        assertEquals(
+            Collections.emptyList(),
+            files
+                .map(Path::toString)
+                .filter(name -> name.endsWith(".parquet"))
+                .collect(Collectors.toList()),
+            "the rollback removes the data files of the failed first publish");
+      }
+
+      String commit2 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(50), commit2, true);
+      HoodieTimeline after = reconstructedTimeline(table.getBasePath());
+      assertEquals(Collections.singletonList(commit2), completedCommitTimes(after));
+      assertNothingPending(after);
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(50, icebergRowCount(table.getBasePath()));
+    }
   }
 
   @Test

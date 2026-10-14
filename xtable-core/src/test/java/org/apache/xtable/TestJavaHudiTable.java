@@ -123,6 +123,31 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, false, tableVersion);
   }
 
+  /**
+   * Same as {@link #forStandardSchema(String, Path, String, HoodieTableType)} with table-level
+   * properties, but at the given base path exactly as a writer would pass it. The other factories
+   * use a {@code file:} URI; a plain local path yields a table whose base path has no scheme, which
+   * is how Spark and Hudi Streamer create a table from a plain path.
+   */
+  public static TestJavaHudiTable forStandardSchemaAtBasePath(
+      String tableName,
+      String basePath,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Properties tableProperties) {
+    return new TestJavaHudiTable(
+        tableName,
+        BASIC_SCHEMA,
+        null,
+        partitionConfig,
+        tableType,
+        null,
+        false,
+        HoodieTableVersion.SIX,
+        tableProperties,
+        basePath);
+  }
+
   public static TestJavaHudiTable forStandardSchemaWithFieldIds(
       String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
     return new TestJavaHudiTable(
@@ -243,7 +268,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         archivalConfig,
         addFieldIds,
         tableVersion,
-        new Properties());
+        new Properties(),
+        null);
   }
 
   private TestJavaHudiTable(
@@ -264,7 +290,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         archivalConfig,
         addFieldIds,
         HoodieTableVersion.SIX,
-        tableProperties);
+        tableProperties,
+        null);
   }
 
   private TestJavaHudiTable(
@@ -276,8 +303,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieArchivalConfig archivalConfig,
       boolean addFieldIds,
       HoodieTableVersion tableVersion,
-      Properties tableProperties) {
-    super(name, schema, tempDir, partitionConfig);
+      Properties tableProperties,
+      String basePath) {
+    super(name, schema, tempDir, partitionConfig, basePath);
     // The caller's table properties win over the module-wide format overrides, which win over the
     // version the factory asked for.
     this.tableVersion =

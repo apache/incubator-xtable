@@ -150,11 +150,21 @@ public abstract class TestAbstractHudiTable
   protected HoodieTableVersion tableVersion = HoodieTableVersion.SIX;
 
   TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
+    this(name, schema, tempDir, partitionConfig, null);
+  }
+
+  /**
+   * @param basePath the base path as the writer spells it, or null to create the table under {@code
+   *     tempDir} at a {@code file:} URI. Spark and Hudi Streamer pass a base path through
+   *     unchanged, so a plain local path gives a table whose base path carries no scheme.
+   */
+  TestAbstractHudiTable(
+      String name, Schema schema, Path tempDir, String partitionConfig, String basePath) {
     try {
       this.tableName = name;
       this.schema = schema;
       // Initialize base path
-      this.basePath = initBasePath(tempDir, name);
+      this.basePath = basePath != null ? basePath : initBasePath(tempDir, name);
       // Add key generator
       this.typedProperties = new TypedProperties();
       typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
