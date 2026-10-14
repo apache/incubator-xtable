@@ -228,10 +228,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
   }
 
   /**
-   * Replace-commit counterpart of {@link #getDiffFromCommitMetadata}. Files the replace commit
-   * supersedes are reported as removed, files it wrote as added.
-   */
-  /**
    * Derives the file diff a completed rollback produces, from the rollback's own metadata rather
    * than by comparing timeline states: the base files the rollback deleted leave, and for each file
    * group they belonged to the previous base file, which the rolled-back commit had superseded and
@@ -311,6 +307,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
                         : second));
   }
 
+  /**
+   * Replace-commit counterpart of {@link #getDiffFromCommitMetadata}. Files the replace commit
+   * supersedes are reported as removed, files it wrote as added.
+   */
   public InternalFilesDiff getDiffFromReplaceCommitMetadata(
       InternalTable table,
       HoodieReplaceCommitMetadata replaceCommitMetadata,
