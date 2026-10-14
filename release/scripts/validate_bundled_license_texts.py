@@ -243,7 +243,13 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
     texts = {entry.split("/")[-1] for entry in names if entry.startswith("META-INF/licenses/LICENSE-")}
     includes = shade_includes(module / "pom.xml")
 
-    result: dict[str, list] = {"missing": [], "mismatched": [], "unresolved": [], "partial": []}
+    result: dict[str, list] = {
+        "missing": [],
+        "mismatched": [],
+        "unresolved": [],
+        "partial": [],
+        "stale_includes": [],
+    }
     bundled = []
     for group, artifact, version, classifier in tree_coords(tree):
         if group == "org.apache.xtable" or f"{group}:{artifact}" not in includes:
@@ -281,6 +287,16 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         if reason and artifact not in KNOWN_TEXT_MISMATCHES:
             result["mismatched"].append(f"{coord}  ({reason})")
 
+    # Reverse check: every shade <include> must still exist in the runtime tree.
+    # This catches stale includes that silently shrink the bundle.
+    tree_artifacts = {f"{g}:{a}" for g, a, v, c in tree_coords(tree)}
+    stale = sorted(includes - tree_artifacts)
+    if stale:
+        result["stale_includes"] = [
+            f"{inc}  (present in shade <includes> but missing from runtime dependency tree)"
+            for inc in stale
+        ]
+
     result["orphaned"] = sorted(texts - {f"LICENSE-{artifact}" for artifact in bundled})
     result["count"] = len(bundled)
     return result
@@ -292,6 +308,7 @@ REPORTS = [
     ("orphaned", "license texts with no bundled non-Apache-2.0 dependency"),
     ("partial", "dependencies only partly present, so they cannot be classified"),
     ("unresolved", "dependencies that could not be resolved or have no license"),
+    ("stale_includes", "shade <include> entries that no longer exist in the runtime dependency tree"),
 ]
 
 
