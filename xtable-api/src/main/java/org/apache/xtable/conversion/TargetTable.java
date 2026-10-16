@@ -29,6 +29,19 @@ import lombok.Getter;
 @Getter
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
+  /**
+   * Value for {@link #metadataRetention} that turns off time-based expiry of the target's
+   * historical metadata. Use it when something else owns the target's history, for example a
+   * pluggable table format that expires Iceberg snapshots exactly when Hudi archives the instants
+   * they record.
+   */
+  public static final Duration NO_METADATA_EXPIRY = Duration.ofSeconds(-1);
+
+  /**
+   * How long historical metadata (Iceberg snapshots, Delta log entries) is kept after a sync.
+   * Defaults to seven days. A negative duration, see {@link #NO_METADATA_EXPIRY}, disables
+   * time-based expiry altogether.
+   */
   private final Duration metadataRetention;
 
   @Builder(toBuilder = true)
