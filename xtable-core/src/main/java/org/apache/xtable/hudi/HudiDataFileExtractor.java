@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -230,23 +231,31 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   /**
    * Derives the file diff a completed rollback produces, from the rollback's own metadata rather
-   * than by comparing timeline states: the base files the rollback deleted leave, and for each file
-   * group they belonged to the previous base file, which the rolled-back commit had superseded and
-   * which is the latest file slice again, comes back. Log files are skipped. Only files of commits
-   * in {@code publishedCommitTimes} are removed, since a commit that never reached the target has
-   * nothing there to remove.
+   * than by comparing timeline states: the base files the rollback deleted leave, and every file
+   * group the rolled-back commits touched comes back with its latest base file, which is live again
+   * now that the commits are gone. Those file groups are the ones the rollback deleted files from,
+   * whose previous version an upsert had superseded, and the ones whose files the target removed
+   * when it recorded the rolled-back commits, which is how a clustering, an insert overwrite or a
+   * delete partition replaced them: the rollback deletes no file of a replaced file group, and the
+   * replace commit's metadata, which names them, is already deleted. Log files are skipped. Only
+   * files of commits in {@code publishedCommitTimes} are removed, since a commit that never reached
+   * the target has nothing there to remove.
    *
    * @param publishedCommitTimes requested times of the commits the target has recorded
+   * @param filesRemovedByRolledBackCommits paths of the base files the target removed when it
+   *     recorded the rolled-back commits
    */
   public InternalFilesDiff getDiffFromRollbackMetadata(
       InternalTable table,
       HoodieRollbackMetadata rollbackMetadata,
-      Set<String> publishedCommitTimes) {
+      Set<String> publishedCommitTimes,
+      Collection<String> filesRemovedByRolledBackCommits) {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     // The rollback has just deleted files and removed the instant, so refresh the cached view.
     fsView.sync();
-    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
     List<InternalDataFile> filesToRemove = new ArrayList<>();
+    Map<String, Set<String>> fileIdsToRestoreByPartition =
+        fileIdsByPartition(filesRemovedByRolledBackCommits);
     rollbackMetadata
         .getPartitionMetadata()
         .forEach(
@@ -264,21 +273,25 @@ public class HudiDataFileExtractor implements AutoCloseable {
               }
               filesToRemove.addAll(
                   getRemovedFiles(partitionPath, deletedBaseFiles, table.getPartitioningFields()));
-              Set<String> fileIdsRolledBack =
-                  deletedBaseFiles.stream()
-                      .map(path -> FSUtils.getFileIdFromFilePath(new StoragePath(path)))
-                      .collect(Collectors.toSet());
-              List<PartitionValue> partitionValues =
-                  partitionValuesExtractor.extractPartitionValues(
-                      table.getPartitioningFields(), partitionPath);
-              fsView
-                  .getLatestBaseFiles(partitionPath)
-                  .filter(baseFile -> fileIdsRolledBack.contains(baseFile.getFileId()))
-                  .forEach(
-                      baseFile ->
-                          filesAddedWithoutStats.add(
-                              buildFileWithoutStats(partitionValues, baseFile)));
+              deletedBaseFiles.forEach(
+                  path ->
+                      fileIdsToRestoreByPartition
+                          .computeIfAbsent(partitionPath, key -> new HashSet<>())
+                          .add(FSUtils.getFileIdFromFilePath(new StoragePath(path))));
             });
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    fileIdsToRestoreByPartition.forEach(
+        (partitionPath, fileIdsToRestore) -> {
+          List<PartitionValue> partitionValues =
+              partitionValuesExtractor.extractPartitionValues(
+                  table.getPartitioningFields(), partitionPath);
+          fsView
+              .getLatestBaseFiles(partitionPath)
+              .filter(baseFile -> fileIdsToRestore.contains(baseFile.getFileId()))
+              .forEach(
+                  baseFile ->
+                      filesAddedWithoutStats.add(buildFileWithoutStats(partitionValues, baseFile)));
+        });
     List<InternalDataFile> filesAdded =
         fileStatsExtractor
             .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
@@ -295,6 +308,24 @@ public class HudiDataFileExtractor implements AutoCloseable {
    */
   private StoragePath qualifiedBasePath() {
     return metaClient.getBasePath().makeQualified(metaClient.getStorage().getUri());
+  }
+
+  /**
+   * Groups base file paths by their partition path, keeping the file ID of each, since a file ID is
+   * only unique within its partition.
+   */
+  private Map<String, Set<String>> fileIdsByPartition(Collection<String> baseFilePaths) {
+    Map<String, Set<String>> fileIdsByPartition = new HashMap<>();
+    for (String path : baseFilePaths) {
+      StoragePath baseFilePath = new StoragePath(path);
+      // Compares the paths without scheme and authority, so a qualified path matches a plain one.
+      fileIdsByPartition
+          .computeIfAbsent(
+              FSUtils.getRelativePartitionPath(metaClient.getBasePath(), baseFilePath.getParent()),
+              key -> new HashSet<>())
+          .add(FSUtils.getFileIdFromFilePath(baseFilePath));
+    }
+    return fileIdsByPartition;
   }
 
   /**

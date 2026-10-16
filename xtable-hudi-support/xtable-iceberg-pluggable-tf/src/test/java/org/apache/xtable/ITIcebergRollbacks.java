@@ -26,19 +26,23 @@ import static org.apache.xtable.IcebergTableAssertions.icebergTable;
 import static org.apache.xtable.IcebergTableAssertions.reconstructedTimeline;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import org.apache.iceberg.types.Types;
@@ -79,6 +83,66 @@ class ITIcebergRollbacks {
       table.insertRecords(50, true);
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
       assertEquals(150, icebergRowCount(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void rollbackByAWriterWithTheMetadataTableEnabledIsRecorded() {
+    String tableName = "rollback_" + UUID.randomUUID();
+    String basePath = tempDir.resolve(tableName).toString();
+    List<String> filesAfterInsert;
+    String upsertCommit;
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchemaAtBasePath(
+            tableName, basePath, null, HoodieTableType.COPY_ON_WRITE, new Properties())) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(100, true);
+      filesAfterInsert = table.getAllLatestBaseFilePaths();
+      table.upsertRecords(inserts.subList(0, 20), true);
+      upsertCommit =
+          table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
+    }
+    // Hudi's Spark rollback procedures build their own write config, which leaves the metadata
+    // table at its default, so the rollback runs with a metadata table. It must still be recorded:
+    // Hudi has deleted the files by the time the hook runs.
+    Properties metadataTableEnabled = new Properties();
+    metadataTableEnabled.setProperty(HoodieMetadataConfig.ENABLE.key(), "true");
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchemaAtBasePath(
+            tableName, basePath, null, HoodieTableType.COPY_ON_WRITE, metadataTableEnabled)) {
+      table.rollback(upsertCommit);
+
+      assertTrue(
+          HoodieTableConfig.loadFromHoodieProps(
+                  table.getMetaClient().getStorage(), table.getMetaClient().getMetaPath())
+              .isMetadataTableAvailable(),
+          "the rollback must have built a metadata table");
+      assertIcebergReferencesExactly(table.getBasePath(), filesAfterInsert);
+      assertEquals(100, icebergRowCount(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void rollbackOfAClusteringRestoresTheReplacedFileGroups() {
+    try (TestJavaHudiTable table = newTable()) {
+      table.insertRecords(100, true);
+      table.insertRecords(100, true);
+      List<String> filesBeforeClustering = table.getAllLatestBaseFilePaths();
+      table.cluster();
+      String clustering =
+          table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
+      assertFalse(
+          filesBeforeClustering.equals(table.getAllLatestBaseFilePaths()),
+          "the clustering should replace the file groups");
+
+      // The rollback deletes only the files of the new file groups; the file groups the
+      // clustering replaced become live again in Hudi and have to come back in Iceberg too.
+      table.rollback(clustering);
+
+      assertIcebergReferencesExactly(table.getBasePath(), filesBeforeClustering);
+      assertEquals(200, icebergRowCount(table.getBasePath()));
+      table.insertRecords(50, true);
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(250, icebergRowCount(table.getBasePath()));
     }
   }
 

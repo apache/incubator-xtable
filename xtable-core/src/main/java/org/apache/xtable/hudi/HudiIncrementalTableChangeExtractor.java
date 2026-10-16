@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
@@ -68,31 +69,36 @@ public class HudiIncrementalTableChangeExtractor {
    * HudiDataFileExtractor#getDiffFromRollbackMetadata}.
    *
    * @param publishedCommitTimes requested times of the commits the target has recorded
-   */
-  public IncrementalTableChanges extractTableChanges(
-      HoodieRollbackMetadata rollbackMetadata,
-      HoodieInstant rollbackInstant,
-      Set<String> publishedCommitTimes) {
-    return extractTableChanges(
-        rollbackMetadata,
-        rollbackInstant,
-        publishedCommitTimes,
-        tableAsOfLatestCommit(rollbackInstant));
-  }
-
-  /**
-   * Same as {@link #extractTableChanges(HoodieRollbackMetadata, HoodieInstant, Set)} with the table
-   * description supplied by the caller, for a rollback after which Hudi has no completed commit
-   * left to derive it from.
+   * @param filesRemovedByRolledBackCommits paths of the base files the target removed when it
+   *     recorded the rolled-back commits
    */
   public IncrementalTableChanges extractTableChanges(
       HoodieRollbackMetadata rollbackMetadata,
       HoodieInstant rollbackInstant,
       Set<String> publishedCommitTimes,
+      Collection<String> filesRemovedByRolledBackCommits) {
+    return extractTableChanges(
+        rollbackMetadata,
+        rollbackInstant,
+        publishedCommitTimes,
+        filesRemovedByRolledBackCommits,
+        tableAsOfLatestCommit(rollbackInstant));
+  }
+
+  /**
+   * Same as {@link #extractTableChanges(HoodieRollbackMetadata, HoodieInstant, Set, Collection)}
+   * with the table description supplied by the caller, for a rollback after which Hudi has no
+   * completed commit left to derive it from.
+   */
+  public IncrementalTableChanges extractTableChanges(
+      HoodieRollbackMetadata rollbackMetadata,
+      HoodieInstant rollbackInstant,
+      Set<String> publishedCommitTimes,
+      Collection<String> filesRemovedByRolledBackCommits,
       InternalTable internalTable) {
     InternalFilesDiff dataFilesDiff =
         dataFileExtractor.getDiffFromRollbackMetadata(
-            internalTable, rollbackMetadata, publishedCommitTimes);
+            internalTable, rollbackMetadata, publishedCommitTimes, filesRemovedByRolledBackCommits);
     return changesFor(internalTable, dataFilesDiff, rollbackInstant);
   }
 

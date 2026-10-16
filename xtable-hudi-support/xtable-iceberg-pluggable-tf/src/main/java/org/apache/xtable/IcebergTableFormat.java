@@ -20,8 +20,10 @@ package org.apache.xtable;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,6 +37,7 @@ import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.common.HoodieTableFormat;
 import org.apache.hudi.common.config.HoodieConfig;
+import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
@@ -42,12 +45,14 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineFactory;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.keygen.constant.KeyGeneratorType;
 import org.apache.hudi.metadata.TableMetadataFactory;
 
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 
@@ -115,6 +120,10 @@ public class IcebergTableFormat implements HoodieTableFormat {
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
+    // Hudi deletes a disabled metadata table during the write, after the meta client loaded the
+    // table config, so the check reads it afresh.
+    requireMetadataTableDisabled(
+        HoodieTableConfig.loadFromHoodieProps(metaClient.getStorage(), metaClient.getMetaPath()));
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
     completeInstant(
@@ -212,7 +221,12 @@ public class IcebergTableFormat implements HoodieTableFormat {
     }
     HudiIncrementalTableChangeExtractor hudiTableExtractor =
         getHudiTableExtractor(metaClient, viewManager);
-    Set<String> publishedCommitTimes = publishedCommitTimes(metaClient);
+    Table table = icebergTable(metaClient);
+    List<Snapshot> ancestors = IcebergSnapshotInstants.ancestorsOldestFirst(table);
+    Set<String> publishedCommitTimes = publishedCommitTimes(ancestors, metaClient);
+    List<String> filesRemovedByRolledBackCommits =
+        filesRemovedByCommits(
+            table, ancestors, metaClient, new HashSet<>(rollbackMetadata.getCommitsRollback()));
     IncrementalTableChanges changes;
     if (metaClient.getActiveTimeline().getCommitsTimeline().filterCompletedInstants().empty()) {
       // Every commit has been rolled back, so Hudi has no commit to take the schema from. The
@@ -222,11 +236,15 @@ public class IcebergTableFormat implements HoodieTableFormat {
               rollbackMetadata,
               rollbackInstant,
               publishedCommitTimes,
+              filesRemovedByRolledBackCommits,
               tableAsRecordedInIceberg(metaClient, rollbackInstant));
     } else {
       changes =
           hudiTableExtractor.extractTableChanges(
-              rollbackMetadata, rollbackInstant, publishedCommitTimes);
+              rollbackMetadata,
+              rollbackInstant,
+              publishedCommitTimes,
+              filesRemovedByRolledBackCommits);
     }
     completeInstant(metaClient, changes);
   }
@@ -265,28 +283,49 @@ public class IcebergTableFormat implements HoodieTableFormat {
             metaClient.getBasePath().toString());
   }
 
-  /**
-   * Requested times of the commits recorded in the current Iceberg snapshot's ancestry. A commit
-   * completed in Hudi but never recorded in Iceberg, because the writer died in between, has no
-   * files in Iceberg for its rollback to remove.
-   */
-  private Set<String> publishedCommitTimes(HoodieTableMetaClient metaClient) {
-    if (!icebergTableExists(metaClient)) {
-      return Collections.emptySet();
-    }
-    IcebergTableManager tableManager =
-        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
-    Table table =
-        tableManager.getTable(
+  private static Table icebergTable(HoodieTableMetaClient metaClient) {
+    return IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap())
+        .getTable(
             null,
             TableIdentifier.of(metaClient.getTableConfig().getTableName()),
             metaClient.getBasePath().toString());
-    return IcebergSnapshotInstants.ancestorsOldestFirst(table).stream()
+  }
+
+  /**
+   * Requested times of the instants recorded in the current Iceberg snapshot's ancestry. A commit
+   * completed in Hudi but never recorded in Iceberg, because the writer died in between, has no
+   * files in Iceberg for its rollback to remove.
+   */
+  private static Set<String> publishedCommitTimes(
+      List<Snapshot> ancestors, HoodieTableMetaClient metaClient) {
+    return ancestors.stream()
         .map(
             snapshot ->
                 IcebergSnapshotInstants.recordedInstant(snapshot, metaClient.getInstantGenerator())
                     .requestedTime())
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * Paths of the data files the snapshots recording the given commits removed: the versions an
+   * upsert superseded and the file groups a clustering, an insert overwrite or a delete partition
+   * replaced. A savepoint shares its commit's requested time and removes nothing, so it is skipped.
+   */
+  private static List<String> filesRemovedByCommits(
+      Table table,
+      List<Snapshot> ancestors,
+      HoodieTableMetaClient metaClient,
+      Set<String> commitTimes) {
+    List<String> removedFiles = new ArrayList<>();
+    for (Snapshot snapshot : ancestors) {
+      HoodieInstant recorded =
+          IcebergSnapshotInstants.recordedInstant(snapshot, metaClient.getInstantGenerator());
+      if (commitTimes.contains(recorded.requestedTime())
+          && !HoodieTimeline.SAVEPOINT_ACTION.equals(recorded.getAction())) {
+        snapshot.removedDataFiles(table.io()).forEach(file -> removedFiles.add(file.location()));
+      }
+    }
+    return removedFiles;
   }
 
   @Override
@@ -429,6 +468,32 @@ public class IcebergTableFormat implements HoodieTableFormat {
     return Arrays.stream(partitionFields.get())
         .map(field -> field + ":" + PartitionTransformType.VALUE)
         .collect(Collectors.joining(","));
+  }
+
+  /**
+   * The Hudi metadata table has to stay off: {@link IcebergMetadataFactory} serves the table's
+   * metadata from a file system listing that answers no index lookup, so once a writer has built
+   * the metadata table, a lookup that relies on it fails with "Unsupported operation:
+   * getColumnsStats". Hudi enables the metadata table by default, and the writer's configuration
+   * does not reach the format, so the check reads the metadata partitions the table config records
+   * as built.
+   *
+   * <p>Only commits are refused. A refused commit has no snapshot, so the next writer rolls it back
+   * and nothing it wrote reaches Iceberg. A clean or a rollback has deleted its files by the time
+   * its hook runs, so refusing one would leave Iceberg pointing at deleted files; Hudi's Spark
+   * procedures, such as rollback_to_instant, also leave the metadata table at its default and build
+   * one, which the next writer with it disabled deletes.
+   *
+   * @throws UnsupportedOperationException when a writer has built the metadata table
+   */
+  static void requireMetadataTableDisabled(HoodieTableConfig tableConfig) {
+    if (tableConfig.isMetadataTableAvailable()) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "The Iceberg table format does not support the Hudi metadata table, but table %s has "
+                  + "one; set %s=false on every writer of the table and remove the metadata table",
+              tableConfig.getTableName(), HoodieMetadataConfig.ENABLE.key()));
+    }
   }
 
   private HudiIncrementalTableChangeExtractor getHudiTableExtractor(

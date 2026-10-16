@@ -57,12 +57,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
@@ -513,6 +515,51 @@ public class ITIcebergVariousActions {
       ValidationTestHelper.validateTableChanges(allBaseFilePaths, allTableChanges);
     } finally {
       safeClose(hudiClient);
+    }
+  }
+
+  /**
+   * Rolling back a completed replace commit makes the file groups it replaced live again in Hudi,
+   * though the rollback deletes none of their files, so Iceberg has to get them back.
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = WriteOperationType.class,
+      names = {"INSERT_OVERWRITE", "DELETE_PARTITION"})
+  void rollbackOfAPartitionReplaceRestoresTheReplacedFileGroups(WriteOperationType operation) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            "test_table_" + UUID.randomUUID(),
+            tempDir,
+            jsc,
+            "level:SIMPLE",
+            HoodieTableType.COPY_ON_WRITE)) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(100, true);
+      table.insertRecords(100, true);
+      List<String> filesBeforeReplace = table.getAllLatestBaseFilePaths();
+      String partition =
+          inserts.stream().map(HoodieRecord::getPartitionPath).sorted().findFirst().get();
+      if (operation == WriteOperationType.INSERT_OVERWRITE) {
+        table.insertOverwrite(
+            inserts.stream()
+                .filter(record -> record.getPartitionPath().equals(partition))
+                .limit(1)
+                .collect(Collectors.toList()),
+            HoodieTableType.COPY_ON_WRITE);
+      } else {
+        table.deletePartition(partition, HoodieTableType.COPY_ON_WRITE);
+      }
+      String replace =
+          table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
+      assertTrue(IcebergTableAssertions.icebergRowCount(table.getBasePath()) < 200);
+
+      table.rollback(replace);
+
+      assertIcebergReferencesExactly(table.getBasePath(), filesBeforeReplace);
+      assertEquals(200, IcebergTableAssertions.icebergRowCount(table.getBasePath()));
+      table.insertRecords(50, true);
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(250, IcebergTableAssertions.icebergRowCount(table.getBasePath()));
     }
   }
 
