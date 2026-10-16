@@ -143,7 +143,7 @@ public class DeltaValueConverter {
     }
     if (partitionTransformType == PartitionTransformType.VALUE) {
       if (fieldType == InternalType.DATE) {
-        return LocalDate.ofEpochDay((int) value).toString();
+        return convertDatePartitionValueToString(value);
       } else {
         return value.toString();
       }
@@ -152,6 +152,35 @@ public class DeltaValueConverter {
       DateFormat formatter = getDateFormat(dateFormat);
       return formatter.format(Date.from(Instant.ofEpochMilli((long) value)));
     }
+  }
+
+  /**
+   * Serializes a DATE partition value to the canonical {@code yyyy-MM-dd} string used in the Delta
+   * partition path/log.
+   *
+   * <p>Different conversion sources surface DATE partition values in different runtime forms: the
+   * Iceberg and Delta sources provide an {@link Integer} epoch-day, whereas the Paimon source
+   * provides an already-formatted {@code yyyy-MM-dd} {@link String} (see {@code
+   * PaimonPartitionExtractor#toPartitionValues}, which derives values from {@code
+   * InternalRowPartitionComputer.generatePartValues}). This helper accepts both so the DATE
+   * partition case no longer fails with a {@link ClassCastException}.
+   */
+  private static String convertDatePartitionValueToString(Object value) {
+    if (value instanceof Number) {
+      return LocalDate.ofEpochDay(((Number) value).longValue()).toString();
+    }
+    if (value instanceof String) {
+      // Already an ISO-8601 date; parse to validate and normalize (also tolerates an epoch-day
+      // encoded as a string).
+      String stringValue = ((String) value).trim();
+      try {
+        return LocalDate.parse(stringValue).toString();
+      } catch (DateTimeParseException ex) {
+        return LocalDate.ofEpochDay(Long.parseLong(stringValue)).toString();
+      }
+    }
+    throw new NotSupportedException(
+        "Unsupported DATE partition value type: " + value.getClass().getName());
   }
 
   public static Object convertFromDeltaPartitionValue(

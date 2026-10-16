@@ -74,6 +74,34 @@ public class TestDeltaValueConverter {
     assertEquals(fieldValue, internalRepresentation);
   }
 
+  /**
+   * Reproduces the Paimon-source -> Delta-target DATE partition failure.
+   *
+   * <p>{@link org.apache.xtable.paimon.PaimonPartitionExtractor#toPartitionValues} always emits
+   * partition values as {@link String} (via {@code InternalRowPartitionComputer.generatePartValues},
+   * e.g. {@code "2019-10-12"}). When such a value reaches {@code convertToDeltaPartitionValue} for a
+   * DATE partition field with a VALUE transform, the current code executes {@code (int) value} on a
+   * String, throwing a {@link ClassCastException}. DATE as a regular (non-partition) column works
+   * because it flows through the column-stat path with a real epoch-day int.
+   */
+  @ParameterizedTest
+  @MethodSource("datePartitionValues")
+  void convertDatePartitionValueAcrossSourceRepresentations(Object value, String expected) {
+    // Epoch day 18181 == "2019-10-12". Integer form is produced by the Iceberg/Delta sources; the
+    // String form is produced by the Paimon source (InternalRowPartitionComputer.generatePartValues).
+    String deltaRepresentation =
+        DeltaValueConverter.convertToDeltaPartitionValue(
+            value, InternalType.DATE, PartitionTransformType.VALUE, "");
+    assertEquals(expected, deltaRepresentation);
+  }
+
+  private static Stream<Arguments> datePartitionValues() {
+    return Stream.of(
+        Arguments.of(18181, "2019-10-12"), // Integer epoch-day (Iceberg / Delta source)
+        Arguments.of("2019-10-12", "2019-10-12"), // ISO date String (Paimon source)
+        Arguments.of("18181", "2019-10-12")); // epoch-day encoded as String
+  }
+
   @Test
   void parseWrongDateTime() throws ParseException {
     String dateFormatString = "yyyy-MM-dd HH:mm:ss";
