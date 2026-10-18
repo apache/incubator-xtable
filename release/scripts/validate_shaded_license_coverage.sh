@@ -24,6 +24,21 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 cd "${ROOT_DIR}"
 
+# A missing tool must fail the run, not read as empty output: rg being absent
+# once let every check here pass vacuously.
+for tool in git grep sed awk sort comm diff mktemp head dirname basename rm; do
+  if ! command -v "${tool}" > /dev/null; then
+    echo "FAIL required command not found: ${tool}"
+    exit 1
+  fi
+done
+
+# Command output is read via temp files rather than < <(...), whose exit status
+# errexit and pipefail never see.
+scratch_dir="$(mktemp -d)"
+trap 'rm -rf "${scratch_dir}"' EXIT
+lines_file="${scratch_dir}/lines"
+
 escape_regex() {
   printf '%s' "$1" | sed 's/[][(){}.^$?*+|/]/\\&/g'
 }
@@ -78,6 +93,15 @@ should_skip_module() {
   return 1
 }
 
+# git grep exits 1 when nothing matches, which the empty check below reports;
+# anything higher is an error.
+grep_status=0
+git grep -l '<artifactId>maven-shade-plugin</artifactId>' -- 'pom.xml' '*/pom.xml' > "${lines_file}" || grep_status=$?
+if [[ ${grep_status} -gt 1 ]]; then
+  echo "FAIL module discovery failed: git grep exited ${grep_status}."
+  exit 1
+fi
+
 SHADE_MODULES=()
 while IFS= read -r module; do
   module_dir="$(dirname "${module}")"
@@ -86,11 +110,7 @@ while IFS= read -r module; do
       SHADE_MODULES+=("${module_dir}")
     fi
   fi
-done < <(
-  git ls-files -- 'pom.xml' '*/pom.xml' \
-    | xargs grep -l '<artifactId>maven-shade-plugin</artifactId>' \
-    | sort
-)
+done < "${lines_file}"
 
 # Finding nothing means the discovery above broke, not that there is nothing to
 # check. Passing on an empty run would make every later check vacuous.
@@ -119,29 +139,29 @@ for module in "${SHADE_MODULES[@]}"; do
   notice_file="${module}/src/main/resources/META-INF/NOTICE-bundled"
   tree_file="${module}/target/dependency-tree-runtime.txt"
 
+  awk '
+    /<artifactSet>/ {in_artifact_set=1}
+    in_artifact_set && /<includes/ {in_includes=1}
+    in_includes {
+      line=$0
+      while (match(line, /<include>([^<]+)<\/include>/)) {
+        print substr(line, RSTART + 9, RLENGTH - 19)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+    in_includes && /<\/includes>/ {in_includes=0}
+    in_artifact_set && /<\/artifactSet>/ {in_artifact_set=0}
+  ' "${pom_file}" | sort -u > "${lines_file}"
   includes=()
   while IFS= read -r include; do
     includes+=("${include}")
-  done < <(
-    awk '
-      /<artifactSet>/ {in_artifact_set=1}
-      in_artifact_set && /<includes/ {in_includes=1}
-      in_includes {
-        line=$0
-        while (match(line, /<include>([^<]+)<\/include>/)) {
-          print substr(line, RSTART + 9, RLENGTH - 19)
-          line = substr(line, RSTART + RLENGTH)
-        }
-      }
-      in_includes && /<\/includes>/ {in_includes=0}
-      in_artifact_set && /<\/artifactSet>/ {in_artifact_set=0}
-    ' "${pom_file}" | sort -u
-  )
+  done < "${lines_file}"
 
+  runtime_coords "${tree_file}" > "${lines_file}"
   runtime_includes=()
   while IFS= read -r coord; do
     runtime_includes+=("${coord}")
-  done < <(runtime_coords "${tree_file}")
+  done < "${lines_file}"
 
   if [[ ${#includes[@]} -eq 0 ]]; then
     echo "FAIL ${module}: no <artifactSet><includes> entries found."
@@ -252,15 +272,17 @@ for module in "${SHADE_MODULES[@]}"; do
     fi
   done | sort -u > "${actual_file}"
 
+  comm -23 "${expected_file}" "${actual_file}" > "${lines_file}"
   missing_texts=()
   while IFS= read -r license_text; do
     missing_texts+=("${license_text}")
-  done < <(comm -23 "${expected_file}" "${actual_file}")
+  done < "${lines_file}"
 
+  comm -13 "${expected_file}" "${actual_file}" > "${lines_file}"
   orphaned_texts=()
   while IFS= read -r license_text; do
     orphaned_texts+=("${license_text}")
-  done < <(comm -13 "${expected_file}" "${actual_file}")
+  done < "${lines_file}"
 
   rm -f "${family_file}" "${expected_file}" "${actual_file}"
 
@@ -280,16 +302,15 @@ for module in "${SHADE_MODULES[@]}"; do
     echo "OK   ${module}: license texts match the bundled non-Apache-2.0 dependencies."
   fi
 
+  awk '
+    /This section summarizes those components and their licenses\./ {in_summary=1}
+    in_summary && prev != "" && /^-+$/ {print prev}
+    {prev=$0}
+  ' "${license_file}" | sed '/^$/d' > "${lines_file}"
   families=()
   while IFS= read -r family; do
     families+=("${family}")
-  done < <(
-    awk '
-      /This section summarizes those components and their licenses\./ {in_summary=1}
-      in_summary && prev != "" && /^-+$/ {print prev}
-      {prev=$0}
-    ' "${license_file}" | sed '/^$/d'
-  )
+  done < "${lines_file}"
 
   if [[ ${#families[@]} -eq 0 ]]; then
     echo "FAIL ${module}: no bundled license families were found in ${license_file}."

@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
@@ -242,10 +243,18 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
     # META-INF/licenses/ directory, which is attribution to keep.
     texts = {entry.split("/")[-1] for entry in names if entry.startswith("META-INF/licenses/LICENSE-")}
     includes = shade_includes(module / "pom.xml")
+    coords = tree_coords(tree)
+    # Either being empty would skip every dependency and report success.
+    if not includes:
+        raise SystemExit(f"FAIL {module.name}: no <artifactSet><includes> found in its pom.xml.")
+    if not coords:
+        raise SystemExit(f"FAIL {module.name}: {TREE} lists no dependencies.")
 
-    result: dict[str, list] = {"missing": [], "mismatched": [], "unresolved": [], "partial": []}
+    result: dict[str, list] = {"missing": [], "mismatched": [], "unresolved": [], "partial": [], "absent": []}
+    in_tree = {f"{group}:{artifact}" for group, artifact, _, _ in coords}
+    result["untracked"] = sorted(i for i in includes - in_tree if not i.startswith("org.apache.xtable:"))
     bundled = []
-    for group, artifact, version, classifier in tree_coords(tree):
+    for group, artifact, version, classifier in coords:
         if group == "org.apache.xtable" or f"{group}:{artifact}" not in includes:
             continue
         coord = f"{group}:{artifact}:{version}"
@@ -260,6 +269,7 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         if declared_classes:
             present = declared_classes & bundled_classes
             if not present:
+                result["absent"].append(coord)
                 continue
             if present != declared_classes:
                 result["partial"].append(f"{coord}  ({len(present)}/{len(declared_classes)} classes)")
@@ -292,12 +302,29 @@ REPORTS = [
     ("orphaned", "license texts with no bundled non-Apache-2.0 dependency"),
     ("partial", "dependencies only partly present, so they cannot be classified"),
     ("unresolved", "dependencies that could not be resolved or have no license"),
+    ("absent", "shade includes resolved by Maven but with no classes in the jar"),
+    ("untracked", "shade includes missing from the dependency tree, so never checked"),
 ]
+
+# Published shaded modules; xtable-utilities is not published yet (see AGENTS.md).
+SKIPPED_SHADE_MODULES = {"xtable-utilities"}
+
+
+def unbuilt_shade_modules(jars: list[pathlib.Path]) -> list[str]:
+    """Shaded modules with no bundled jar, which would otherwise go unchecked."""
+    poms = subprocess.run(
+        ["git", "grep", "-l", "<artifactId>maven-shade-plugin</artifactId>", "--", "*/pom.xml"],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    ).stdout.split()
+    modules = {str(pathlib.PurePosixPath(pom).parent) for pom in poms} - SKIPPED_SHADE_MODULES
+    built = {str(jar.resolve().parent.parent.relative_to(ROOT)) for jar in jars}
+    return sorted(modules - built)
 
 
 def main() -> None:
     """Check every bundled jar, or only those named on the command line."""
-    jars = [pathlib.Path(a) for a in sys.argv[1:]] or sorted(ROOT.glob("**/target/*-bundled.jar"))
+    named = [pathlib.Path(a) for a in sys.argv[1:]]
+    jars = named or sorted(ROOT.glob("**/target/*-bundled.jar"))
     if not jars:
         raise SystemExit(
             "FAIL: no */target/*-bundled.jar found; nothing was validated.\n"
@@ -305,6 +332,12 @@ def main() -> None:
         )
 
     status = 0
+    unbuilt = [] if named else unbuilt_shade_modules(jars)
+    if unbuilt:
+        status = 1
+        print("FAIL shaded modules with no bundled jar, so nothing of theirs was checked:")
+        for module in unbuilt:
+            print(f"  - {module}")
     for jar_path in jars:
         result = check(jar_path.parent.parent, jar_path)
         failed = False

@@ -113,6 +113,11 @@ jobs:
       - name: Validate Jar License Layout
         run: python3 release/scripts/validate_bundled_jar_license_layout.py
 
+      # Plants a fault for each check above and expects it to fail, so a check
+      # that silently stops checking (as with a missing rg) fails CI instead.
+      - name: Test The License Checks Fail When They Should
+        run: python3 release/scripts/test_license_checks.py
+
       # Nothing above this line resolves xtable-utilities or xtable-service:
       # `apache-rat:check` requires no dependency resolution, `dependency:tree`
       # collects poms rather than jars, and the shaded-bundle build reaches only
