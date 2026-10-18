@@ -81,6 +81,7 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.marker.MarkerType;
@@ -142,17 +143,35 @@ public abstract class TestAbstractHudiTable
   protected KeyGenerator keyGenerator;
   protected Schema schema;
   protected List<String> partitionFieldNames;
+  // Hudi table format version used when creating the test table. Defaults to version 6 (legacy 0.x
+  // timeline layout / column-stats index V1) to match the historical behaviour; tests covering the
+  // Hudi 1.x layout (column-stats index V2) can opt into version 9. See
+  // https://github.com/apache/incubator-xtable/issues/834.
+  protected HoodieTableVersion tableVersion = HoodieTableVersion.SIX;
 
   TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
+    this(name, schema, tempDir, partitionConfig, null);
+  }
+
+  /**
+   * @param basePath the base path as the writer spells it, or null to create the table under {@code
+   *     tempDir} at a {@code file:} URI. Spark and Hudi Streamer pass a base path through
+   *     unchanged, so a plain local path gives a table whose base path carries no scheme.
+   */
+  TestAbstractHudiTable(
+      String name, Schema schema, Path tempDir, String partitionConfig, String basePath) {
     try {
       this.tableName = name;
       this.schema = schema;
       // Initialize base path
-      this.basePath = initBasePath(tempDir, name);
+      this.basePath = basePath != null ? basePath : initBasePath(tempDir, name);
       // Add key generator
       this.typedProperties = new TypedProperties();
       typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
       typedProperties.put(HoodieMetadataConfig.ENABLE.key(), "true");
+      Properties tableFormatOverrides = tableFormatOverrides();
+      typedProperties.putAll(tableFormatOverrides);
+      this.tableVersion = tableVersionFrom(tableFormatOverrides, tableVersion);
       if (partitionConfig == null) {
         this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
         this.partitionFieldNames = Collections.emptyList();
@@ -441,14 +460,15 @@ public abstract class TestAbstractHudiTable
         HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
-    // Hudi 1.x MDT col-stats generation fails for array and map types, so only enable column
-    // stats when the schema does not contain those types.
-    // https://github.com/apache/incubator-xtable/issues/773
-    // boolean columnStatsSupported = !schemaContainsArrayOrMap(schema);
+    // A table format that supplies its own metadata, such as a pluggable format, can turn the
+    // Hudi metadata table off through the properties.
+    boolean metadataTableEnabled =
+        Boolean.parseBoolean(
+            keyGenProperties.getProperty(HoodieMetadataConfig.ENABLE.key(), "true"));
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
-            .enable(true)
-            .withMetadataIndexColumnStats(true)
+            .enable(metadataTableEnabled)
+            .withMetadataIndexColumnStats(metadataTableEnabled)
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
             .build();
     Properties lockProperties = new Properties();
@@ -457,10 +477,9 @@ public abstract class TestAbstractHudiTable
         LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
     return HoodieWriteConfig.newBuilder()
-        // Pin writes to table version 6 and disable auto-upgrade so the write client does not
-        // upgrade the test table to version 9. Table version 9 support will be added in a
-        // follow-up PR.
-        .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+        // Write at the configured table version (default 6) and disable auto-upgrade so the write
+        // client does not migrate the test table to a different version.
+        .withWriteTableVersion(tableVersion.versionCode())
         .withAutoUpgradeVersion(false)
         .withProperties(keyGenProperties)
         .withPath(this.basePath)
@@ -611,6 +630,62 @@ public abstract class TestAbstractHudiTable
       HoodieTableType hoodieTableType,
       Configuration conf,
       boolean populateMetaFields) {
+    return getMetaClient(
+        keyGenProperties, hoodieTableType, conf, populateMetaFields, new Properties());
+  }
+
+  /**
+   * Table-level properties selecting the pluggable table format named by the {@code
+   * hoodie.table.format} system property, empty when it is unset. A module whose tests all run
+   * against one format sets the property once for the JVM rather than threading properties through
+   * every table constructor.
+   */
+  protected static Properties tableFormatOverrides() {
+    return tableFormatOverrides(System.getProperty(HoodieTableConfig.TABLE_FORMAT.key()));
+  }
+
+  /** @param tableFormat the requested pluggable format, or null for Hudi's native format. */
+  static Properties tableFormatOverrides(String tableFormat) {
+    Properties overrides = new Properties();
+    if (tableFormat != null) {
+      overrides.put(HoodieTableConfig.TABLE_FORMAT.key(), tableFormat);
+      // A pluggable format reconstructs the timeline from its own metadata, which needs the v2
+      // timeline layout, and supplies the file listing that the Hudi metadata table would.
+      overrides.put(
+          HoodieTableConfig.VERSION.key(), String.valueOf(HoodieTableVersion.EIGHT.versionCode()));
+      // FileSystemBackedTableMetadata, which IcebergBackedTableMetadata extends, throws on every
+      // index lookup, so leaving the metadata table on fails with "Unsupported operation:
+      // getColumnsStats".
+      overrides.put(HoodieMetadataConfig.ENABLE.key(), "false");
+    }
+    return overrides;
+  }
+
+  /**
+   * Returns the table version named by {@code hoodie.table.version} in the given table-level
+   * properties, or {@code defaultVersion} when the properties do not set one.
+   */
+  protected static HoodieTableVersion tableVersionFrom(
+      Properties tableProperties, HoodieTableVersion defaultVersion) {
+    String configured = tableProperties.getProperty(HoodieTableConfig.VERSION.key());
+    return configured == null
+        ? defaultVersion
+        : HoodieTableVersion.fromVersionCode(Integer.parseInt(configured));
+  }
+
+  /**
+   * @param tableProperties table-level properties to persist into {@code hoodie.properties}, for
+   *     example {@code hoodie.table.format} or {@code hoodie.table.version}. {@code
+   *     builder.set(Map)} does not persist these, so they are applied through {@code
+   *     fromProperties} instead.
+   */
+  @SneakyThrows
+  protected HoodieTableMetaClient getMetaClient(
+      TypedProperties keyGenProperties,
+      HoodieTableType hoodieTableType,
+      Configuration conf,
+      boolean populateMetaFields,
+      Properties tableProperties) {
     LocalFileSystem fs = (LocalFileSystem) HadoopFSUtils.getFs(basePath, conf);
     // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
@@ -625,13 +700,17 @@ public abstract class TestAbstractHudiTable
     }
     @SuppressWarnings("unchecked")
     Map<String, Object> keyGenPropsMap = (Map) keyGenProperties;
+    Properties effectiveTableProperties = tableFormatOverrides();
+    effectiveTableProperties.putAll(tableProperties);
     return HoodieTableMetaClient.newTableBuilder()
         .set(keyGenPropsMap)
+        .fromProperties(effectiveTableProperties)
         .setTableName(tableName)
         .setTableType(hoodieTableType)
-        // Pin test tables to table version 6 to match the conversion target. Table version 9
-        // support will be added in a follow-up PR.
-        .setTableVersion(HoodieTableVersion.SIX)
+        // Use the configured table version (default 6) so tests can exercise both the legacy and
+        // Hudi 1.x layouts. A test may also set it through tableProperties, for example a
+        // pluggable table format that needs the v2 timeline.
+        .setTableVersion(tableVersion)
         .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
         .setPartitionFields(String.join(",", partitionFieldNames))
         .setRecordKeyFields(RECORD_KEY_FIELD_NAME)

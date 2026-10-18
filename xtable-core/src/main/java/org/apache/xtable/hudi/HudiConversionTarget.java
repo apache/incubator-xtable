@@ -27,13 +27,14 @@ import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -50,7 +51,7 @@ import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.client.timeline.HoodieTimelineArchiver;
-import org.apache.hudi.client.timeline.versioning.v1.TimelineArchiverV1;
+import org.apache.hudi.client.timeline.TimelineArchivers;
 import org.apache.hudi.common.HoodieCleanStat;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -79,7 +80,9 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
+import org.apache.hudi.metadata.MetadataPartitionType;
 import org.apache.hudi.table.HoodieJavaTable;
+import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -101,6 +104,10 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 
 @Log4j2
 public class HudiConversionTarget implements ConversionTarget {
+  // Commit extra-metadata key that marks a table whose file groups use the file-group prefix
+  // layout, where a file such as Paimon's <partition>/bucket-N/<file> is registered under
+  // <partition>.
+  static final String FILE_GROUP_PREFIX_LAYOUT = "XTABLE_HUDI_FILE_GROUP_PREFIX_LAYOUT";
   private BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private AvroSchemaConverter avroSchemaConverter;
   private HudiTableManager hudiTableManager;
@@ -112,6 +119,9 @@ public class HudiConversionTarget implements ConversionTarget {
   private CommitState commitState;
   // database to register the target table under, resolved from the target namespace
   private String databaseName;
+  // Hudi table format version to write (6 = legacy 0.x layout, 9 = Hudi 1.x layout), resolved from
+  // the xtable.hudi.target.table_version config; defaults to version 6.
+  private HoodieTableVersion tableVersion = HudiTargetConfig.DEFAULT_TABLE_VERSION;
 
   public HudiConversionTarget() {}
 
@@ -131,6 +141,9 @@ public class HudiConversionTarget implements ConversionTarget {
         HudiTableManager.of(configuration),
         CommitState::new);
     this.databaseName = resolveDatabaseName(targetTable);
+    this.tableVersion =
+        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties()).getTableVersion();
+    warnIfExistingTableVersionDiffers();
   }
 
   @VisibleForTesting
@@ -185,6 +198,30 @@ public class HudiConversionTarget implements ConversionTarget {
         HudiTableManager.of(configuration),
         CommitState::new);
     this.databaseName = resolveDatabaseName(targetTable);
+    this.tableVersion =
+        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties()).getTableVersion();
+    warnIfExistingTableVersionDiffers();
+  }
+
+  /**
+   * The configured table version applies only when the table is created, so an existing table keeps
+   * its own version.
+   */
+  private void warnIfExistingTableVersionDiffers() {
+    metaClient.ifPresent(
+        client -> {
+          HoodieTableVersion existingVersion = client.getTableConfig().getTableVersion();
+          if (existingVersion != tableVersion) {
+            log.warn(
+                "Hudi target table at {} is at table version {}, which differs from the configured {}={}."
+                    + " The configured version applies only when the table is created, so the table stays at version {}.",
+                tableDataPath,
+                existingVersion.versionCode(),
+                HudiTargetConfig.HUDI_TABLE_VERSION,
+                tableVersion.versionCode(),
+                existingVersion.versionCode());
+          }
+        });
   }
 
   /** Uses the first namespace level as the Hudi database name, or the default if none is set. */
@@ -269,6 +306,8 @@ public class HudiConversionTarget implements ConversionTarget {
         baseFileUpdatesExtractor.extractSnapshotChanges(
             partitionedDataFiles, getMetaClient(), commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
+    // A snapshot sync replaces every file group, so the table uses the file-group prefix layout.
+    commitState.setFileGroupPrefixLayout(true);
   }
 
   @Override
@@ -276,19 +315,65 @@ public class HudiConversionTarget implements ConversionTarget {
     if (!metaClient.isPresent()) {
       throw new IllegalStateException("Meta client is not initialized");
     }
+    boolean fileGroupPrefixLayout = lastCommitHasFileGroupPrefixLayout(metaClient.get());
+    if (!fileGroupPrefixLayout && hasPartitionSubdirectory(internalFilesDiff)) {
+      throw new NotSupportedException(
+          String.format(
+              "Hudi target table at %s registered files that have a partition subdirectory as"
+                  + " separate partitions, and an incremental sync cannot update this layout. Run"
+                  + " one sync with syncMode FULL, and incremental sync then resumes.",
+              tableDataPath));
+    }
     HoodieIndexVersion indexVersion =
         existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, metaClient.get());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.convertDiff(
             internalFilesDiff, commitState.getInstantTime(), indexVersion);
     commitState.setReplaceMetadata(replaceMetadata);
+    // An incremental sync keeps the file groups in place, so it carries the layout forward.
+    commitState.setFileGroupPrefixLayout(fileGroupPrefixLayout);
+  }
+
+  private static boolean hasPartitionSubdirectory(InternalFilesDiff internalFilesDiff) {
+    return Stream.concat(
+            internalFilesDiff.dataFilesAdded().stream(),
+            internalFilesDiff.dataFilesRemoved().stream())
+        .anyMatch(file -> file.getPartitionSubdirectory().isPresent());
+  }
+
+  /**
+   * A target written without {@link #FILE_GROUP_PREFIX_LAYOUT} registered files that have a
+   * partition subdirectory under {@code <partition>/<subdirectory>} partitions. A table without
+   * completed commits has no file groups, so it uses the new layout.
+   */
+  private static boolean lastCommitHasFileGroupPrefixLayout(HoodieTableMetaClient client) {
+    return client
+        .getActiveTimeline()
+        .getCommitsTimeline()
+        .filterCompletedInstants()
+        .lastInstant()
+        .toJavaOptional()
+        .map(
+            instant -> {
+              try {
+                return Boolean.parseBoolean(
+                    TimelineUtils.getCommitMetadata(instant, client.getActiveTimeline())
+                        .getExtraMetadata()
+                        .get(FILE_GROUP_PREFIX_LAYOUT));
+              } catch (IOException ex) {
+                throw new ReadException("Unable to read commit metadata for " + instant, ex);
+              }
+            })
+        .orElse(true);
   }
 
   @Override
   public void beginSync(InternalTable table) {
     if (!metaClient.isPresent()) {
       metaClient =
-          Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table, databaseName));
+          Optional.of(
+              hudiTableManager.initializeHudiTable(
+                  tableDataPath, table, databaseName, tableVersion));
     } else {
       // make sure meta client has up-to-date view of the timeline
       getMetaClient().reloadActiveTimeline();
@@ -316,6 +401,30 @@ public class HudiConversionTarget implements ConversionTarget {
                 .lastInstant()
                 .toJavaOptional()
                 .flatMap(instant -> getMetadata(instant, client)));
+  }
+
+  /**
+   * XTable 0.4.0 did not build the column-stats index for partitioned tables. Hudi cannot build it
+   * later for the externally created files, so a snapshot sync registers every file again with its
+   * stats.
+   */
+  @Override
+  public boolean isIncrementalSyncSafe() {
+    return metaClient
+        .map(
+            client -> {
+              if (!client.isTimelineNonEmpty()
+                  || client
+                      .getTableConfig()
+                      .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS)) {
+                return true;
+              }
+              log.info(
+                  "Hudi target table at {} has no column-stats index, so a snapshot sync builds it.",
+                  tableDataPath);
+              return false;
+            })
+        .orElse(true);
   }
 
   @Override
@@ -381,6 +490,7 @@ public class HudiConversionTarget implements ConversionTarget {
     private List<WriteStatus> writeStatuses;
     @Setter private Schema schema;
     @Setter private TableSyncMetadata tableSyncMetadata;
+    @Setter private boolean fileGroupPrefixLayout;
     private Map<String, List<String>> partitionToReplacedFileIds;
 
     private CommitState(
@@ -504,23 +614,33 @@ public class HudiConversionTarget implements ConversionTarget {
                       deletePathsForPartition -> {
                         String partition = deletePathsForPartition.getKey();
                         // we need to manipulate the path to properly clean from the metadata table,
-                        // so we map the file path to the base file
-                        Map<String, HoodieBaseFile> baseFilesByPath =
-                            fsView
-                                .getAllReplacedFileGroups(partition)
-                                .flatMap(HoodieFileGroup::getAllBaseFiles)
-                                .collect(
-                                    Collectors.toMap(HoodieBaseFile::getPath, Function.identity()));
+                        // so we map the file path to the base files that can be cleaned. A file
+                        // registered again by a snapshot sync has an older file slice in a live
+                        // file group with the same path, so the latest slice of a live file group
+                        // is never a candidate.
+                        Map<String, List<HoodieBaseFile>> cleanableBaseFilesByPath =
+                            Stream.concat(
+                                    fsView
+                                        .getAllFileGroups(partition)
+                                        .flatMap(fileGroup -> fileGroup.getAllBaseFiles().skip(1)),
+                                    fsView
+                                        .getAllReplacedFileGroups(partition)
+                                        .flatMap(HoodieFileGroup::getAllBaseFiles))
+                                .collect(Collectors.groupingBy(HoodieBaseFile::getPath));
                         return deletePathsForPartition.getValue().getValue().stream()
+                            .map(cleanFileInfo -> cleanFileInfo.getFilePath())
+                            .distinct()
+                            .flatMap(
+                                path ->
+                                    cleanableBaseFilesByPath
+                                        .getOrDefault(path, Collections.emptyList())
+                                        .stream())
                             .map(
-                                cleanFileInfo -> {
-                                  HoodieBaseFile baseFile =
-                                      baseFilesByPath.get(cleanFileInfo.getFilePath());
-                                  return new HoodieCleanFileInfo(
-                                      ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
-                                          baseFile.getFileName(), baseFile.getCommitTime()),
-                                      false);
-                                })
+                                baseFile ->
+                                    new HoodieCleanFileInfo(
+                                        ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                                            baseFile.getFileName(), baseFile.getCommitTime()),
+                                        false))
                             .collect(Collectors.toList());
                       }));
       // there is nothing to clean, so exit early
@@ -570,16 +690,17 @@ public class HudiConversionTarget implements ConversionTarget {
                       String partitionPath = entry.getKey();
                       List<String> deletePaths =
                           entry.getValue().stream()
-                              .map(HoodieCleanFileInfo::getFilePath)
+                              .map(cleanFileInfo -> cleanFileInfo.getFilePath())
                               .collect(Collectors.toList());
-                      return new HoodieCleanStat(
-                          HoodieCleaningPolicy.KEEP_LATEST_COMMITS,
-                          partitionPath,
-                          deletePaths,
-                          deletePaths,
-                          Collections.emptyList(),
-                          earliestInstant.get().requestedTime(),
-                          instantTime);
+                      return HoodieCleanStat.builder()
+                          .withPolicy(HoodieCleaningPolicy.KEEP_LATEST_COMMITS)
+                          .withPartitionPath(partitionPath)
+                          .withDeletePathPatterns(deletePaths)
+                          .withSuccessDeleteFiles(deletePaths)
+                          .withFailedDeleteFiles(Collections.emptyList())
+                          .withEarliestCommitToRetain(earliestInstant.get().requestedTime())
+                          .withLastCompletedCommitTimestamp(instantTime)
+                          .build();
                     })
                 .collect(Collectors.toList());
         HoodieCleanMetadata cleanMetadata =
@@ -599,9 +720,12 @@ public class HudiConversionTarget implements ConversionTarget {
 
     private void runArchiver(
         HoodieJavaTable<?> table, HoodieWriteConfig config, HoodieEngineContext engineContext) {
-      // trigger archiver manually
+      // trigger archiver manually, selecting the archiver implementation that matches the table's
+      // timeline layout (V1 for table version 6, V2/LSM for table version 9).
       try {
-        HoodieTimelineArchiver archiver = new TimelineArchiverV1(config, table);
+        HoodieTimelineArchiver archiver =
+            TimelineArchivers.getInstance(
+                table.getMetaClient().getTimelineLayoutVersion(), config, (HoodieTable) table);
         archiver.archiveIfRequired(engineContext, true);
       } catch (IOException ex) {
         throw new UpdateException("Unable to archive Hudi timeline", ex);
@@ -609,8 +733,11 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
-      Map<String, String> extraMetadata =
-          Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      Map<String, String> extraMetadata = new HashMap<>();
+      extraMetadata.put(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      if (fileGroupPrefixLayout) {
+        extraMetadata.put(FILE_GROUP_PREFIX_LAYOUT, Boolean.TRUE.toString());
+      }
       return Option.of(extraMetadata);
     }
 
@@ -622,10 +749,11 @@ public class HudiConversionTarget implements ConversionTarget {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
       return HoodieWriteConfig.newBuilder()
-          // Pin writes to table version 6 and disable auto-upgrade so the write client does not
-          // upgrade the table to version 9 (Hudi 1.x). Table version 9 support will be added in a
-          // follow-up PR, tracked in https://github.com/apache/incubator-xtable/issues/834.
-          .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+          // Write at the table's own format version (selected via xtable.hudi.target.table_version,
+          // default 6) and disable auto-upgrade so the write client never migrates the table to a
+          // different version behind our back. See
+          // https://github.com/apache/incubator-xtable/issues/834.
+          .withWriteTableVersion(metaClient.getTableConfig().getTableVersion().versionCode())
           .withAutoUpgradeVersion(false)
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
           .withPath(metaClient.getBasePath().toString())
@@ -648,14 +776,14 @@ public class HudiConversionTarget implements ConversionTarget {
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
                   .withProperties(properties)
-                  // Hudi 1.2.0 couples the partition-stats index to the column-stats index. For
-                  // partitioned tables, the partition-stats generation path rebuilds a file-system
-                  // view over the committed external parquet files and groups them by fileId.
-                  // XTable's externally-registered files have non-Hudi names whose fileId cannot be
-                  // parsed once the "_hudiext" marker is stripped, which leads to failures. So
-                  // column stats are only enabled for un-partitioned tables for now. Tracked in
-                  // https://github.com/apache/incubator-xtable/issues/832.
-                  .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
+                  // Build the column-stats index for all tables, but not the partition-stats
+                  // index. Its generation path rebuilds a file-system view over the committed
+                  // external parquet files and groups them by fileId, but XTable's
+                  // externally-registered files have non-Hudi names whose fileId cannot be parsed
+                  // once the "_hudiext" marker is stripped, which leads to failures on partitioned
+                  // tables.
+                  .withMetadataIndexColumnStats(true)
+                  .withMetadataIndexPartitionStats(false)
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
                   .build())
           .build();

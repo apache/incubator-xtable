@@ -96,6 +96,8 @@ public class TestConversionController {
   void setupTargetFormats() {
     when(mockConversionTarget1.getTableFormat()).thenReturn(ICEBERG);
     when(mockConversionTarget2.getTableFormat()).thenReturn(DELTA);
+    when(mockConversionTarget1.isIncrementalSyncSafe()).thenReturn(true);
+    when(mockConversionTarget2.isIncrementalSyncSafe()).thenReturn(true);
   }
 
   @Test
@@ -259,6 +261,60 @@ public class TestConversionController {
     Instant instantAsOfNow = Instant.now();
     Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
     when(mockConversionSource.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(false);
+
+    // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
+    when(mockConversionTarget1.getTableMetadata())
+        .thenReturn(
+            Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0")));
+    when(mockConversionTarget2.getTableMetadata())
+        .thenReturn(
+            Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0")));
+
+    when(mockConversionSource.getCurrentSnapshot()).thenReturn(internalSnapshot);
+    when(tableFormatSync.syncSnapshot(
+            argThat(containsAll(Arrays.asList(mockConversionTarget1, mockConversionTarget2))),
+            eq(internalSnapshot)))
+        .thenReturn(syncResults);
+    ConversionController conversionController =
+        new ConversionController(
+            mockConf,
+            mockConversionTargetFactory,
+            mockCatalogConversionFactory,
+            tableFormatSync,
+            catalogSync);
+    Map<String, SyncResult> result =
+        conversionController.sync(conversionConfig, mockConversionSourceProvider);
+    assertEquals(syncResults, result);
+  }
+
+  @Test
+  void testIncrementalSyncFallBackToSnapshotWhenTargetIsNotSafe() {
+    SyncMode syncMode = SyncMode.INCREMENTAL;
+    InternalTable internalTable = getInternalTable();
+    Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1", "0");
+    SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
+    Map<String, SyncResult> syncResults = new HashMap<>();
+    syncResults.put(TableFormat.ICEBERG, syncResult);
+    syncResults.put(TableFormat.DELTA, syncResult);
+    ConversionConfig conversionConfig =
+        getTableSyncConfig(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), syncMode);
+    when(mockConversionSourceProvider.getConversionSourceInstance(
+            conversionConfig.getSourceTable()))
+        .thenReturn(mockConversionSource);
+    when(mockConversionTargetFactory.createForFormat(
+            conversionConfig.getTargetTables().get(0), mockConf))
+        .thenReturn(mockConversionTarget1);
+    when(mockConversionTargetFactory.createForFormat(
+            conversionConfig.getTargetTables().get(1), mockConf))
+        .thenReturn(mockConversionTarget2);
+
+    Instant instantAsOfNow = Instant.now();
+    Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
+    when(mockConversionSource.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(true);
+    // The source allows an incremental sync, but both targets require a snapshot sync.
+    when(mockConversionTarget1.isIncrementalSyncSafe()).thenReturn(false);
+    when(mockConversionTarget2.isIncrementalSyncSafe()).thenReturn(false);
 
     // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
     when(mockConversionTarget1.getTableMetadata())

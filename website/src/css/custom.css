@@ -110,3 +110,37 @@ html[data-theme='dark'] {
     padding-left: 0;
     padding-right: 48px;
 }
+
+/* BlogLayout wraps the blog list and the single-post page in Infima's
+   .container, which caps at --ifm-container-width. That defaults to 1140px and
+   leaves a wide monitor mostly empty. Infima reads the variable on the element,
+   so setting it here widens only the blog pages and leaves the docs, the
+   release notes and the home page at the default line length. See
+   src/theme/BlogLayout/index.js. */
+.blogLayoutContainer {
+  --ifm-container-width: 1600px;
+  --ifm-container-width-xl: 1600px;
+}
+
+/* Blog list cards: two per row on wide screens, one per row on narrow ones.
+   This replaces an inline width:50% on the post container, which no stylesheet
+   could override, held at every breakpoint, and also applied to the single-post
+   page. See src/theme/BlogPostItem/Container/index.js. */
+.blogPostCard {
+  width: 50%;
+}
+
+@media (max-width: 996px) {
+  .blogPostCard {
+    width: 100%;
+  }
+}
+
+/* Blog list thumbnails differ in aspect ratio. Most are 2:1 and fill the column
+   at about 365px tall, so cap every thumbnail there: a near-square image then
+   stands as tall as its neighbours instead of pushing its title far below.
+   The same image is the hero on the single-post page, where there is no
+   neighbour to line up with, so scope the cap to the list cards. */
+.blogPostCard .blog-image {
+  max-height: 365px;
+}

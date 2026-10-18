@@ -33,7 +33,7 @@ HMS and AWS Glue are the two catalogs supported right now, support for other cat
 - Only Copy-on-Write or Read-Optimized views of tables are currently supported. This means that only the underlying parquet files are synced but log files from Hudi and [delete vectors](https://docs.delta.io/latest/delta-deletion-vectors.html#:~:text=Deletion%20vectors%20indicate%20changes%20to,is%20run%20on%20the%20table.) from Delta and Iceberg are not captured by the sync.
 
 ### Hudi
-- Hudi 0.14.0 is required when reading a Hudi target table. Users will also need to enable 
+- Hudi 0.14.0 or later is required when reading a Hudi target table. Users will also need to enable 
   - the metadata table (`hoodie.metadata.enable=true`) and 
   - hive style partitioning (`hoodie.datasource.write.hive_style_partitioning=true`) wherever applicable when reading the data.
 - Be sure to enable `parquet.avro.write-old-list-structure=false` for proper compatibility with lists when syncing from Hudi to Iceberg.
@@ -42,3 +42,7 @@ HMS and AWS Glue are the two catalogs supported right now, support for other cat
 ### Delta
 - When using Delta as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions for enabling column mapping [here](https://docs.delta.io/latest/delta-column-mapping.html).
 - When Delta is the source, Generated Columns are not synced to the target schema. For tables that are partitioned on Generated Columns, there is limited support. For example, we support date functions like transforming a timestamp to `yyyy-MM-dd` format. Please file a GitHub issue or pull-request for any cases that you think should be supported.
+
+### Parquet
+- Schema evolution across files in a Parquet source directory is not supported. XTable derives the table schema from the footer of a file with the most recent filesystem modification time; it does not merge or comprehensively validate schemas across all files. If the files have different schemas, synchronization may use a schema that does not represent every file or may fail while processing them. Copying or restoring files can also change their modification times and therefore change which schema XTable selects.
+- Hive-style partition columns that exist only in directory paths are not supported. When partition extraction is configured, XTable resolves each source field against the selected file's schema. If a partition column exists only in a directory path, such as `region=eu/`, XTable cannot synthesize the field or infer its type, and synchronization fails.

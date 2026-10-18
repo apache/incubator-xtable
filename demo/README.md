@@ -26,6 +26,9 @@ When you are done, use `./stop_demo.sh` to stop and remove the containers. Pass 
 ## Notebooks
 - `work/demo.ipynb` — the main demo: two existing datasets (Hudi and Delta) are synced across Hudi, Delta and Iceberg, updated from Trino, joined, and validated from Trino.
 
+## Standalone Spark demo
+- `spark-runtime/` — keeps a table interoperable by adding the `xtable-spark-runtime` jar with `--jars`. No Docker required; see `spark-runtime/README.md`.
+
 ## Accessing Services
 ### Jupyter Notebook
 To access the notebook, look for a log line during startup that contains `To access the server, open this file in a browser: ...  Or copy and paste one of these URLs: ...` and use the `http://127.0.0.1:8888/...` url to open the notebook in your browser. The demo is located at `work/demo.ipynb`. 

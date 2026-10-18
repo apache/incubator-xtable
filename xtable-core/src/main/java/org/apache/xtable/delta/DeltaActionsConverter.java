@@ -24,8 +24,6 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.hadoop.fs.Path;
-
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor;
@@ -82,7 +80,7 @@ public class DeltaActionsConverter {
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.path()))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.size())
         .lastModified(addFile.modificationTime())
@@ -110,7 +108,7 @@ public class DeltaActionsConverter {
       List<InternalPartitionField> partitionFields,
       DeltaPartitionExtractor partitionExtractor) {
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, removeFile.path()))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, removeFile.path()))
         .fileFormat(fileFormat)
         .partitionValues(
             partitionExtractor.partitionValueExtraction(
@@ -129,14 +127,7 @@ public class DeltaActionsConverter {
   }
 
   static String getFullPathToFile(Snapshot snapshot, String dataFilePath) {
-    return getFullPathToFile(tableBasePath(snapshot), dataFilePath);
-  }
-
-  static String getFullPathToFile(String tableBasePath, String dataFilePath) {
-    if (dataFilePath.startsWith(tableBasePath)) {
-      return dataFilePath;
-    }
-    return tableBasePath + Path.SEPARATOR + dataFilePath;
+    return DeltaPathUtils.getFullPathToFile(tableBasePath(snapshot), dataFilePath);
   }
 
   private static String tableBasePath(Snapshot snapshot) {
@@ -164,6 +155,6 @@ public class DeltaActionsConverter {
     }
 
     String dataFilePath = addFile.path();
-    return getFullPathToFile(tableBasePath, dataFilePath);
+    return DeltaPathUtils.getFullPathToFile(tableBasePath, dataFilePath);
   }
 }

@@ -25,13 +25,12 @@ import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.hadoop.fs.Path;
-
 import io.delta.kernel.Table;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 
+import org.apache.xtable.delta.DeltaPathUtils;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -69,7 +68,7 @@ public class DeltaKernelActionsConverter {
     long recordCount = fileStats.getNumRecords();
 
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(addFile.getPath(), tableBasePath))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.getPath()))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.getSize())
         .lastModified(addFile.getModificationTime())
@@ -93,7 +92,7 @@ public class DeltaKernelActionsConverter {
       DeltaKernelPartitionExtractor partitionExtractor,
       Map<String, String> partitionValues) {
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(removeFile.getPath(), tableBasePath))
+        .physicalPath(DeltaPathUtils.getFullPathToFile(tableBasePath, removeFile.getPath()))
         .fileFormat(fileFormat)
         .partitionValues(
             partitionExtractor.partitionValueExtraction(partitionValues, partitionFields))
@@ -120,24 +119,6 @@ public class DeltaKernelActionsConverter {
    */
   static String getFullPathToFile(String dataFilePath, Engine engine, Table table) {
     String tableBasePath = table.getPath(engine);
-    return getFullPathToFile(dataFilePath, tableBasePath);
-  }
-
-  /**
-   * Constructs the full path to a file using a provided base path (most efficient).
-   *
-   * @param dataFilePath the data file path (relative or absolute)
-   * @param tableBasePath the table base path
-   * @return the full absolute path to the file
-   */
-  static String getFullPathToFile(String dataFilePath, String tableBasePath) {
-    // Check if the file path is already absolute and under the table base path
-    // Use separator check to avoid false positives (e.g., "/foo" matching "/foobar/x.parquet")
-    String basePathWithSeparator =
-        tableBasePath.endsWith(Path.SEPARATOR) ? tableBasePath : tableBasePath + Path.SEPARATOR;
-    if (dataFilePath.startsWith(basePathWithSeparator)) {
-      return dataFilePath;
-    }
-    return basePathWithSeparator + dataFilePath;
+    return DeltaPathUtils.getFullPathToFile(tableBasePath, dataFilePath);
   }
 }

@@ -148,7 +148,7 @@ SELECT * FROM <database_name>.<table_name>;
 <TabItem value="delta">
 
 ```shell md title="shell"
-spark-sql --packages io.delta:delta-core_2.12:2.0.0 \
+spark-sql --packages io.delta:delta-core_2.12:2.4.0 \
 --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
 --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
 --conf "spark.sql.catalogImplementation=hive"
@@ -182,7 +182,7 @@ SELECT * FROM delta_db.<table_name>;
 <TabItem value="iceberg">
 
 ```shell md title="shell"
-spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.1 \
+spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2 \
 --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
 --conf "spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog" \
 --conf "spark.sql.catalog.spark_catalog.type=hive" \
