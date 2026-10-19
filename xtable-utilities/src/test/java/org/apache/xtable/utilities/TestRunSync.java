@@ -69,7 +69,7 @@ class TestRunSync {
   }
 
   @Test
-  public void testTargetPropertiesArePassedToTheirFormat(@TempDir Path tempDir) throws IOException {
+  public void testTargetTablesForEachFormat(@TempDir Path tempDir) throws IOException {
     Path configFile = tempDir.resolve("config.yaml");
     String config =
         "sourceFormat: ICEBERG\n"
@@ -78,6 +78,7 @@ class TestRunSync {
             + "  - DELTA\n"
             + "datasets:\n"
             + "  - tableBasePath: /tmp/warehouse/people\n"
+            + "    tableDataPath: /tmp/warehouse/people/data\n"
             + "    tableName: people\n"
             + "    targetProperties:\n"
             + "      HUDI:\n"
@@ -89,6 +90,9 @@ class TestRunSync {
         RunSync.targetTableBuilder(
             datasetConfig.getDatasets().get(0), null, Arrays.asList(HUDI, DELTA));
 
+    // a Hudi target sits at the data path, other targets at the table root
+    Assertions.assertEquals("file:///tmp/warehouse/people/data", targetTables.get(0).getBasePath());
+    Assertions.assertEquals("file:///tmp/warehouse/people", targetTables.get(1).getBasePath());
     Properties hudiProperties = new Properties();
     hudiProperties.setProperty("xtable.hudi.target.secondary.index.column", "email");
     Assertions.assertEquals(hudiProperties, targetTables.get(0).getAdditionalProperties());

@@ -146,7 +146,7 @@ public class RunSync {
                 tableFormat ->
                     TargetTable.builder()
                         .name(table.getTableName())
-                        .basePath(table.getTableBasePath())
+                        .basePath(getTargetBasePath(table, tableFormat))
                         .namespace(
                             table.getNamespace() == null ? null : table.getNamespace().split("\\."))
                         .catalogConfig(catalogConfig)
@@ -155,6 +155,18 @@ public class RunSync {
                         .build())
             .collect(Collectors.toList());
     return targetTables;
+  }
+
+  /**
+   * Hudi resolves partitions relative to its base path, so a Hudi target sits at the data path of
+   * the source, for example the {@code data} directory of an Iceberg table. Other targets sit at
+   * the table root.
+   */
+  private static String getTargetBasePath(DatasetConfig.Table table, String tableFormat) {
+    String tableDataPath = table.getTableDataPath();
+    return TableFormat.HUDI.equals(tableFormat) && tableDataPath != null && !tableDataPath.isEmpty()
+        ? tableDataPath
+        : table.getTableBasePath();
   }
 
   private static Properties getTargetProperties(DatasetConfig.Table table, String tableFormat) {
