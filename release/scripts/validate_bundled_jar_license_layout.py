@@ -44,6 +44,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CANONICAL = ("META-INF/LICENSE", "META-INF/NOTICE")
 # Inputs to the shade transformers. They belong in target/classes, never in a jar.
 NOT_PACKAGED = ("META-INF/LICENSE-bundled", "META-INF/NOTICE-bundled")
+CHECKED = set(CANONICAL) | set(NOT_PACKAGED)
 LICENSE_DIR = "META-INF/licenses/"
 LICENSE_LIKE = re.compile(r"licen[cs]e|notice", re.IGNORECASE)
 
@@ -60,8 +61,7 @@ def find_jars() -> list[pathlib.Path]:
 def check(jar: pathlib.Path) -> list[str]:
     with zipfile.ZipFile(jar) as archive:
         entries = set(archive.namelist())
-        interesting = set(CANONICAL) | set(NOT_PACKAGED)
-        contents = {name: archive.read(name) for name in entries & interesting}
+        contents = {name: archive.read(name) for name in entries & CHECKED}
     problems = []
 
     for name in CANONICAL:
@@ -75,30 +75,20 @@ def check(jar: pathlib.Path) -> list[str]:
             detail = f" (byte-identical to {canonical})" if same else ""
             problems.append(f"{name} should not be packaged{detail}")
 
-    # Any other directory of license texts, e.g. the META-INF/license netty ships.
-    # Matched on a path segment being exactly license/licenses, so that classes
-    # like org/apache/ivy/core/module/descriptor/License.class are not mistaken
-    # for one. Classes never carry license text, so they are out of scope anyway.
-    other_dirs = set()
-    for name in entries:
-        if name.endswith((".class", "/")) or name.startswith(LICENSE_DIR):
+    # Any other directory of license texts, e.g. the META-INF/license netty ships,
+    # matched on a whole path segment so License.class and the like are not; and
+    # loose files outside one, such as a dependency's root LICENSE.txt.
+    other_dirs, loose = set(), []
+    for name in sorted(entries):
+        if name.endswith((".class", "/")) or name.startswith(LICENSE_DIR) or name in CHECKED:
             continue
         parts = name.split("/")[:-1]
         if any(part.lower() in ("license", "licenses") for part in parts):
             other_dirs.add("/".join(parts) + "/")
-    other_dirs = sorted(other_dirs)
-    for directory in other_dirs:
-        problems.append(f"license texts outside {LICENSE_DIR}: {directory}")
-
-    # Loose files, such as a dependency's root LICENSE.txt, outside any such directory.
-    known = set(CANONICAL) | set(NOT_PACKAGED)
-    for name in sorted(entries):
-        if name.endswith((".class", "/")) or name.startswith(LICENSE_DIR) or name in known:
-            continue
-        if any(name.startswith(directory) for directory in other_dirs):
-            continue
-        if LICENSE_LIKE.search(name.rsplit("/", 1)[-1]):
-            problems.append(f"license file outside {LICENSE_DIR}: {name}")
+        elif LICENSE_LIKE.search(name.rsplit("/", 1)[-1]):
+            loose.append(name)
+    problems += [f"license texts outside {LICENSE_DIR}: {directory}" for directory in sorted(other_dirs)]
+    problems += [f"license file outside {LICENSE_DIR}: {name}" for name in loose]
 
     return problems
 

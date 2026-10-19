@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -44,9 +45,10 @@ EXTENSIONS = "xtable-hudi-support/xtable-hudi-support-extensions"
 UTILS_JAR_GLOB = "xtable-hudi-support/xtable-hudi-support-utils/target/*.jar"
 SPARK_JAR_GLOB = "xtable-spark-runtime/target/xtable-spark-runtime_*.jar"
 AWS_LICENSES = "xtable-aws/src/main/resources/META-INF/licenses"
-# Tools the coverage script uses, linked into a bare PATH for the missing-tool test.
-SHELL_TOOLS = ("bash", "git", "grep", "sed", "awk", "sort", "comm", "diff", "mktemp",
-               "dirname", "rm", "cat", "basename", "printf", "xargs", "head")
+# The coverage script's required tools, read from its own check, plus bash.
+SHELL_TOOLS = ("bash", *re.search(
+    r"^for tool in (.*); do$", (ROOT / SCRIPTS / "validate_shaded_license_coverage.sh").read_text(), re.M
+).group(1).split())
 
 
 def build_outputs() -> list[pathlib.Path]:
@@ -174,7 +176,7 @@ class CoverageTest(ValidatorTest):
         self.assertFails(self.SCRIPT, "LICENSE-jta")
 
     def test_orphaned_license_text(self) -> None:
-        self.box.path("xtable-aws/src/main/resources/META-INF/licenses/LICENSE-not-bundled").write_text("text\n")
+        self.box.path(f"{AWS_LICENSES}/LICENSE-not-bundled").write_text("text\n")
         self.assertFails(self.SCRIPT, "LICENSE-not-bundled")
 
     def test_empty_dependency_tree(self) -> None:
@@ -259,7 +261,6 @@ class JarLayoutTest(ValidatorTest):
     def test_second_license_directory(self) -> None:
         self.box.rewrite_jar(self.box.one(UTILS_JAR_GLOB), add={"license/LICENSE.other.txt": "text\n"})
         self.assertFails(self.SCRIPT, "license texts outside")
-
 
     def test_loose_license_file(self) -> None:
         # How hamcrest's root LICENSE.txt reached the hive-metastore bundle.

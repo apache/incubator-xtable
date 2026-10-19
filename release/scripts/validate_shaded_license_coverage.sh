@@ -26,7 +26,7 @@ cd "${ROOT_DIR}"
 
 # A missing tool must fail the run, not read as empty output: rg being absent
 # once let every check here pass vacuously.
-for tool in git grep sed awk sort comm diff mktemp head dirname basename rm; do
+for tool in git grep sed awk sort comm diff mktemp head dirname rm cut uniq; do
   if ! command -v "${tool}" > /dev/null; then
     echo "FAIL required command not found: ${tool}"
     exit 1
@@ -92,7 +92,17 @@ embedded_text_owner() {
   esac
 }
 
+# Prints a FAIL for the module when the file of offending entries is non-empty.
+report_texts() {
+  [[ -s "$2" ]] || return 0
+  echo "FAIL ${module}: $1"
+  sed 's/^/  - /' "$2"
+  overall_status=1
+  texts_failed=1
+}
+
 SCALA_BINARY_VERSION="$(sed -n 's:.*<scala.binary.version>\(.*\)</scala.binary.version>.*:\1:p' pom.xml | head -n 1)"
+# Keep in sync with SKIPPED_SHADE_MODULES in validate_bundled_license_texts.py.
 SKIPPED_SHADE_MODULES=(
   "xtable-utilities"
 )
@@ -246,11 +256,12 @@ for module in "${SHADE_MODULES[@]}"; do
   # already confirmed covers every shaded include.
   licenses_dir="${module}/src/main/resources/META-INF/licenses"
   family_file="${scratch_dir}/families"
+  text_family_file="${scratch_dir}/text-families"
   expected_file="${scratch_dir}/expected"
   actual_file="${scratch_dir}/actual"
-  text_family_file="${scratch_dir}/text-families"
-  : > "${expected_file}"
-  : > "${text_family_file}"
+  unowned_file="${scratch_dir}/unowned"
+  : > "${actual_file}"
+  : > "${unowned_file}"
 
   awk '
     /This section summarizes those components and their licenses\./ {in_summary=1; prev=""; next}
@@ -263,85 +274,45 @@ for module in "${SHADE_MODULES[@]}"; do
     {prev=$0}
   ' "${license_file}" | sort -u > "${family_file}"
 
-  for include in "${includes[@]}"; do
-    include="$(resolve_property "${include}")"
-
-    if [[ "${include}" == org.apache.xtable:* ]]; then
-      continue
-    fi
-
-    # An include absent from LICENSE-bundled was already reported above.
-    family="$(awk -F'\t' -v coord="${include}" '$1 == coord {print $2; exit}' "${family_file}")"
-    if [[ -n "${family}" && "${family}" != "Apache License 2.0" ]]; then
-      printf 'LICENSE-%s\n' "${include##*:}" >> "${expected_file}"
-      printf 'LICENSE-%s\t%s\n' "${include##*:}" "${family}" >> "${text_family_file}"
-    fi
-  done
-
-  sort -u "${expected_file}" -o "${expected_file}"
-
-  # Texts are named by artifactId, so one file cannot serve two licenses.
-  sort -u "${text_family_file}" \
-    | awk -F'\t' '{n[$1]++} END {for (name in n) if (n[name] > 1) print name}' \
-    | sort > "${lines_file}"
-  shared_texts=()
-  while IFS= read -r license_text; do
-    shared_texts+=("${license_text}")
-  done < "${lines_file}"
+  # LICENSE-<artifactId> and family for each non-Apache include. An include
+  # absent from LICENSE-bundled was already reported above.
+  awk -F'\t' '
+    NR == FNR {family[$1] = $2; next}
+    $0 !~ /^org\.apache\.xtable:/ && ($0 in family) && family[$0] != "Apache License 2.0" {
+      n = split($0, coord, ":")
+      print "LICENSE-" coord[n] "\t" family[$0]
+    }
+  ' "${family_file}" "${include_set_file}" | sort -u > "${text_family_file}"
+  cut -f1 "${text_family_file}" | sort -u > "${expected_file}"
 
   # Curated texts are named LICENSE-<artifactId> with no extension. The *.txt
   # files are texts a dependency ships for code it embeds (#701); each must
   # belong to a bundled dependency, per embedded_text_owner.
-  unowned_texts=()
   for license_text in "${licenses_dir}"/*; do
-    if [[ -f "${license_text}" && "${license_text}" != *.txt ]]; then
-      basename "${license_text}"
-    elif [[ -f "${license_text}" ]]; then
-      owner="$(embedded_text_owner "$(basename "${license_text}")")"
-      if [[ -z "${owner}" ]] || ! grep -qxF "${owner}" "${include_set_file}"; then
-        unowned_texts+=("$(basename "${license_text}")${owner:+ (from ${owner}, which is not bundled)}")
-      fi
+    [[ -f "${license_text}" ]] || continue
+    name="${license_text##*/}"
+    if [[ "${name}" != *.txt ]]; then
+      echo "${name}" >> "${actual_file}"
+      continue
     fi
-  done > "${actual_file}"
+    owner="$(embedded_text_owner "${name}")"
+    if [[ -z "${owner}" ]] || ! grep -qxF "${owner}" "${include_set_file}"; then
+      echo "${name}${owner:+ (from ${owner}, which is not bundled)}" >> "${unowned_file}"
+    fi
+  done
   sort -u "${actual_file}" -o "${actual_file}"
 
-  comm -23 "${expected_file}" "${actual_file}" > "${lines_file}"
-  missing_texts=()
-  while IFS= read -r license_text; do
-    missing_texts+=("${license_text}")
-  done < "${lines_file}"
+  comm -23 "${expected_file}" "${actual_file}" > "${scratch_dir}/missing"
+  comm -13 "${expected_file}" "${actual_file}" > "${scratch_dir}/orphaned"
+  # Texts are named by artifactId, so one file cannot serve two licenses.
+  cut -f1 "${text_family_file}" | sort | uniq -d > "${scratch_dir}/shared"
 
-  comm -13 "${expected_file}" "${actual_file}" > "${lines_file}"
-  orphaned_texts=()
-  while IFS= read -r license_text; do
-    orphaned_texts+=("${license_text}")
-  done < "${lines_file}"
-
-  if [[ ${#missing_texts[@]} -gt 0 ]]; then
-    overall_status=1
-    echo "FAIL ${module}: bundled dependencies with no license text in ${licenses_dir}:"
-    printf '  - %s\n' "${missing_texts[@]}"
-  fi
-
-  if [[ ${#orphaned_texts[@]} -gt 0 ]]; then
-    overall_status=1
-    echo "FAIL ${module}: license texts in ${licenses_dir} with no bundled dependency behind them:"
-    printf '  - %s\n' "${orphaned_texts[@]}"
-  fi
-
-  if [[ ${#unowned_texts[@]} -gt 0 ]]; then
-    overall_status=1
-    echo "FAIL ${module}: embedded license texts in ${licenses_dir} with no bundled dependency behind them:"
-    printf '  - %s\n' "${unowned_texts[@]}"
-  fi
-
-  if [[ ${#shared_texts[@]} -gt 0 ]]; then
-    overall_status=1
-    echo "FAIL ${module}: license texts needed by dependencies under different licenses:"
-    printf '  - %s\n' "${shared_texts[@]}"
-  fi
-
-  if [[ ${#missing_texts[@]} -eq 0 && ${#orphaned_texts[@]} -eq 0 && ${#unowned_texts[@]} -eq 0 && ${#shared_texts[@]} -eq 0 ]]; then
+  texts_failed=0
+  report_texts "bundled dependencies with no license text in ${licenses_dir}:" "${scratch_dir}/missing"
+  report_texts "license texts in ${licenses_dir} with no bundled dependency behind them:" "${scratch_dir}/orphaned"
+  report_texts "embedded license texts in ${licenses_dir} with no bundled dependency behind them:" "${unowned_file}"
+  report_texts "license texts needed by dependencies under different licenses:" "${scratch_dir}/shared"
+  if [[ ${texts_failed} -eq 0 ]]; then
     echo "OK   ${module}: license texts match the bundled non-Apache-2.0 dependencies."
   fi
 
