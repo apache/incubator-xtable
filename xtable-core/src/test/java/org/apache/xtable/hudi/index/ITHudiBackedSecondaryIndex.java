@@ -323,9 +323,9 @@ public class ITHudiBackedSecondaryIndex {
     }
   }
 
-  /** Hudi needs every file under its base path, the table location. */
+  /** Hudi needs every file under its base path, the data location. */
   @Test
-  void dataFileOutsideTableLocationFailsSync() throws Exception {
+  void dataFileOutsideDataLocationFailsSync() throws Exception {
     String tableName = "test_table_" + UUID.randomUUID().toString().replace("-", "_");
     try (TestIcebergTable table =
         TestIcebergTable.forStandardSchemaAndPartitioning(
@@ -341,8 +341,7 @@ public class ITHudiBackedSecondaryIndex {
                   .iterator()
                   .next()
                   .location());
-      Path outside =
-          new Path(tempDir.resolve("outside").toString(), UUID.randomUUID() + ".parquet");
+      Path outside = new Path(icebergTable.location(), "outside/" + UUID.randomUUID() + ".parquet");
       FileSystem fs = source.getFileSystem(jsc.hadoopConfiguration());
       FileUtil.copy(fs, source, fs, outside, false, jsc.hadoopConfiguration());
       appendDataFile(icebergTable, outside);
@@ -465,7 +464,7 @@ public class ITHudiBackedSecondaryIndex {
       syncIndex(sourceTable, INDEXED_COLUMN);
       Path unfinishedPartition =
           new Path(
-              table.getBasePath(), ".hoodie/metadata/secondary_index_" + SECOND_INDEXED_COLUMN);
+              table.getDataPath(), ".hoodie/metadata/secondary_index_" + SECOND_INDEXED_COLUMN);
       FileSystem fs = unfinishedPartition.getFileSystem(jsc.hadoopConfiguration());
       assertTrue(fs.mkdirs(unfinishedPartition));
       assertTrue(newIndexReader(sourceTable).doesIndexExist(INDEXED_COLUMN));
@@ -532,15 +531,14 @@ public class ITHudiBackedSecondaryIndex {
   }
 
   /**
-   * Syncs the table to a Hudi target under its base path with a secondary index on the column, as
-   * {@code RunSync} does with the column in the Hudi target properties. Returns the result of the
-   * Hudi target, which is null when the table has no new commit to sync.
+   * Syncs the table to a Hudi target at its data path with a secondary index on the column. Returns
+   * the result of the Hudi target, which is null when the table has no new commit to sync.
    */
   private static SyncResult runIndexSync(SourceTable sourceTable, String column) {
     TargetTable targetTable =
         TargetTable.builder()
             .name(sourceTable.getName())
-            .basePath(sourceTable.getBasePath())
+            .basePath(sourceTable.getDataPath())
             .formatName(TableFormat.HUDI)
             .additionalProperties(indexProperties(column))
             .build();

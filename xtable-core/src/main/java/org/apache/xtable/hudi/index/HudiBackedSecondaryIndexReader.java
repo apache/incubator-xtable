@@ -66,10 +66,10 @@ import org.apache.xtable.schema.SparkSchemaExtractor;
 /**
  * Reads the secondary index of a table of any source format, and returns the file and row position
  * of each match. The index is built by syncing the table to a Hudi target with {@link
- * org.apache.xtable.hudi.HudiTargetConfig#SECONDARY_INDEX_COLUMN} set, with the base path of the
- * source table as the base path of the target. Because the data files carry no Hudi record keys,
- * the record key of a row is {@code <file path relative to the base path>_<row position>}, which
- * the lookup resolves back to a file path and row position.
+ * org.apache.xtable.hudi.HudiTargetConfig#SECONDARY_INDEX_COLUMN} set, with the data path of the
+ * source table as the base path of the target, as for any Hudi target. Because the data files carry
+ * no Hudi record keys, the record key of a row is {@code <file path relative to the data path>_<row
+ * position>}, which the lookup resolves back to a file path and row position.
  *
  * <p>Hudi keys the index by the string of Spark's internal value of the column: the day count of a
  * DATE, the microseconds of a TIMESTAMP (with or without time zone) and the plain string of other
@@ -95,6 +95,7 @@ public class HudiBackedSecondaryIndexReader
   private static final String NTZ_EPOCH = "TIMESTAMP_NTZ'1970-01-01 00:00:00'";
 
   private final String tableLocation;
+  private final String dataPath;
   private final SourceTable sourceTable;
   private final ConversionSourceProvider<?> sourceProvider;
   private final SparkSession sparkSession;
@@ -102,7 +103,7 @@ public class HudiBackedSecondaryIndexReader
   private final HoodieSparkEngineContext engineContext;
 
   /**
-   * @param sourceTable the indexed table. Its base path is the base path of the Hudi target
+   * @param sourceTable the indexed table. Its data path is the base path of the Hudi target
    * @param sourceProvider the provider of the conversion source for the format of the table, which
    *     reads the type of the looked up column. The lookup initializes it with the Hadoop
    *     configuration of the Spark session
@@ -117,6 +118,7 @@ public class HudiBackedSecondaryIndexReader
         "A Hudi table has its own metadata table and cannot be the source of the index");
     this.sourceTable = sourceTable;
     this.tableLocation = sourceTable.getBasePath();
+    this.dataPath = sourceTable.getDataPath();
     this.sparkSession = sparkSession;
     this.javaSparkContext = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     this.engineContext = new HoodieSparkEngineContext(javaSparkContext);
@@ -174,14 +176,14 @@ public class HudiBackedSecondaryIndexReader
   @Override
   public boolean doesIndexExist(String columnName) {
     return HudiBackedSecondaryIndexUtils.getIndexedColumns(
-            tableLocation, javaSparkContext.hadoopConfiguration())
+            dataPath, javaSparkContext.hadoopConfiguration())
         .contains(columnName);
   }
 
   @Override
   public Optional<String> getLastSyncedSourceIdentifier() {
     return HudiBackedSecondaryIndexUtils.getLastSyncedSourceIdentifier(
-        tableLocation, javaSparkContext.hadoopConfiguration());
+        dataPath, javaSparkContext.hadoopConfiguration());
   }
 
   @Override
@@ -189,7 +191,7 @@ public class HudiBackedSecondaryIndexReader
     HudiBackedSecondaryIndexUtils.checkIndexedTable(tableLocation, table);
     HoodieTableMetaClient metaClient =
         HudiBackedSecondaryIndexUtils.getMetaClient(
-            tableLocation, javaSparkContext.hadoopConfiguration());
+            dataPath, javaSparkContext.hadoopConfiguration());
     if (!HudiBackedSecondaryIndexUtils.getIndexedColumns(metaClient).contains(columnName)) {
       throw new IllegalStateException(
           "The secondary index of column "
@@ -213,20 +215,18 @@ public class HudiBackedSecondaryIndexReader
             metaClient
                 .getTableFormat()
                 .getMetadataFactory()
-                .create(engineContext, metaClient.getStorage(), metadataConfig, tableLocation)) {
+                .create(engineContext, metaClient.getStorage(), metadataConfig, dataPath)) {
       HoodiePairData<String, String> recordKeysBySecondaryKey =
           tableMetadata.readSecondaryIndexDataTableRecordKeysWithKeys(
               HoodieJavaRDD.of(secondaryKeys), PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
       // capture the field so the closure does not serialize the index instance
-      String tableLocation = this.tableLocation;
+      String dataPath = this.dataPath;
       JavaRDD<Row> lookupResults =
           toJavaPairRDD(recordKeysBySecondaryKey)
               .map(
                   recordKeyBySecondaryKey ->
                       toLookupResult(
-                          tableLocation,
-                          recordKeyBySecondaryKey._1(),
-                          recordKeyBySecondaryKey._2()));
+                          dataPath, recordKeyBySecondaryKey._1(), recordKeyBySecondaryKey._2()));
       StructType resultSchema =
           new StructType()
               .add(SECONDARY_KEY_COLUMN, DataTypes.StringType, false)
@@ -261,7 +261,7 @@ public class HudiBackedSecondaryIndexReader
     return javaSparkContext.parallelizePairs(pairs);
   }
 
-  private static Row toLookupResult(String tableLocation, String secondaryKey, String recordKey) {
+  private static Row toLookupResult(String dataPath, String secondaryKey, String recordKey) {
     // record keys generated by Hudi for files without record keys are "<relative path>_<row
     // position>"
     int positionSeparator = recordKey.lastIndexOf('_');
@@ -272,7 +272,7 @@ public class HudiBackedSecondaryIndexReader
     String relativeFilePath = recordKey.substring(0, positionSeparator);
     return RowFactory.create(
         secondaryKey,
-        FSUtils.constructAbsolutePath(tableLocation, relativeFilePath).toString(),
+        FSUtils.constructAbsolutePath(dataPath, relativeFilePath).toString(),
         Long.parseLong(recordKey.substring(positionSeparator + 1)));
   }
 }

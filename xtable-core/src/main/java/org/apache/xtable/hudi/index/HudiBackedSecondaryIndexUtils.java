@@ -110,15 +110,15 @@ public final class HudiBackedSecondaryIndexUtils {
             "The index belongs to table %s but got table %s", tableLocation, table.getBasePath()));
   }
 
-  static HoodieTableMetaClient getMetaClient(String basePath, Configuration configuration) {
-    HoodieStorage storage = new HoodieHadoopStorage(basePath, configuration);
-    return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(basePath).build();
+  static HoodieTableMetaClient getMetaClient(String dataPath, Configuration configuration) {
+    HoodieStorage storage = new HoodieHadoopStorage(dataPath, configuration);
+    return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(dataPath).build();
   }
 
   /** Returns the columns whose index exists, or an empty set when there is no Hudi table yet. */
-  static Set<String> getIndexedColumns(String basePath, Configuration configuration) {
+  static Set<String> getIndexedColumns(String dataPath, Configuration configuration) {
     try {
-      return getIndexedColumns(getMetaClient(basePath, configuration));
+      return getIndexedColumns(getMetaClient(dataPath, configuration));
     } catch (TableNotFoundException e) {
       return Collections.emptySet();
     }
@@ -147,10 +147,10 @@ public final class HudiBackedSecondaryIndexUtils {
    * commit makes no Hudi commit, so the identifier stays at the last synced source commit.
    */
   static Optional<String> getLastSyncedSourceIdentifier(
-      String basePath, Configuration configuration) {
+      String dataPath, Configuration configuration) {
     HoodieTableMetaClient metaClient;
     try {
-      metaClient = getMetaClient(basePath, configuration);
+      metaClient = getMetaClient(dataPath, configuration);
     } catch (TableNotFoundException e) {
       return Optional.empty();
     }
@@ -167,7 +167,7 @@ public final class HudiBackedSecondaryIndexUtils {
       return TableSyncMetadata.fromJson(syncMetadata).map(TableSyncMetadata::getSourceIdentifier);
     } catch (IOException e) {
       throw new UncheckedIOException(
-          "Failed to read the XTable sync metadata of " + lastCommit.get() + " in " + basePath, e);
+          "Failed to read the XTable sync metadata of " + lastCommit.get() + " in " + dataPath, e);
     }
   }
 }
