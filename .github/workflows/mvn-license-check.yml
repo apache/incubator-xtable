@@ -100,7 +100,7 @@ jobs:
       - name: Build Shaded Bundles
         run: >
           ./mvnw -B -DskipTests -Dmaven.build.cache.enabled=false
-          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions
+          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions,xtable-spark-runtime
           -am package
           dependency:tree -DoutputType=text -DoutputFile=target/dependency-tree.txt
 
@@ -110,7 +110,7 @@ jobs:
       # Nothing above this line resolves xtable-utilities or xtable-service:
       # `apache-rat:check` requires no dependency resolution, `dependency:tree`
       # collects poms rather than jars, and the shaded-bundle build reaches only
-      # the `-am` closure of the three modules it names, which excludes both
+      # the `-am` closure of the four modules it names, which excludes both
       # leaves. Without this step the entry never gains the Quarkus stack or
       # xtable-utilities' bundled dependencies, and Maven CI Build - which
       # cannot write the cache - would re-download them from Central on every
