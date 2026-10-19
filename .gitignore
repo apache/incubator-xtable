@@ -54,3 +54,6 @@ spec/generated
 demo/notebook/spark-warehouse/
 demo/notebook/metastore_db/
 demo/notebook/derby.log
+
+# Written by maven-shade-plugin in xtable-spark-runtime
+dependency-reduced-pom.xml
