@@ -94,6 +94,24 @@ def shade_includes(pom: pathlib.Path) -> set[str]:
     }
 
 
+def shade_relocations(pom: pathlib.Path) -> list[tuple[str, str]]:
+    """(from, to) class-path prefixes for each <relocation>, so relocated classes still match."""
+    relocations = []
+    for body in re.findall(r"<relocation>(.*?)</relocation>", pom.read_text(), re.DOTALL):
+        # Partial relocations would need shade's own matching; refuse rather than misjudge.
+        if re.search(r"<(includes|excludes|rawString)>", body):
+            raise SystemExit(f"FAIL {pom}: relocations with includes, excludes or rawString are not supported.")
+        pattern, shaded = _tag(body, "pattern"), _tag(body, "shadedPattern")
+        relocations.append((pattern.replace(".", "/") + "/", shaded.replace(".", "/") + "/"))
+    return relocations
+
+
+def relocate(entry: str, relocations: list[tuple[str, str]]) -> str:
+    for prefix, shaded in relocations:
+        if entry.startswith(prefix):
+            return shaded + entry[len(prefix):]
+    return entry
+
 
 def dependency_jar(group: str, artifact: str, version: str, classifier: str) -> pathlib.Path:
     """Where a resolved coordinate lives in the local repository."""
@@ -107,7 +125,10 @@ def class_entries(jar: pathlib.Path) -> set[str]:
         return {
             entry
             for entry in archive.namelist()
-            if entry.endswith(".class") and entry.rsplit("/", 1)[-1] not in DROPPED_BY_SHADE
+            if entry.endswith(".class")
+            and entry.rsplit("/", 1)[-1] not in DROPPED_BY_SHADE
+            # Multi-release copies of base classes; bundles may filter them out.
+            and not entry.startswith("META-INF/versions/")
         }
 
 
@@ -248,6 +269,7 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
     # META-INF/licenses/ directory, which is attribution to keep.
     texts = {entry.split("/")[-1] for entry in names if entry.startswith("META-INF/licenses/LICENSE-")}
     includes = shade_includes(module / "pom.xml")
+    relocations = shade_relocations(module / "pom.xml")
     coords = tree_coords(tree)
     # Either being empty would skip every dependency and report success.
     if not includes:
@@ -270,7 +292,7 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         # A dependency in both the tree and <includes> is bundled. Classes are
         # how that gets verified; native-binary and aggregator jars have none,
         # so they are taken at their word rather than skipped.
-        declared_classes = class_entries(jar)
+        declared_classes = {relocate(entry, relocations) for entry in class_entries(jar)}
         if declared_classes:
             present = declared_classes & bundled_classes
             if not present:

@@ -42,6 +42,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPTS = "release/scripts"
 EXTENSIONS = "xtable-hudi-support/xtable-hudi-support-extensions"
 UTILS_JAR_GLOB = "xtable-hudi-support/xtable-hudi-support-utils/target/*.jar"
+SPARK_JAR_GLOB = "xtable-spark-runtime/target/xtable-spark-runtime_*.jar"
 # Tools the coverage script uses, linked into a bare PATH for the missing-tool test.
 SHELL_TOOLS = ("bash", "git", "grep", "sed", "awk", "sort", "comm", "diff", "mktemp",
                "dirname", "rm", "cat", "basename", "printf", "xargs", "head")
@@ -203,6 +204,22 @@ class BundledTextsTest(ValidatorTest):
     def test_missing_license_text(self) -> None:
         self.box.rewrite_jar(self.box.one(f"{EXTENSIONS}/target/*-bundled.jar"), drop="META-INF/licenses/LICENSE-paranamer")
         self.assertFails(self.SCRIPT, "paranamer")
+
+    # xtable-spark-runtime ships its shaded jar as the main artifact, not *-bundled.jar.
+    def test_spark_runtime_missing_license_text(self) -> None:
+        self.box.rewrite_jar(self.box.one(SPARK_JAR_GLOB), drop="META-INF/licenses/LICENSE-checker-qual")
+        self.assertFails(self.SCRIPT, "checker-qual")
+
+    def test_spark_runtime_not_built(self) -> None:
+        self.box.one(SPARK_JAR_GLOB).unlink()
+        self.assertFails(self.SCRIPT, "xtable-spark-runtime")
+
+    def test_relocation_not_followed(self) -> None:
+        # The unmodified tree passes only if relocated classes are matched, not skipped.
+        pom = self.box.path("xtable-spark-runtime/pom.xml")
+        text = pom.read_text().replace("<pattern>org.yaml.snakeyaml</pattern>", "<pattern>org.example.none</pattern>", 1)
+        self.box.rewrite(pom, text)
+        self.assertFails(self.SCRIPT, "org.yaml:snakeyaml")
 
 
 class JarLayoutTest(ValidatorTest):

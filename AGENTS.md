@@ -100,6 +100,7 @@ Current shaded modules include:
 - `xtable-aws`
 - `xtable-hive-metastore`
 - `xtable-hudi-support/xtable-hudi-support-extensions`
+- `xtable-spark-runtime` (the shaded jar is the main artifact, with relocations)
 - `xtable-utilities`
 
 `xtable-utilities` is intentionally skipped by `release/scripts/validate_shaded_license_coverage.sh` while it is not published. Keep its bundled metadata useful for local builds, but do not treat it as release-blocking until that artifact is published.
