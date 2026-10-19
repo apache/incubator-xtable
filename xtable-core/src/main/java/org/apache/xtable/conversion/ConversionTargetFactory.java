@@ -94,15 +94,15 @@ public class ConversionTargetFactory {
     while (true) {
       ConversionTarget target;
       try {
-        // hasNext() loads provider classes lazily, so it can throw too.
+        // hasNext() resolves provider classes lazily, so it throws too and has to be guarded.
         if (!iterator.hasNext()) {
           break;
         }
         target = iterator.next();
       } catch (ServiceConfigurationError | LinkageError error) {
-        // The target's engine is not on the classpath. Skip it; if it is the requested format,
-        // the NotSupportedException below reports it.
-        log.warn("Skipping a ConversionTarget whose engine is not on the classpath", error);
+        // A registered target whose engine library is absent. Skip it so a subset of engines works;
+        // a missing engine for the requested format still fails below as NotSupportedException.
+        log.warn("Skipping a ConversionTarget whose engine library is not on the classpath", error);
         continue;
       }
       if (target.getTableFormat().equalsIgnoreCase(tableFormatName)

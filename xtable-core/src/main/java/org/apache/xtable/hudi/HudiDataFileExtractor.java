@@ -22,15 +22,21 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.fs.Path;
 
@@ -50,6 +56,7 @@ import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.table.view.FileSystemViewManager;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.FileSystemViewStorageType;
@@ -57,6 +64,8 @@ import org.apache.hudi.common.table.view.SyncableFileSystemView;
 import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.StoragePathInfo;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.NotSupportedException;
@@ -71,6 +80,7 @@ import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /** Extracts all the files for Hudi table represented by {@link InternalTable}. */
+@Log4j2
 public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieTableMetadata tableMetadata;
   private final HoodieTableMetaClient metaClient;
@@ -80,6 +90,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieMetadataConfig metadataConfig;
   private final FileSystemViewManager fileSystemViewManager;
   private final Path basePath;
+  // Previous-commit metadata read to recover cleaned files, keyed by instant time. The extractor
+  // lives for a single sync, so each instant is read at most once per sync.
+  private final Map<String, Optional<HoodieCommitMetadata>> prevCommitMetadataCache =
+      new HashMap<>();
 
   public HudiDataFileExtractor(
       HoodieTableMetaClient metaClient,
@@ -107,6 +121,21 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 .build(),
             HoodieCommonConfig.newBuilder().build(),
             meta -> tableMetadata);
+    this.metaClient = metaClient;
+    this.partitionValuesExtractor = hudiPartitionValuesExtractor;
+    this.fileStatsExtractor = hudiFileStatsExtractor;
+  }
+
+  public HudiDataFileExtractor(
+      HoodieTableMetaClient metaClient,
+      PathBasedPartitionValuesExtractor hudiPartitionValuesExtractor,
+      HudiFileStatsExtractor hudiFileStatsExtractor,
+      FileSystemViewManager fileSystemViewManager) {
+    this.engineContext = new HoodieLocalEngineContext(metaClient.getStorageConf());
+    this.metadataConfig = HoodieMetadataConfig.newBuilder().enable(false).build();
+    this.basePath = HadoopFSUtils.convertToHadoopPath(metaClient.getBasePath());
+    this.tableMetadata = null;
+    this.fileSystemViewManager = fileSystemViewManager;
     this.metaClient = metaClient;
     this.partitionValuesExtractor = hudiPartitionValuesExtractor;
     this.fileStatsExtractor = hudiFileStatsExtractor;
@@ -145,6 +174,263 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
 
+  /**
+   * Derives the file diff from the metadata of the commit being written, rather than by comparing
+   * two committed states as {@link #getDiffForCommit(HoodieInstant, InternalTable, HoodieInstant,
+   * HoodieTimeline)} does. Requires the constructor taking a {@link FileSystemViewManager}, since
+   * it reads the live file system view. Log files are skipped, so merge-on-read updates are not
+   * represented.
+   */
+  public InternalFilesDiff getDiffFromCommitMetadata(
+      InternalTable table, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    List<InternalDataFile> filesToRemove = new ArrayList<>();
+    StoragePath qualifiedBasePath = qualifiedBasePath();
+    Map<String, StoragePathInfo> fullPathInfo =
+        commitMetadata.getFullPathToInfo(metaClient.getStorage(), qualifiedBasePath.toString());
+    commitMetadata
+        .getPartitionToWriteStats()
+        .forEach(
+            (partitionPath, writeStats) -> {
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              Map<String, HoodieBaseFile> currentBaseFilesInPartition =
+                  previousBaseFileVersions(fsView, partitionPath, commit.requestedTime());
+              for (HoodieWriteStat writeStat : writeStats) {
+                if (FSUtils.isLogFile(new StoragePath(writeStat.getPath()))) {
+                  continue;
+                }
+                StoragePath baseFileFullPath =
+                    FSUtils.constructAbsolutePath(qualifiedBasePath, writeStat.getPath());
+                if (FSUtils.getCommitTimeWithFullPath(baseFileFullPath.toString())
+                    .equals(commit.requestedTime())) {
+                  // getFullPathToInfo keys the map by the absolute path, not the file name
+                  StoragePathInfo pathInfo = fullPathInfo.get(baseFileFullPath.toString());
+                  if (pathInfo == null) {
+                    throw new ReadException(
+                        "Commit metadata has no file info for base file " + baseFileFullPath);
+                  }
+                  filesAddedWithoutStats.add(
+                      buildFileWithoutStats(partitionValues, new HoodieBaseFile(pathInfo)));
+                }
+                if (currentBaseFilesInPartition.containsKey(writeStat.getFileId())) {
+                  filesToRemove.add(
+                      buildFileWithoutStats(
+                          partitionValues, currentBaseFilesInPartition.get(writeStat.getFileId())));
+                }
+              }
+            });
+    List<InternalDataFile> filesAdded =
+        fileStatsExtractor
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+            .collect(Collectors.toList());
+    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
+  }
+
+  /**
+   * Derives the file diff a completed rollback produces, from the rollback's own metadata rather
+   * than by comparing timeline states: the base files the rollback deleted leave, and every file
+   * group the rolled-back commits touched comes back with its latest base file, which is live again
+   * now that the commits are gone. Those file groups are the ones the rollback deleted files from,
+   * whose previous version an upsert had superseded, and the ones whose files the target removed
+   * when it recorded the rolled-back commits, which is how a clustering, an insert overwrite or a
+   * delete partition replaced them: the rollback deletes no file of a replaced file group, and the
+   * replace commit's metadata, which names them, is already deleted. Log files are skipped. Only
+   * files of commits in {@code publishedCommitTimes} are removed, since a commit that never reached
+   * the target has nothing there to remove.
+   *
+   * @param publishedCommitTimes requested times of the commits the target has recorded
+   * @param filesRemovedByRolledBackCommits paths of the base files the target removed when it
+   *     recorded the rolled-back commits
+   */
+  public InternalFilesDiff getDiffFromRollbackMetadata(
+      InternalTable table,
+      HoodieRollbackMetadata rollbackMetadata,
+      Set<String> publishedCommitTimes,
+      Collection<String> filesRemovedByRolledBackCommits) {
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    // The rollback has just deleted files and removed the instant, so refresh the cached view.
+    fsView.sync();
+    List<InternalDataFile> filesToRemove = new ArrayList<>();
+    Map<String, Set<String>> fileIdsToRestoreByPartition =
+        fileIdsByPartition(filesRemovedByRolledBackCommits);
+    rollbackMetadata
+        .getPartitionMetadata()
+        .forEach(
+            (partitionPath, partitionMetadata) -> {
+              List<String> deletedBaseFiles =
+                  partitionMetadata.getSuccessDeleteFiles().stream()
+                      .filter(path -> FSUtils.isBaseFile(new StoragePath(path)))
+                      .filter(
+                          path ->
+                              publishedCommitTimes.contains(
+                                  FSUtils.getCommitTimeWithFullPath(path)))
+                      .collect(Collectors.toList());
+              if (deletedBaseFiles.isEmpty()) {
+                return;
+              }
+              filesToRemove.addAll(
+                  getRemovedFiles(partitionPath, deletedBaseFiles, table.getPartitioningFields()));
+              deletedBaseFiles.forEach(
+                  path ->
+                      fileIdsToRestoreByPartition
+                          .computeIfAbsent(partitionPath, key -> new HashSet<>())
+                          .add(FSUtils.getFileIdFromFilePath(new StoragePath(path))));
+            });
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    fileIdsToRestoreByPartition.forEach(
+        (partitionPath, fileIdsToRestore) -> {
+          List<PartitionValue> partitionValues =
+              partitionValuesExtractor.extractPartitionValues(
+                  table.getPartitioningFields(), partitionPath);
+          fsView
+              .getLatestBaseFiles(partitionPath)
+              .filter(baseFile -> fileIdsToRestore.contains(baseFile.getFileId()))
+              .forEach(
+                  baseFile ->
+                      filesAddedWithoutStats.add(buildFileWithoutStats(partitionValues, baseFile)));
+        });
+    List<InternalDataFile> filesAdded =
+        fileStatsExtractor
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+            .collect(Collectors.toList());
+    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
+  }
+
+  /**
+   * The base path qualified with the storage scheme and authority, so the paths of the files a
+   * commit wrote match the paths the file system view lists for the files it superseded. A table
+   * created from a plain local path has an unqualified base path, and Iceberg ignores a delete
+   * whose path differs from the one the file was added under, which would leave both versions of a
+   * rewritten file group in the Iceberg table.
+   */
+  private StoragePath qualifiedBasePath() {
+    return metaClient.getBasePath().makeQualified(metaClient.getStorage().getUri());
+  }
+
+  /**
+   * Groups base file paths by their partition path, keeping the file ID of each, since a file ID is
+   * only unique within its partition.
+   */
+  private Map<String, Set<String>> fileIdsByPartition(Collection<String> baseFilePaths) {
+    Map<String, Set<String>> fileIdsByPartition = new HashMap<>();
+    for (String path : baseFilePaths) {
+      StoragePath baseFilePath = new StoragePath(path);
+      // Compares the paths without scheme and authority, so a qualified path matches a plain one.
+      fileIdsByPartition
+          .computeIfAbsent(
+              FSUtils.getRelativePartitionPath(metaClient.getBasePath(), baseFilePath.getParent()),
+              key -> new HashSet<>())
+          .add(FSUtils.getFileIdFromFilePath(baseFilePath));
+    }
+    return fileIdsByPartition;
+  }
+
+  /**
+   * The latest base file of each file group in the partition other than the files the given commit
+   * wrote, so the result is the same whether or not the view has been synced past that commit.
+   */
+  private static Map<String, HoodieBaseFile> previousBaseFileVersions(
+      SyncableFileSystemView fsView, String partitionPath, String commitTime) {
+    return fsView
+        .getAllBaseFiles(partitionPath)
+        .filter(baseFile -> !commitTime.equals(baseFile.getCommitTime()))
+        .collect(
+            Collectors.toMap(
+                HoodieBaseFile::getFileId,
+                Function.identity(),
+                (first, second) ->
+                    InstantComparison.compareTimestamps(
+                            first.getCommitTime(),
+                            InstantComparison.GREATER_THAN,
+                            second.getCommitTime())
+                        ? first
+                        : second));
+  }
+
+  /**
+   * Replace-commit counterpart of {@link #getDiffFromCommitMetadata}. Files the replace commit
+   * supersedes are reported as removed, files it wrote as added.
+   */
+  public InternalFilesDiff getDiffFromReplaceCommitMetadata(
+      InternalTable table,
+      HoodieReplaceCommitMetadata replaceCommitMetadata,
+      HoodieInstant commit) {
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    List<InternalDataFile> filesToRemove = new ArrayList<>();
+    StoragePath qualifiedBasePath = qualifiedBasePath();
+    Map<String, StoragePathInfo> fullPathInfo =
+        replaceCommitMetadata.getFullPathToInfo(
+            metaClient.getStorage(), qualifiedBasePath.toString());
+    replaceCommitMetadata
+        .getPartitionToReplaceFileIds()
+        .forEach(
+            (partitionPath, fileIds) -> {
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              Map<String, HoodieBaseFile> currentBaseFilesInPartition =
+                  fsView
+                      .getLatestBaseFiles(partitionPath)
+                      .collect(Collectors.toMap(HoodieBaseFile::getFileId, Function.identity()));
+              filesToRemove.addAll(
+                  fileIds.stream()
+                      .map(
+                          fileId -> {
+                            HoodieBaseFile replaced = currentBaseFilesInPartition.get(fileId);
+                            if (replaced == null) {
+                              throw new ReadException(
+                                  String.format(
+                                      "Replaced file group %s in partition %s has no base file in"
+                                          + " the file system view at %s",
+                                      fileId, partitionPath, commit));
+                            }
+                            return buildFileWithoutStats(partitionValues, replaced);
+                          })
+                      .collect(Collectors.toList()));
+            });
+    replaceCommitMetadata
+        .getPartitionToWriteStats()
+        .forEach(
+            (partitionPath, writeStats) -> {
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              filesAddedWithoutStats.addAll(
+                  writeStats.stream()
+                      .map(
+                          writeStat ->
+                              FSUtils.constructAbsolutePath(qualifiedBasePath, writeStat.getPath())
+                                  .toString())
+                      .filter(
+                          baseFileFullPath ->
+                              FSUtils.getCommitTimeWithFullPath(baseFileFullPath)
+                                  .equals(commit.requestedTime()))
+                      .map(
+                          baseFileFullPath -> {
+                            // getFullPathToInfo keys the map by the absolute path and carries the
+                            // file length, without which the registered file cannot be scanned
+                            StoragePathInfo pathInfo = fullPathInfo.get(baseFileFullPath);
+                            if (pathInfo == null) {
+                              throw new ReadException(
+                                  "Commit metadata has no file info for base file "
+                                      + baseFileFullPath);
+                            }
+                            return new HoodieBaseFile(pathInfo);
+                          })
+                      .map(hoodieBaseFile -> buildFileWithoutStats(partitionValues, hoodieBaseFile))
+                      .collect(Collectors.toList()));
+            });
+    List<InternalDataFile> filesAdded =
+        fileStatsExtractor
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+            .collect(Collectors.toList());
+    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
+  }
+
   private AddedAndRemovedFiles getAddedAndRemovedPartitionInfo(
       HoodieTimeline timeline,
       HoodieInstant instant,
@@ -165,16 +451,13 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .getPartitionToWriteStats()
               .forEach(
                   (partitionPath, writeStats) -> {
-                    Set<String> affectedFileIds =
-                        writeStats.stream()
-                            .map(HoodieWriteStat::getFileId)
-                            .collect(Collectors.toSet());
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
+                            timeline,
                             instantToConsider,
                             partitionPath,
-                            affectedFileIds,
+                            writeStats,
                             partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
@@ -261,11 +544,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<InternalPartitionField> partitioningFields) {
     List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
+    // Rollback metadata records the paths as the writer spelled them, which under a plain base
+    // path means without a scheme, while the files were added to the target under the qualified
+    // form; the qualified base path always has a scheme to supply.
+    URI basePathUri = qualifiedBasePath().toUri();
     return deletedPaths.stream()
         .map(
             path -> {
               try {
-                URI basePathUri = basePath.toUri();
                 if (path.startsWith(basePathUri.getScheme())) {
                   return path;
                 }
@@ -282,10 +568,26 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   private AddedAndRemovedFiles getUpdatesToPartition(
       TableFileSystemView fsView,
+      HoodieTimeline timeline,
       HoodieInstant instantToConsider,
       String partitionPath,
-      Set<String> affectedFileIds,
+      List<HoodieWriteStat> writeStats,
       List<InternalPartitionField> partitioningFields) {
+    Set<String> affectedFileIds =
+        writeStats.stream().map(HoodieWriteStat::getFileId).collect(Collectors.toSet());
+    // Build a map from fileId → prevCommit for file groups that are UPSERTs (not brand-new).
+    // Used below to recover the old file path when CLEAN has already deleted it from the FS.
+    Map<String, String> fileIdToPrevCommit =
+        writeStats.stream()
+            .filter(
+                ws ->
+                    ws.getPrevCommit() != null
+                        && !HoodieTimeline.INIT_INSTANT_TS.equals(ws.getPrevCommit()))
+            .collect(
+                Collectors.toMap(
+                    HoodieWriteStat::getFileId,
+                    HoodieWriteStat::getPrevCommit,
+                    (existing, replacement) -> existing));
     List<InternalDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     List<PartitionValue> partitionValues =
@@ -300,6 +602,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
               List<HoodieBaseFile> baseFiles =
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
               boolean newBaseFileAdded = false;
+              boolean removeEmitted = false;
               for (HoodieBaseFile baseFile : baseFiles) {
                 if (baseFile.getCommitTime().equals(instantToConsider.requestedTime())) {
                   newBaseFileAdded = true;
@@ -308,11 +611,67 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   // if a new base file was added, then the previous base file for the group needs
                   // to be removed
                   filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
+                  removeEmitted = true;
                   break;
+                }
+              }
+              // Recover old file path from timeline when CLEAN deleted it before this sync.
+              if (newBaseFileAdded && !removeEmitted) {
+                String fileId = fileGroup.getFileGroupId().getFileId();
+                String prevCommit = fileIdToPrevCommit.get(fileId);
+                if (prevCommit != null) {
+                  recoverRemovedFile(timeline, partitionPath, fileId, prevCommit, partitionValues)
+                      .ifPresent(filesToRemove::add);
                 }
               }
             });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
+  }
+
+  /**
+   * Looks up the previous base file path from the timeline when CLEAN has already deleted it from
+   * storage, so the downstream format can emit a proper REMOVE for the stale file.
+   *
+   * @return the old {@link InternalDataFile}, or empty if the previous commit is no longer in the
+   *     visible timeline (e.g. archived before this sync ran)
+   */
+  Optional<InternalDataFile> recoverRemovedFile(
+      HoodieTimeline timeline,
+      String partitionPath,
+      String fileId,
+      String prevCommitTime,
+      List<PartitionValue> partitionValues) {
+    return prevCommitMetadataCache
+        .computeIfAbsent(prevCommitTime, commitTime -> readCommitMetadata(timeline, commitTime))
+        .flatMap(
+            prevMeta ->
+                prevMeta
+                    .getPartitionToWriteStats()
+                    .getOrDefault(partitionPath, Collections.emptyList())
+                    .stream()
+                    .filter(ws -> fileId.equals(ws.getFileId()))
+                    .findFirst()
+                    .map(
+                        ws ->
+                            buildFileWithoutStats(
+                                partitionValues, new HoodieBaseFile(ws.getPath()))));
+  }
+
+  private Optional<HoodieCommitMetadata> readCommitMetadata(
+      HoodieTimeline timeline, String commitTime) {
+    return timeline.getInstants().stream()
+        .filter(hoodieInstant -> commitTime.equals(hoodieInstant.requestedTime()))
+        .findFirst()
+        .flatMap(
+            instant -> {
+              try {
+                return Optional.of(timeline.readCommitMetadata(instant));
+              } catch (IOException e) {
+                log.warn(
+                    "Unable to read previous commit {} to recover removed files", commitTime, e);
+                return Optional.empty();
+              }
+            });
   }
 
   private AddedAndRemovedFiles getUpdatesToPartitionForReplaceCommit(

@@ -74,7 +74,29 @@ class TestTableSyncMetadata {
             "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"instantsToConsiderForNextSync\":[],\"version\":0,\"sourceTableFormat\":\"TEST\",\"sourceIdentifier\":\"0\"}"),
         Arguments.of(
             TableSyncMetadata.of(Instant.parse("2020-07-04T10:15:30.00Z"), null, "TEST", "0"),
-            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"version\":0,\"sourceTableFormat\":\"TEST\",\"sourceIdentifier\":\"0\"}"));
+            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"version\":0,\"sourceTableFormat\":\"TEST\",\"sourceIdentifier\":\"0\"}"),
+        // Version 0 with the `latestTableOperationIdentifier` field a pluggable table format writes
+        Arguments.of(
+            TableSyncMetadata.of(
+                Instant.parse("2020-07-04T10:15:30.00Z"),
+                Collections.emptyList(),
+                "HUDI",
+                "20200704101530000",
+                "20200704101530000.commit"),
+            "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"instantsToConsiderForNextSync\":[],\"version\":0,\"sourceTableFormat\":\"HUDI\",\"sourceIdentifier\":\"20200704101530000\",\"latestTableOperationIdentifier\":\"20200704101530000.commit\"}"));
+  }
+
+  @Test
+  void ignoresFieldsAddedByANewerWriter() {
+    // The blob lives in target-table metadata, so a reader on an older version has to keep
+    // parsing a version-0 payload that a newer writer extended with fields it does not know.
+    TableSyncMetadata parsed =
+        TableSyncMetadata.fromJson(
+                "{\"lastInstantSynced\":\"2020-07-04T10:15:30Z\",\"instantsToConsiderForNextSync\":[],\"version\":0,\"fieldFromANewerWriter\":\"ignored\"}")
+            .get();
+    assertEquals(
+        TableSyncMetadata.of(Instant.parse("2020-07-04T10:15:30.00Z"), Collections.emptyList()),
+        parsed);
   }
 
   @Test
