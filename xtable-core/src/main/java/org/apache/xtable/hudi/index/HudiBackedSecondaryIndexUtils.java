@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.index;
+package org.apache.xtable.hudi.index;
 
 import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_SECONDARY_INDEX_PREFIX;
 
@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -33,6 +34,8 @@ import lombok.NoArgsConstructor;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.TimelineUtils;
 import org.apache.hudi.exception.TableNotFoundException;
 import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
@@ -41,17 +44,18 @@ import com.google.common.base.Preconditions;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 /**
- * Shared parts of {@link HudiBackedSecondaryIndexWriter} and {@link
+ * Shared parts of the Hudi target, which builds the secondary index, and {@link
  * HudiBackedSecondaryIndexReader}.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-final class HudiBackedSecondaryIndexUtils {
+public final class HudiBackedSecondaryIndexUtils {
   // types whose values Hudi renders as their plain string, a day count or microseconds
   private static final Set<InternalType> SUPPORTED_KEY_TYPES =
       EnumSet.of(
@@ -82,7 +86,7 @@ final class HudiBackedSecondaryIndexUtils {
    * Returns the field of the given column, and checks that the index supports its type. Hudi
    * renders a BINARY, FIXED or UUID value as an object reference, so those types are not supported.
    */
-  static InternalField getIndexableField(InternalSchema schema, String column) {
+  public static InternalField getIndexableField(InternalSchema schema, String column) {
     InternalField field =
         schema.getAllFields().stream()
             .filter(candidate -> candidate.getPath().equals(column))
@@ -106,15 +110,15 @@ final class HudiBackedSecondaryIndexUtils {
             "The index belongs to table %s but got table %s", tableLocation, table.getBasePath()));
   }
 
-  static HoodieTableMetaClient getMetaClient(String dataPath, Configuration configuration) {
-    HoodieStorage storage = new HoodieHadoopStorage(dataPath, configuration);
-    return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(dataPath).build();
+  static HoodieTableMetaClient getMetaClient(String basePath, Configuration configuration) {
+    HoodieStorage storage = new HoodieHadoopStorage(basePath, configuration);
+    return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(basePath).build();
   }
 
   /** Returns the columns whose index exists, or an empty set when there is no Hudi table yet. */
-  static Set<String> getIndexedColumns(String dataPath, Configuration configuration) {
+  static Set<String> getIndexedColumns(String basePath, Configuration configuration) {
     try {
-      return getIndexedColumns(getMetaClient(dataPath, configuration));
+      return getIndexedColumns(getMetaClient(basePath, configuration));
     } catch (TableNotFoundException e) {
       return Collections.emptySet();
     }
@@ -135,5 +139,35 @@ final class HudiBackedSecondaryIndexUtils {
         .filter(partition -> partition.startsWith(PARTITION_NAME_SECONDARY_INDEX_PREFIX))
         .map(partition -> partition.substring(PARTITION_NAME_SECONDARY_INDEX_PREFIX.length()))
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * Returns the source commit identifier in the sync metadata of the last completed commit, or
+   * empty when there is no Hudi table or no completed commit yet. A sync without a new source
+   * commit makes no Hudi commit, so the identifier stays at the last synced source commit.
+   */
+  static Optional<String> getLastSyncedSourceIdentifier(
+      String basePath, Configuration configuration) {
+    HoodieTableMetaClient metaClient;
+    try {
+      metaClient = getMetaClient(basePath, configuration);
+    } catch (TableNotFoundException e) {
+      return Optional.empty();
+    }
+    Optional<HoodieInstant> lastCommit =
+        metaClient.getCommitsTimeline().filterCompletedInstants().lastInstant().toJavaOptional();
+    if (!lastCommit.isPresent()) {
+      return Optional.empty();
+    }
+    try {
+      String syncMetadata =
+          TimelineUtils.getCommitMetadata(lastCommit.get(), metaClient.getActiveTimeline())
+              .getExtraMetadata()
+              .get(TableSyncMetadata.XTABLE_METADATA);
+      return TableSyncMetadata.fromJson(syncMetadata).map(TableSyncMetadata::getSourceIdentifier);
+    } catch (IOException e) {
+      throw new UncheckedIOException(
+          "Failed to read the XTable sync metadata of " + lastCommit.get() + " in " + basePath, e);
+    }
   }
 }

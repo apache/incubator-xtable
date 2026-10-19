@@ -91,6 +91,7 @@ import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.hudi.engine.HudiExecutionEngineProvider;
 import org.apache.xtable.hudi.engine.HudiExecutionEngineProviderFactory;
+import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexUtils;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
@@ -252,6 +253,9 @@ public class HudiConversionTarget implements ConversionTarget {
 
   @Override
   public void syncSchema(InternalSchema schema) {
+    targetConfig
+        .getSecondaryIndexColumn()
+        .ifPresent(column -> HudiBackedSecondaryIndexUtils.getIndexableField(schema, column));
     if (metaClient.isPresent()) {
       validateRecordKeysAreNotModified(schema);
     }

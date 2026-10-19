@@ -85,6 +85,7 @@ public class TestHudiTargetConfig {
   void parsesSecondaryIndexSettings() {
     Properties props = new Properties();
     props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    props.setProperty(HudiTargetConfig.EXECUTION_ENGINE, "spark");
     props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, " id ");
     props.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "2");
     props.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "4");
@@ -107,6 +108,7 @@ public class TestHudiTargetConfig {
   void rejectsMoreThanOneSecondaryIndexColumn() {
     Properties props = new Properties();
     props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    props.setProperty(HudiTargetConfig.EXECUTION_ENGINE, "spark");
     props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "id,name");
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
@@ -120,6 +122,16 @@ public class TestHudiTargetConfig {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
     assertTrue(exception.getMessage().contains(HudiTargetConfig.HUDI_TABLE_VERSION));
+  }
+
+  @Test
+  void secondaryIndexRequiresSparkEngine() {
+    Properties props = new Properties();
+    props.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    props.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "id");
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> HudiTargetConfig.fromProperties(props));
+    assertTrue(exception.getMessage().contains(HudiTargetConfig.EXECUTION_ENGINE));
   }
 
   @ParameterizedTest

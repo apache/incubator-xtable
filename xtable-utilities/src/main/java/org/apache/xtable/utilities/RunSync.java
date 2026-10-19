@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -150,9 +151,19 @@ public class RunSync {
                             table.getNamespace() == null ? null : table.getNamespace().split("\\."))
                         .catalogConfig(catalogConfig)
                         .formatName(tableFormat)
+                        .additionalProperties(getTargetProperties(table, tableFormat))
                         .build())
             .collect(Collectors.toList());
     return targetTables;
+  }
+
+  private static Properties getTargetProperties(DatasetConfig.Table table, String tableFormat) {
+    Properties targetProperties = new Properties();
+    if (table.getTargetProperties() != null) {
+      targetProperties.putAll(
+          table.getTargetProperties().getOrDefault(tableFormat, Collections.emptyMap()));
+    }
+    return targetProperties;
   }
 
   static void syncTableMetdata(
@@ -378,6 +389,12 @@ public class RunSync {
       String tableName;
       String partitionSpec;
       String namespace;
+
+      /**
+       * Properties of the target tables, keyed by the target format, for example {@code
+       * xtable.hudi.target.secondary.index.column} for a {@link TableFormat#HUDI} target.
+       */
+      Map<String, Map<String, String>> targetProperties;
     }
   }
 

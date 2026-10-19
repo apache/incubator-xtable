@@ -97,13 +97,18 @@ public class TestHudiConversionTarget {
       mock(HudiExecutionEngineProvider.class);
 
   private HudiConversionTarget getTargetClient(HoodieTableMetaClient mockMetaClient) {
+    return getTargetClient(mockMetaClient, TARGET_CONFIG);
+  }
+
+  private HudiConversionTarget getTargetClient(
+      HoodieTableMetaClient mockMetaClient, HudiTargetConfig targetConfig) {
     when(mockHudiTableManager.loadTableMetaClientIfExists(BASE_PATH))
         .thenReturn(Optional.ofNullable(mockMetaClient));
     return new HudiConversionTarget(
         BASE_PATH,
         RETENTION_IN_HOURS,
         MAX_DELTA_COMMITS,
-        TARGET_CONFIG,
+        targetConfig,
         mockEngineProvider,
         mockBaseFileUpdatesExtractor,
         mockAvroSchemaConverter,
@@ -133,6 +138,36 @@ public class TestHudiConversionTarget {
     targetClient.syncSchema(input);
     // validate that schema is set in commitState
     verify(mockCommitState).setSchema(converted);
+  }
+
+  /** Hudi renders a BYTES value as an object reference, so it cannot be indexed. */
+  @ParameterizedTest
+  @ValueSource(strings = {"bytes_field", "missing_field"})
+  void syncSchemaRejectsUnsupportedSecondaryIndexColumn(String column) {
+    Properties properties = new Properties();
+    properties.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    properties.setProperty(HudiTargetConfig.EXECUTION_ENGINE, "spark");
+    properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, column);
+    HudiConversionTarget targetClient =
+        getTargetClient(null, HudiTargetConfig.fromProperties(properties));
+    InternalSchema input =
+        InternalSchema.builder()
+            .name("schema")
+            .dataType(InternalType.RECORD)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("bytes_field")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("bytes")
+                                .dataType(InternalType.BYTES)
+                                .build())
+                        .build()))
+            .build();
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> targetClient.syncSchema(input));
+    assertTrue(exception.getMessage().contains(column));
   }
 
   @Test
@@ -381,6 +416,7 @@ public class TestHudiConversionTarget {
   void writeConfigWithSecondaryIndex() {
     Properties properties = new Properties();
     properties.setProperty(HudiTargetConfig.HUDI_TABLE_VERSION, "9");
+    properties.setProperty(HudiTargetConfig.EXECUTION_ENGINE, "spark");
     properties.setProperty(HudiTargetConfig.SECONDARY_INDEX_COLUMN, "email");
     properties.setProperty(HudiTargetConfig.RECORD_INDEX_MIN_FILEGROUP_COUNT, "2");
     properties.setProperty(HudiTargetConfig.RECORD_INDEX_MAX_FILEGROUP_COUNT, "4");

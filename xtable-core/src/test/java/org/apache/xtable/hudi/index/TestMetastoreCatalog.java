@@ -16,10 +16,11 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.index;
+package org.apache.xtable.hudi.index;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -134,7 +135,7 @@ public class TestMetastoreCatalog extends BaseMetastoreCatalog {
       METADATA_LOCATIONS.compute(
           key,
           (ignored, currentLocation) -> {
-            if (!java.util.Objects.equals(currentLocation, expectedLocation)) {
+            if (!Objects.equals(currentLocation, expectedLocation)) {
               throw new CommitFailedException(
                   "Cannot commit %s: metadata location changed from %s to %s",
                   key, expectedLocation, currentLocation);

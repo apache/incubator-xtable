@@ -77,9 +77,10 @@ public class HudiTargetConfig {
   /**
    * Column to build a Hudi secondary index on. Setting it also enables the global record index,
    * which the secondary index depends on. Both indexes are stored in the Hudi metadata table under
-   * the target table path and require table version 9. Only one column is supported, and the index
-   * is built when the Hudi metadata table is created; changing the column of an existing table is
-   * not supported yet.
+   * the target table path and require table version 9 and the {@code spark} execution engine, since
+   * Hudi's Java engine cannot build the secondary index yet. Only one column is supported, and the
+   * index is built when the Hudi metadata table is created; changing the column of an existing
+   * table is not supported yet.
    */
   public static final String SECONDARY_INDEX_COLUMN = "xtable.hudi.target.secondary.index.column";
 
@@ -123,6 +124,12 @@ public class HudiTargetConfig {
           String.format(
               "%s requires Hudi target table version 9, set %s=9.",
               SECONDARY_INDEX_COLUMN, HUDI_TABLE_VERSION));
+    }
+    if (secondaryIndexColumn.isPresent() && executionEngine != ExecutionEngine.SPARK) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s requires the Spark execution engine, set %s=%s.",
+              SECONDARY_INDEX_COLUMN, EXECUTION_ENGINE, ExecutionEngine.SPARK.getConfigValue()));
     }
     if (secondaryIndexColumn.filter(column -> column.contains(",")).isPresent()) {
       throw new IllegalArgumentException(
