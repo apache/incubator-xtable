@@ -231,12 +231,9 @@
                                 </transformer>
                             </transformers>
                             <!--
-                              Two dependencies put license texts somewhere other than
-                              META-INF/licenses, which left the bundle with three separate
-                              license directories (#701). Their texts are carried under
-                              META-INF/licenses instead: netty's ten verbatim, and xml-apis'
-                              W3C and SAX notices inside LICENSE-xml-apis. The bundle is
-                              left with one directory and nothing is lost.
+                              License texts dependencies ship outside META-INF/licenses (#701).
+                              Texts for code they embed are checked in there as LICENSE.*.txt;
+                              the rest duplicate a checked-in text or the Apache LICENSE.
                             -->
                             <filters combine.children="append">
                                 <filter>
@@ -249,6 +246,30 @@
                                     <artifact>xml-apis:xml-apis</artifact>
                                     <excludes>
                                         <exclude>license/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.datanucleus:datanucleus-core</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/ASM_LICENSE.txt</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.hamcrest:hamcrest-core</artifact>
+                                    <excludes>
+                                        <exclude>LICENSE.txt</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.apache.zookeeper:zookeeper</artifact>
+                                    <excludes>
+                                        <exclude>LICENSE.txt</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>junit:junit</artifact>
+                                    <excludes>
+                                        <exclude>LICENSE-junit.txt</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

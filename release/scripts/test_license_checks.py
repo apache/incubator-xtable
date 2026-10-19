@@ -237,5 +237,11 @@ class JarLayoutTest(ValidatorTest):
         self.assertFails(self.SCRIPT, "license texts outside")
 
 
+    def test_loose_license_file(self) -> None:
+        # How hamcrest's root LICENSE.txt reached the hive-metastore bundle.
+        self.box.rewrite_jar(self.box.one(UTILS_JAR_GLOB), add={"LICENSE.txt": "text\n"})
+        self.assertFails(self.SCRIPT, "license file outside META-INF/licenses/: LICENSE.txt")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

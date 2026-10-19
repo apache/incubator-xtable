@@ -25,7 +25,8 @@ carrying two separate directories of license texts.
 
 Every jar must have exactly one canonical META-INF/LICENSE and NOTICE, no
 LICENSE-bundled or NOTICE-bundled beside them, and at most one directory of
-license texts, at META-INF/licenses.
+license texts, at META-INF/licenses, with no loose license or notice files
+anywhere else.
 
 Usage:  validate_bundled_jar_license_layout.py [<jar> ...]
 With no arguments every */target/*.jar in the repo is checked. Finding no jars
@@ -34,6 +35,7 @@ is a failure -- an empty run must not report success.
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 import zipfile
 
@@ -43,6 +45,7 @@ CANONICAL = ("META-INF/LICENSE", "META-INF/NOTICE")
 # Inputs to the shade transformers. They belong in target/classes, never in a jar.
 NOT_PACKAGED = ("META-INF/LICENSE-bundled", "META-INF/NOTICE-bundled")
 LICENSE_DIR = "META-INF/licenses/"
+LICENSE_LIKE = re.compile(r"licen[cs]e|notice", re.IGNORECASE)
 
 
 def find_jars() -> list[pathlib.Path]:
@@ -86,6 +89,16 @@ def check(jar: pathlib.Path) -> list[str]:
     other_dirs = sorted(other_dirs)
     for directory in other_dirs:
         problems.append(f"license texts outside {LICENSE_DIR}: {directory}")
+
+    # Loose files, such as a dependency's root LICENSE.txt, outside any such directory.
+    known = set(CANONICAL) | set(NOT_PACKAGED)
+    for name in sorted(entries):
+        if name.endswith((".class", "/")) or name.startswith(LICENSE_DIR) or name in known:
+            continue
+        if any(name.startswith(directory) for directory in other_dirs):
+            continue
+        if LICENSE_LIKE.search(name.rsplit("/", 1)[-1]):
+            problems.append(f"license file outside {LICENSE_DIR}: {name}")
 
     return problems
 
