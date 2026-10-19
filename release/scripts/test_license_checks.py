@@ -43,6 +43,7 @@ SCRIPTS = "release/scripts"
 EXTENSIONS = "xtable-hudi-support/xtable-hudi-support-extensions"
 UTILS_JAR_GLOB = "xtable-hudi-support/xtable-hudi-support-utils/target/*.jar"
 SPARK_JAR_GLOB = "xtable-spark-runtime/target/xtable-spark-runtime_*.jar"
+AWS_LICENSES = "xtable-aws/src/main/resources/META-INF/licenses"
 # Tools the coverage script uses, linked into a bare PATH for the missing-tool test.
 SHELL_TOOLS = ("bash", "git", "grep", "sed", "awk", "sort", "comm", "diff", "mktemp",
                "dirname", "rm", "cat", "basename", "printf", "xargs", "head")
@@ -179,6 +180,29 @@ class CoverageTest(ValidatorTest):
     def test_empty_dependency_tree(self) -> None:
         self.box.rewrite(self.box.path("xtable-aws/target/dependency-tree-runtime.txt"), "")
         self.assertFails(self.SCRIPT, "did not contain any runtime dependencies")
+
+    def test_unknown_embedded_text(self) -> None:
+        self.box.path(f"{AWS_LICENSES}/LICENSE.unknown.txt").write_text("text\n")
+        self.assertFails(self.SCRIPT, "LICENSE.unknown.txt")
+
+    def test_embedded_text_owner_not_bundled(self) -> None:
+        # xml-apis is bundled by hive-metastore but not by xtable-aws.
+        name = "LICENSE.xml-apis-dom-sax.txt"
+        shutil.copy(self.box.path(f"xtable-hive-metastore/src/main/resources/META-INF/licenses/{name}"),
+                    self.box.path(f"{AWS_LICENSES}/{name}"))
+        self.assertFails(self.SCRIPT, f"{name} (from xml-apis:xml-apis, which is not bundled)")
+
+    def test_text_shared_across_licenses(self) -> None:
+        # A second checker-qual, under CDDL, would be served by the MIT LICENSE-checker-qual.
+        pom = self.box.path("xtable-aws/pom.xml")
+        self.box.rewrite(pom, pom.read_text().replace(
+            "<include>org.checkerframework:checker-qual</include>",
+            "<include>org.checkerframework:checker-qual</include><include>org.example:checker-qual</include>", 1))
+        bundled = self.box.path("xtable-aws/src/main/resources/META-INF/LICENSE-bundled")
+        self.box.rewrite(bundled, bundled.read_text().replace(
+            "javax.annotation:javax.annotation-api:1.3.2\n",
+            "javax.annotation:javax.annotation-api:1.3.2\norg.example:checker-qual:1.0\n", 1))
+        self.assertFails(self.SCRIPT, "different licenses:\n  - LICENSE-checker-qual")
 
 
 class BundledTextsTest(ValidatorTest):

@@ -77,6 +77,21 @@ classify_license_family() {
   esac
 }
 
+# The dependency that ships each LICENSE.*.txt, a text for code it embeds.
+embedded_text_owner() {
+  case "$1" in
+    LICENSE.base64.txt|LICENSE.commons-logging.txt|LICENSE.felix.txt|LICENSE.jboss-logging.txt|LICENSE.jsr166y.txt|LICENSE.jzlib.txt|LICENSE.log4j.txt|LICENSE.protobuf.txt|LICENSE.slf4j.txt|LICENSE.webbit.txt)
+      printf 'io.netty:netty\n'
+      ;;
+    LICENSE.xml-apis-dom-sax.txt)
+      printf 'xml-apis:xml-apis\n'
+      ;;
+    LICENSE.datanucleus-asm.txt)
+      printf 'org.datanucleus:datanucleus-core\n'
+      ;;
+  esac
+}
+
 SCALA_BINARY_VERSION="$(sed -n 's:.*<scala.binary.version>\(.*\)</scala.binary.version>.*:\1:p' pom.xml | head -n 1)"
 SKIPPED_SHADE_MODULES=(
   "xtable-utilities"
@@ -175,9 +190,9 @@ for module in "${SHADE_MODULES[@]}"; do
     continue
   fi
 
-  include_set_file="$(mktemp)"
-  runtime_set_file="$(mktemp)"
-  diff_output_file="$(mktemp)"
+  include_set_file="${scratch_dir}/includes"
+  runtime_set_file="${scratch_dir}/runtime"
+  diff_output_file="${scratch_dir}/diff"
 
   printf '%s\n' "${includes[@]}" | while IFS= read -r include; do
     resolve_property "${include}"
@@ -189,8 +204,6 @@ for module in "${SHADE_MODULES[@]}"; do
     sed 's/^/  /' "${diff_output_file}"
     overall_status=1
   fi
-
-  rm -f "${include_set_file}" "${runtime_set_file}" "${diff_output_file}"
 
   if [[ ! -f "${license_file}" ]]; then
     echo "FAIL ${module}: ${license_file} is missing, cannot validate bundled dependency licenses."
@@ -232,9 +245,12 @@ for module in "${SHADE_MODULES[@]}"; do
   # reported. The families come from LICENSE-bundled, which the check above has
   # already confirmed covers every shaded include.
   licenses_dir="${module}/src/main/resources/META-INF/licenses"
-  family_file="$(mktemp)"
-  expected_file="$(mktemp)"
-  actual_file="$(mktemp)"
+  family_file="${scratch_dir}/families"
+  expected_file="${scratch_dir}/expected"
+  actual_file="${scratch_dir}/actual"
+  text_family_file="${scratch_dir}/text-families"
+  : > "${expected_file}"
+  : > "${text_family_file}"
 
   awk '
     /This section summarizes those components and their licenses\./ {in_summary=1; prev=""; next}
@@ -258,19 +274,36 @@ for module in "${SHADE_MODULES[@]}"; do
     family="$(awk -F'\t' -v coord="${include}" '$1 == coord {print $2; exit}' "${family_file}")"
     if [[ -n "${family}" && "${family}" != "Apache License 2.0" ]]; then
       printf 'LICENSE-%s\n' "${include##*:}" >> "${expected_file}"
+      printf 'LICENSE-%s\t%s\n' "${include##*:}" "${family}" >> "${text_family_file}"
     fi
   done
 
   sort -u "${expected_file}" -o "${expected_file}"
+
+  # Texts are named by artifactId, so one file cannot serve two licenses.
+  sort -u "${text_family_file}" \
+    | awk -F'\t' '{n[$1]++} END {for (name in n) if (n[name] > 1) print name}' \
+    | sort > "${lines_file}"
+  shared_texts=()
+  while IFS= read -r license_text; do
+    shared_texts+=("${license_text}")
+  done < "${lines_file}"
+
   # Curated texts are named LICENSE-<artifactId> with no extension. The *.txt
-  # files beside them are license texts a dependency ships for code it embeds,
-  # checked in so the bundle has one licenses directory rather than two (#701);
-  # they answer to no coordinate of ours, so they are not matched here.
+  # files are texts a dependency ships for code it embeds (#701); each must
+  # belong to a bundled dependency, per embedded_text_owner.
+  unowned_texts=()
   for license_text in "${licenses_dir}"/*; do
     if [[ -f "${license_text}" && "${license_text}" != *.txt ]]; then
       basename "${license_text}"
+    elif [[ -f "${license_text}" ]]; then
+      owner="$(embedded_text_owner "$(basename "${license_text}")")"
+      if [[ -z "${owner}" ]] || ! grep -qxF "${owner}" "${include_set_file}"; then
+        unowned_texts+=("$(basename "${license_text}")${owner:+ (from ${owner}, which is not bundled)}")
+      fi
     fi
-  done | sort -u > "${actual_file}"
+  done > "${actual_file}"
+  sort -u "${actual_file}" -o "${actual_file}"
 
   comm -23 "${expected_file}" "${actual_file}" > "${lines_file}"
   missing_texts=()
@@ -284,8 +317,6 @@ for module in "${SHADE_MODULES[@]}"; do
     orphaned_texts+=("${license_text}")
   done < "${lines_file}"
 
-  rm -f "${family_file}" "${expected_file}" "${actual_file}"
-
   if [[ ${#missing_texts[@]} -gt 0 ]]; then
     overall_status=1
     echo "FAIL ${module}: bundled dependencies with no license text in ${licenses_dir}:"
@@ -298,7 +329,19 @@ for module in "${SHADE_MODULES[@]}"; do
     printf '  - %s\n' "${orphaned_texts[@]}"
   fi
 
-  if [[ ${#missing_texts[@]} -eq 0 && ${#orphaned_texts[@]} -eq 0 ]]; then
+  if [[ ${#unowned_texts[@]} -gt 0 ]]; then
+    overall_status=1
+    echo "FAIL ${module}: embedded license texts in ${licenses_dir} with no bundled dependency behind them:"
+    printf '  - %s\n' "${unowned_texts[@]}"
+  fi
+
+  if [[ ${#shared_texts[@]} -gt 0 ]]; then
+    overall_status=1
+    echo "FAIL ${module}: license texts needed by dependencies under different licenses:"
+    printf '  - %s\n' "${shared_texts[@]}"
+  fi
+
+  if [[ ${#missing_texts[@]} -eq 0 && ${#orphaned_texts[@]} -eq 0 && ${#unowned_texts[@]} -eq 0 && ${#shared_texts[@]} -eq 0 ]]; then
     echo "OK   ${module}: license texts match the bundled non-Apache-2.0 dependencies."
   fi
 
