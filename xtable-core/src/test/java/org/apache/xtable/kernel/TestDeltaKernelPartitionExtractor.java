@@ -453,6 +453,44 @@ public class TestDeltaKernelPartitionExtractor {
   }
 
   @Test
+  public void testPartitionValueExtractionWithColumnMappingPhysicalName() {
+    // With delta.columnMapping.mode=name, add actions key partition values by the physical
+    // column name (e.g. "col-<uuid>"), while the partition field carries the logical name and
+    // exposes the physical name as its storage name (issue #972).
+    String physicalName = "col-1a2b3c4d-5e6f-4a5b-8c9d-0e1f2a3b4c5d";
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put(physicalName, "USA");
+          }
+        };
+    InternalPartitionField internalPartitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("country")
+                    .storageName(physicalName)
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField)
+                .range(Range.scalar("USA"))
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaKernelPartitionExtractor.partitionValueExtraction(
+            partitionValuesMap, Arrays.asList(internalPartitionField));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
   public void testYearMonthDayHourGeneratedPartitionValueExtraction() {
     // year, month and day are generated in the table as based on some_date_column which is of
     // timestamp type.
