@@ -42,13 +42,38 @@ public class DeltaConversionSourceConfig {
   public static final String REUSE_METADATA_ACROSS_COMMITS =
       "xtable.delta.source.reuse_metadata_across_commits";
 
+  /**
+   * Allows sync to continue after finding a Delta deletion vector even though conversion targets
+   * cannot represent it. Defaults to {@code false} so unsupported deletes fail instead of silently
+   * producing inconsistent target data.
+   */
+  public static final String ALLOW_UNSUPPORTED_DELETION_VECTORS =
+      "xtable.delta.source.allow_unsupported_deletion_vectors";
+
   boolean reuseMetadataAcrossCommits;
+  boolean allowUnsupportedDeletionVectors;
+
+  public DeltaConversionSourceConfig(boolean reuseMetadataAcrossCommits) {
+    this(reuseMetadataAcrossCommits, false);
+  }
+
+  public DeltaConversionSourceConfig(
+      boolean reuseMetadataAcrossCommits, boolean allowUnsupportedDeletionVectors) {
+    this.reuseMetadataAcrossCommits = reuseMetadataAcrossCommits;
+    this.allowUnsupportedDeletionVectors = allowUnsupportedDeletionVectors;
+  }
 
   public static DeltaConversionSourceConfig fromProperties(Properties properties) {
     boolean reuseMetadataAcrossCommits =
         properties != null
             && Boolean.parseBoolean(
                 properties.getProperty(REUSE_METADATA_ACROSS_COMMITS, Boolean.FALSE.toString()));
-    return new DeltaConversionSourceConfig(reuseMetadataAcrossCommits);
+    boolean allowUnsupportedDeletionVectors =
+        properties != null
+            && Boolean.parseBoolean(
+                properties.getProperty(
+                    ALLOW_UNSUPPORTED_DELETION_VECTORS, Boolean.FALSE.toString()));
+    return new DeltaConversionSourceConfig(
+        reuseMetadataAcrossCommits, allowUnsupportedDeletionVectors);
   }
 }
