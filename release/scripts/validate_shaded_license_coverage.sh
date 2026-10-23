@@ -80,12 +80,6 @@ classify_license_family() {
 # The dependency that ships each LICENSE.*.txt, a text for code it embeds.
 embedded_text_owner() {
   case "$1" in
-    LICENSE.base64.txt|LICENSE.commons-logging.txt|LICENSE.felix.txt|LICENSE.jboss-logging.txt|LICENSE.jsr166y.txt|LICENSE.jzlib.txt|LICENSE.log4j.txt|LICENSE.protobuf.txt|LICENSE.slf4j.txt|LICENSE.webbit.txt)
-      printf 'io.netty:netty\n'
-      ;;
-    LICENSE.xml-apis-dom-sax.txt)
-      printf 'xml-apis:xml-apis\n'
-      ;;
     LICENSE.datanucleus-asm.txt)
       printf 'org.datanucleus:datanucleus-core\n'
       ;;
