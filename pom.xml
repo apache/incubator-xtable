@@ -663,6 +663,20 @@
     <build>
         <pluginManagement>
             <plugins>
+                <!--
+                  LICENSE-bundled and NOTICE-bundled are shade transformer inputs, read
+                  from target/classes; packaging them too duplicated each jar's LICENSE (#701).
+                -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>META-INF/LICENSE-bundled</exclude>
+                            <exclude>META-INF/NOTICE-bundled</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
@@ -926,6 +940,7 @@
                             <exclude>${target.dir.pattern}</exclude>
                             <exclude>release/scripts/generate_shaded_license_metadata.py</exclude>
                             <exclude>release/scripts/validate_bundled_license_texts.py</exclude>
+                            <exclude>release/scripts/validate_bundled_jar_license_layout.py</exclude>
                             <exclude>website/node_modules/**</exclude>
                             <exclude>website/build/**</exclude>
                             <exclude>website/.docusaurus/**</exclude>
