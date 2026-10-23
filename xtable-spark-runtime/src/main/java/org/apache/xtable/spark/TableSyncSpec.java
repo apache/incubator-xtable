@@ -40,7 +40,11 @@ public class TableSyncSpec {
   /** Optional namespace segments for the table. */
   String[] namespace;
 
-  /** Optional partition spec for a partitioned Hudi source, e.g. {@code level:VALUE}. */
+  /**
+   * Optional source partition spec (e.g. {@code level:VALUE}); applies to partitioned Hudi and
+   * Parquet sources. Maps to {@code xtable.hudi.source.partition_field_spec_config} for Hudi and
+   * {@code xtable.parquet.source.partition_field_spec_config} for Parquet.
+   */
   String partitionSpec;
 
   /** The source table format, e.g. {@code HUDI} (see {@code TableFormat}). */
