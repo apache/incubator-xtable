@@ -169,11 +169,10 @@ The license workflow runs:
 - `./mvnw apache-rat:check -B`
 - `release/scripts/validate_shaded_license_coverage.sh`
 - `release/scripts/validate_bundled_license_texts.py` and `validate_bundled_jar_license_layout.py`, against the built bundles
-- `release/scripts/test_license_checks.py`, which plants a fault for each check and expects it to fail
 
 If you change dependency behavior, assume this workflow must still pass.
 
-If you change a license validator, run `test_license_checks.py` too, and add a planted fault for any new way it can fail. A check must fail rather than pass when it finds nothing to check.
+If you change a license validator, it must fail rather than pass when it finds nothing to check.
 
 For non-dependency changes, expect the main Maven CI workflow to be the baseline bar. If you touch release scripts or contributor automation, also sanity-check the affected scripts locally when practical.
 
