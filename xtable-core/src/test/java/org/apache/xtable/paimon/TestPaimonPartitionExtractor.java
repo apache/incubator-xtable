@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -33,7 +34,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.BinaryRowWriter;
 import org.apache.paimon.data.BinaryString;
+import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.FileStoreTable;
+import org.apache.paimon.types.DataTypes;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -121,6 +124,44 @@ public class TestPaimonPartitionExtractor {
     PartitionValue partitionValue = result.get(0);
     assertEquals("level", partitionValue.getPartitionField().getSourceField().getName());
     assertEquals(Range.scalar("INFO"), partitionValue.getRange());
+  }
+
+  @Test
+  void testToPartitionValuesWithTypedPartitionKeys() {
+    Schema paimonSchema =
+        Schema.newBuilder()
+            .column("id", DataTypes.INT())
+            .column("dt", DataTypes.DATE())
+            .column("bucket_num", DataTypes.INT())
+            .column("event_id", DataTypes.BIGINT())
+            .primaryKey("id", "dt", "bucket_num", "event_id")
+            .partitionKeys("dt", "bucket_num", "event_id")
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .build();
+    FileStoreTable paimonTable =
+        ((TestPaimonTable)
+                TestPaimonTable.createTable(
+                    "typed_table", "dt", tempDir, new Configuration(), false, paimonSchema))
+            .getPaimonTable();
+    InternalSchema schema =
+        PaimonSchemaExtractor.getInstance().toInternalSchema(paimonTable.schema());
+
+    int epochDay = (int) LocalDate.of(2019, 10, 12).toEpochDay();
+    BinaryRow partition = new BinaryRow(3);
+    BinaryRowWriter writer = new BinaryRowWriter(partition);
+    writer.writeInt(0, epochDay);
+    writer.writeInt(1, 7);
+    writer.writeLong(2, 42L);
+    writer.complete();
+
+    List<PartitionValue> result = extractor.toPartitionValues(paimonTable, partition, schema);
+
+    assertEquals(3, result.size());
+    assertEquals("dt", result.get(0).getPartitionField().getSourceField().getName());
+    assertEquals(Range.scalar(epochDay), result.get(0).getRange());
+    assertEquals(Range.scalar(7), result.get(1).getRange());
+    assertEquals(Range.scalar(42L), result.get(2).getRange());
   }
 
   @Test

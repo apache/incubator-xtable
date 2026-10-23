@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -58,6 +59,10 @@ import java.util.stream.StreamSupport;
 import lombok.Builder;
 import lombok.Value;
 
+import org.apache.paimon.data.BinaryString;
+import org.apache.paimon.data.GenericRow;
+import org.apache.paimon.schema.Schema;
+import org.apache.paimon.types.DataTypes;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
@@ -1085,6 +1090,64 @@ public class ITConversionController {
           "level == 'INFO' AND string_field > 'abc'",
           Collections.emptyMap());
     }
+  }
+
+  @Test
+  void otherPaimonPartitionTypes() {
+    String tableName = getTableName();
+    List<String> targetTableFormats = Arrays.asList(ICEBERG, DELTA);
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(PAIMON);
+    Schema schema =
+        Schema.newBuilder()
+            .column("id", DataTypes.INT())
+            .column("name", DataTypes.STRING())
+            .column("dt", DataTypes.DATE())
+            .column("bucket_num", DataTypes.INT())
+            .column("event_id", DataTypes.BIGINT())
+            .primaryKey("id", "dt", "bucket_num", "event_id")
+            .partitionKeys("dt", "bucket_num", "event_id")
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .build();
+    // partition field is left null so the partition columns are compared too
+    try (TestPaimonTable table =
+        (TestPaimonTable)
+            TestPaimonTable.createTable(
+                tableName, null, tempDir, jsc.hadoopConfiguration(), false, schema)) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              PAIMON, SyncMode.INCREMENTAL, tableName, table, targetTableFormats, null, null);
+      TestPaimonTable.writeRows(
+          table.getPaimonTable(), buildPaimonRows(0, 50, LocalDate.of(2019, 10, 12), 7, 42L));
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(PAIMON, table, targetTableFormats, 50);
+
+      TestPaimonTable.writeRows(
+          table.getPaimonTable(), buildPaimonRows(50, 50, LocalDate.of(2024, 2, 29), 8, 43L));
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(PAIMON, table, targetTableFormats, 100);
+      checkDatasetEquivalenceWithFilter(
+          PAIMON,
+          table,
+          targetTableFormats,
+          "dt = DATE '2024-02-29' AND bucket_num = 8 AND event_id = 43",
+          Collections.emptyMap());
+    }
+  }
+
+  private static List<GenericRow> buildPaimonRows(
+      int startId, int numRows, LocalDate date, int bucketNum, long eventId) {
+    List<GenericRow> rows = new ArrayList<>(numRows);
+    for (int id = startId; id < startId + numRows; id++) {
+      rows.add(
+          GenericRow.of(
+              id,
+              BinaryString.fromString("name_" + id),
+              (int) date.toEpochDay(),
+              bucketNum,
+              eventId));
+    }
+    return rows;
   }
 
   private Map<String, String> getTimeTravelOption(String tableFormat, Instant time) {
