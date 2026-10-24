@@ -313,6 +313,15 @@ public class DeltaKernelPartitionExtractor {
       Map<String, String> values, InternalPartitionField partitionField) {
     if (partitionField.getPartitionFieldNames() == null
         || partitionField.getPartitionFieldNames().isEmpty()) {
+      // With Delta column mapping, add-file partition values are keyed by the physical
+      // (storage) column name rather than the logical name.
+      String storageName = partitionField.getSourceField().getStorageName();
+      if (storageName != null) {
+        String valueByStorageName = values.get(storageName);
+        if (valueByStorageName != null) {
+          return valueByStorageName;
+        }
+      }
       return values.getOrDefault(partitionField.getSourceField().getName(), null);
     }
     List<String> partitionFieldNames = partitionField.getPartitionFieldNames();
