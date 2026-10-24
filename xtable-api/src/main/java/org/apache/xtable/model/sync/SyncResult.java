@@ -50,6 +50,17 @@ public class SyncResult {
   // The sync status for each catalog.
   @Builder.Default List<CatalogSyncStatus> catalogSyncStatusList = Collections.emptyList();
 
+  /**
+   * Returns the error message of the table format sync, or null when the sync reported no error
+   * details.
+   */
+  public String getErrorMessage() {
+    if (tableFormatSyncStatus == null || tableFormatSyncStatus.getErrorDetails() == null) {
+      return null;
+    }
+    return tableFormatSyncStatus.getErrorDetails().getErrorMessage();
+  }
+
   /** Represents the status of a Sync operation. */
   @Value
   @Builder
