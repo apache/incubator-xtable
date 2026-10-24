@@ -84,17 +84,17 @@ public class DeltaSchemaExtractor {
     return (int) nestedIds.getLong(path);
   }
 
-  public InternalSchema toInternalSchema(StructType structType) {
-    return toInternalSchema(structType, null, false, null, null, null, null);
+  private static Integer nestedFieldId(
+      Metadata nestedIds, String nestedIdPath, String parquetChildName, String internalChildName) {
+    Integer fieldId = nestedFieldId(nestedIds, childIdPath(nestedIdPath, parquetChildName));
+    if (fieldId != null || parquetChildName.equals(internalChildName)) {
+      return fieldId;
+    }
+    return nestedFieldId(nestedIds, childIdPath(nestedIdPath, internalChildName));
   }
 
-  private InternalSchema toInternalSchema(
-      DataType dataType,
-      String parentPath,
-      boolean nullable,
-      String comment,
-      Metadata originalMetadata) {
-    return toInternalSchema(dataType, parentPath, nullable, comment, originalMetadata, null, null);
+  public InternalSchema toInternalSchema(StructType structType) {
+    return toInternalSchema(structType, null, false, null, null, null, null);
   }
 
   /**
@@ -174,6 +174,10 @@ public class DeltaSchemaExtractor {
                               : null;
                       String fieldComment =
                           field.getComment().isDefined() ? field.getComment().get() : null;
+                      Metadata childNestedIds =
+                          field.metadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                              ? field.metadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
+                              : null;
                       InternalSchema schema =
                           toInternalSchema(
                               field.dataType(),
@@ -181,9 +185,7 @@ public class DeltaSchemaExtractor {
                               field.nullable(),
                               fieldComment,
                               field.metadata(),
-                              field.metadata().contains(DELTA_COLUMN_MAPPING_NESTED_IDS)
-                                  ? field.metadata().getMetadata(DELTA_COLUMN_MAPPING_NESTED_IDS)
-                                  : null,
+                              childNestedIds,
                               storageName != null ? storageName : field.name());
                       return InternalField.builder()
                           .name(field.name())
@@ -207,7 +209,12 @@ public class DeltaSchemaExtractor {
         break;
       case "array":
         ArrayType arrayType = (ArrayType) dataType;
-        String elementIdPath = childIdPath(nestedIdPath, PARQUET_LIST_ELEMENT_FIELD_NAME);
+        Integer elementId =
+            nestedFieldId(
+                nestedIds,
+                nestedIdPath,
+                PARQUET_LIST_ELEMENT_FIELD_NAME,
+                InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME);
         InternalSchema elementSchema =
             toInternalSchema(
                 arrayType.elementType(),
@@ -217,12 +224,12 @@ public class DeltaSchemaExtractor {
                 null,
                 null,
                 nestedIds,
-                elementIdPath);
+                childIdPath(nestedIdPath, PARQUET_LIST_ELEMENT_FIELD_NAME));
         InternalField elementField =
             InternalField.builder()
                 .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                 .parentPath(parentPath)
-                .fieldId(nestedFieldId(nestedIds, elementIdPath))
+                .fieldId(elementId)
                 .schema(elementSchema)
                 .build();
         type = InternalType.LIST;
@@ -230,8 +237,18 @@ public class DeltaSchemaExtractor {
         break;
       case "map":
         MapType mapType = (MapType) dataType;
-        String keyIdPath = childIdPath(nestedIdPath, PARQUET_MAP_KEY_FIELD_NAME);
-        String valueIdPath = childIdPath(nestedIdPath, PARQUET_MAP_VALUE_FIELD_NAME);
+        Integer keyId =
+            nestedFieldId(
+                nestedIds,
+                nestedIdPath,
+                PARQUET_MAP_KEY_FIELD_NAME,
+                InternalField.Constants.MAP_KEY_FIELD_NAME);
+        Integer valueId =
+            nestedFieldId(
+                nestedIds,
+                nestedIdPath,
+                PARQUET_MAP_VALUE_FIELD_NAME,
+                InternalField.Constants.MAP_VALUE_FIELD_NAME);
         InternalSchema keySchema =
             toInternalSchema(
                 mapType.keyType(),
@@ -241,12 +258,12 @@ public class DeltaSchemaExtractor {
                 null,
                 null,
                 nestedIds,
-                keyIdPath);
+                childIdPath(nestedIdPath, PARQUET_MAP_KEY_FIELD_NAME));
         InternalField keyField =
             InternalField.builder()
                 .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                 .parentPath(parentPath)
-                .fieldId(nestedFieldId(nestedIds, keyIdPath))
+                .fieldId(keyId)
                 .schema(keySchema)
                 .build();
         InternalSchema valueSchema =
@@ -258,12 +275,12 @@ public class DeltaSchemaExtractor {
                 null,
                 null,
                 nestedIds,
-                valueIdPath);
+                childIdPath(nestedIdPath, PARQUET_MAP_VALUE_FIELD_NAME));
         InternalField valueField =
             InternalField.builder()
                 .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                 .parentPath(parentPath)
-                .fieldId(nestedFieldId(nestedIds, valueIdPath))
+                .fieldId(valueId)
                 .schema(valueSchema)
                 .build();
         type = InternalType.MAP;
