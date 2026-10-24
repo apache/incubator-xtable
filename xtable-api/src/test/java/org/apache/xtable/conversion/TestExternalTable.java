@@ -19,6 +19,7 @@
 package org.apache.xtable.conversion;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
@@ -32,11 +33,15 @@ public class TestExternalTable {
 
     ExternalTable localFilePath =
         new ExternalTable("name", "hudi", "/local/data//path", null, null, null);
-    assertEquals("file:///local/data/path", localFilePath.getBasePath());
+    assertEquals("/local/data/path", localFilePath.getBasePath());
 
     ExternalTable properLocalFilePath =
         new ExternalTable("name", "hudi", "file:///local/data//path", null, null, null);
     assertEquals("file:///local/data/path", properLocalFilePath.getBasePath());
+
+    ExternalTable windowsLocalPath =
+        new ExternalTable("name", "hudi", "C:/local/data//path", null, null, null);
+    assertFalse(windowsLocalPath.getBasePath().startsWith("file:"));
   }
 
   @Test
