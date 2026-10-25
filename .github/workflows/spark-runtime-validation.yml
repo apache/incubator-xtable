@@ -60,7 +60,7 @@ jobs:
           cache: maven
 
       - name: Cache Spark distribution
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/spark
           key: spark-${{ env.SPARK_VERSION }}-bin-${{ env.SPARK_HADOOP_PROFILE }}
