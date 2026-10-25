@@ -93,6 +93,53 @@ class ITRunSync {
     }
   }
 
+  @Test
+  void testSyncCompletesBeforeTimeout(@TempDir Path tempDir) throws IOException {
+    String tableName = "tiny-table";
+    try (GenericTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      table.insertRows(5); // small numRows for it to finish before the timeout does
+      File configFile = writeConfigFile(tempDir, table, tableName);
+
+      String[] args = new String[] {"--datasetConfig", configFile.getPath(), "--syncTimeout", "60"};
+      RunSync.main(args);
+      // check successful sync
+      Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
+      waitForNumIcebergCommits(icebergMetadataPath, 3);
+    }
+  }
+
+  @Test
+  void testSyncTimeoutFires(@TempDir Path tempDir) throws IOException {
+    String tableName = "large-table";
+    try (GenericTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+
+      table.insertRows(5000);
+      File configFile = writeConfigFile(tempDir, table, tableName);
+
+      long startTime = System.currentTimeMillis();
+
+      String[] args =
+          new String[] {
+            "--datasetConfig",
+            configFile.getPath(),
+            "--syncTimeout",
+            "1" // rapid timeout compared to the large table
+          };
+      RunSync.main(args);
+
+      long durationInSeconds = (System.currentTimeMillis() - startTime) / 1000;
+
+      org.junit.jupiter.api.Assertions.assertTrue(
+          durationInSeconds < 3, // being generous with 3 seconds
+          "The sync should have cut off and stopped immediately around 1 second. Took: "
+              + durationInSeconds);
+    }
+  }
+
   private static File writeConfigFile(Path tempDir, GenericTable table, String tableName)
       throws IOException {
     RunSync.DatasetConfig config =
