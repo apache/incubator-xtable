@@ -348,7 +348,8 @@ public class ITParquetConversionSource {
         targetFormats,
         Collections.emptyMap(),
         null,
-        isPartitioned);
+        isPartitioned,
+        schema);
   }
 
   private void checkDatasetEquivalence(
@@ -358,7 +359,8 @@ public class ITParquetConversionSource {
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
       Integer expectedCount,
-      boolean isPartitioned) {
+      boolean isPartitioned,
+      StructType schema) {
     Dataset<Row> sourceRows =
         sparkSession
             .read()
@@ -432,6 +434,103 @@ public class ITParquetConversionSource {
                 "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
                 sourceFormat, format));
       }
+    }
+  }
+
+  @Test
+  void testSyncWithValuePartitions() {
+    String tableName = getTableName();
+    StructType valueSchema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("id", DataTypes.IntegerType, false),
+              DataTypes.createStructField("region", DataTypes.StringType, false),
+              DataTypes.createStructField("order_date", DataTypes.DateType, false)
+            });
+    Path dataPath = tempDir.resolve("value_partitioned_data");
+    // Partition columns stay in the files, as when a Hive-style layout is written without Spark's
+    // partitionBy.
+    writeHiveStyle(
+        Arrays.asList(
+            RowFactory.create(1, "us-west", java.sql.Date.valueOf("2026-08-01")),
+            RowFactory.create(2, "us-west", java.sql.Date.valueOf("2026-08-02")),
+            RowFactory.create(3, "us-east", java.sql.Date.valueOf("2026-08-01"))),
+        valueSchema,
+        dataPath);
+    List<String> targetFormats = Arrays.asList(ICEBERG, DELTA, HUDI);
+
+    try (GenericTable table =
+        GenericTable.getInstance(tableName, dataPath, sparkSession, jsc, PARQUET, true)) {
+      syncValuePartitioned(tableName, table, valueSchema, targetFormats, SyncMode.FULL);
+      writeHiveStyle(
+          Collections.singletonList(
+              RowFactory.create(4, "eu-central", java.sql.Date.valueOf("2026-08-03"))),
+          valueSchema,
+          dataPath);
+      syncValuePartitioned(tableName, table, valueSchema, targetFormats, SyncMode.INCREMENTAL);
+
+      assertEquals(
+          "[identity(region), identity(order_date)]",
+          new org.apache.iceberg.hadoop.HadoopTables(jsc.hadoopConfiguration())
+              .load(table.getDataPath()).spec().fields().stream()
+                  .map(field -> field.transform() + "(" + field.name() + ")")
+                  .collect(Collectors.toList())
+                  .toString());
+      Row deltaDetail =
+          sparkSession
+              .sql(String.format("DESCRIBE DETAIL delta.`%s`", table.getDataPath()))
+              .first();
+      // The Delta target does not keep the partition column order, so compare as sets.
+      assertEquals(
+          new HashSet<>(Arrays.asList("region", "order_date")),
+          new HashSet<>(deltaDetail.getList(deltaDetail.fieldIndex("partitionColumns"))));
+    }
+  }
+
+  private void syncValuePartitioned(
+      String tableName,
+      GenericTable table,
+      StructType valueSchema,
+      List<String> targetFormats,
+      SyncMode syncMode) {
+    ConversionConfig conversionConfig =
+        getTableSyncConfig(
+            PARQUET,
+            syncMode,
+            tableName,
+            table,
+            targetFormats,
+            "region:VALUE,order_date:VALUE",
+            null);
+    new ConversionController(jsc.hadoopConfiguration())
+        .sync(conversionConfig, getConversionSourceProvider(PARQUET));
+    checkDatasetEquivalence(
+        PARQUET,
+        table,
+        Collections.emptyMap(),
+        targetFormats,
+        Collections.emptyMap(),
+        null,
+        true,
+        valueSchema);
+  }
+
+  private void writeHiveStyle(List<Row> rows, StructType valueSchema, Path dataPath) {
+    Dataset<Row> df = sparkSession.createDataFrame(rows, valueSchema);
+    for (Row partition : df.select("region", "order_date").distinct().collectAsList()) {
+      df.filter(
+              functions
+                  .col("region")
+                  .equalTo(partition.get(0))
+                  .and(functions.col("order_date").equalTo(partition.get(1))))
+          .coalesce(1)
+          .write()
+          .mode(SaveMode.Append)
+          .parquet(
+              dataPath
+                  .resolve("region=" + partition.get(0))
+                  .resolve("order_date=" + partition.get(1))
+                  .toString());
     }
   }
 

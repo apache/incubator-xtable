@@ -20,6 +20,7 @@ package org.apache.xtable.parquet;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,10 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
       partitionFields.add(
           InternalPartitionField.builder()
               .sourceField(sourceField)
-              .partitionFieldNames(getListPartitionNamesFromFormatInput(fieldSpec.getFormat()))
+              .partitionFieldNames(
+                  fieldSpec.getFormat() == null
+                      ? Collections.emptyList()
+                      : getListPartitionNamesFromFormatInput(fieldSpec.getFormat()))
               .transformType(fieldSpec.getTransformType())
               .build());
     }
