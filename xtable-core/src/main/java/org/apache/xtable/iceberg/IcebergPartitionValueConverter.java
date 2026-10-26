@@ -32,8 +32,7 @@ import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.avro.generic.IndexedRecord;
-
+import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
@@ -59,8 +58,6 @@ public class IcebergPartitionValueConverter {
   private static final IcebergPartitionValueConverter INSTANCE =
       new IcebergPartitionValueConverter();
   private static final AvroSchemaConverter SCHEMA_CONVERTER = AvroSchemaConverter.getInstance();
-  private static final String DOT = ".";
-  private static final String DOT_REPLACEMENT = "_x2E";
   private static final String YEAR = "year";
   private static final String MONTH = "month";
   private static final String DAY = "day";
@@ -80,12 +77,12 @@ public class IcebergPartitionValueConverter {
     List<PartitionValue> partitionValues = new ArrayList<>(partitionSpec.fields().size());
     Map<InternalField, Map<PartitionTransformType, InternalPartitionField>> partitionFieldMap =
         getInternalPartitionFieldMap(internalTable);
-    IndexedRecord partitionData = ((IndexedRecord) structLike);
-    for (PartitionField partitionField : partitionSpec.fields()) {
+    List<PartitionField> partitionFields = partitionSpec.fields();
+    for (int specPosition = 0; specPosition < partitionFields.size(); specPosition++) {
+      PartitionField partitionField = partitionFields.get(specPosition);
       Object value;
       PartitionTransformType transformType;
-      int fieldPosition =
-          partitionData.getSchema().getField(escapeFieldName(partitionField.name())).pos();
+      int fieldPosition = getFieldPosition(structLike, partitionField.name(), specPosition);
       // Convert date based partitions into millis since epoch
       switch (partitionField.transform().toString()) {
         case YEAR:
@@ -181,8 +178,21 @@ public class IcebergPartitionValueConverter {
                 Collectors.toMap(InternalPartitionField::getTransformType, Function.identity())));
   }
 
-  private static String escapeFieldName(String fieldName) {
-    return fieldName.replace(DOT, DOT_REPLACEMENT);
+  /**
+   * Resolves the position of a partition field in the partition struct of a data file, which
+   * Iceberg stores as {@link PartitionData}. The struct can belong to an older spec than {@code
+   * partitionSpec}, so the field is resolved by name. Other structs are read in spec order.
+   */
+  private static int getFieldPosition(StructLike structLike, String fieldName, int specPosition) {
+    if (!(structLike instanceof PartitionData)) {
+      return specPosition;
+    }
+    Types.StructType partitionType = ((PartitionData) structLike).getPartitionType();
+    Types.NestedField field = partitionType.field(fieldName);
+    if (field == null) {
+      throw new IllegalStateException("Partition field not found in partition data: " + fieldName);
+    }
+    return partitionType.fields().indexOf(field);
   }
 
   public PartitionKey toIceberg(

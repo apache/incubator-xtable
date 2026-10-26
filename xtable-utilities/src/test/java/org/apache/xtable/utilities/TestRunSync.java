@@ -25,13 +25,21 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.xtable.conversion.CatalogConfig;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
@@ -58,6 +66,37 @@ class TestRunSync {
     DatasetConfig config = RunSync.getDatasetConfig(filePath);
     // Assert
     Assertions.assertNotNull(config);
+  }
+
+  @Test
+  public void testTargetTablesForEachFormat(@TempDir Path tempDir) throws IOException {
+    Path configFile = tempDir.resolve("config.yaml");
+    String config =
+        "sourceFormat: ICEBERG\n"
+            + "targetFormats:\n"
+            + "  - HUDI\n"
+            + "  - DELTA\n"
+            + "datasets:\n"
+            + "  - tableBasePath: /tmp/warehouse/people\n"
+            + "    tableDataPath: /tmp/warehouse/people/data\n"
+            + "    tableName: people\n"
+            + "    targetProperties:\n"
+            + "      HUDI:\n"
+            + "        xtable.hudi.target.secondary.index.column: email\n";
+    Files.write(configFile, config.getBytes(StandardCharsets.UTF_8));
+    DatasetConfig datasetConfig = RunSync.getDatasetConfig(configFile.toString());
+
+    List<TargetTable> targetTables =
+        RunSync.targetTableBuilder(
+            datasetConfig.getDatasets().get(0), null, Arrays.asList(HUDI, DELTA));
+
+    // a Hudi target sits at the data path, other targets at the table root
+    Assertions.assertEquals("file:///tmp/warehouse/people/data", targetTables.get(0).getBasePath());
+    Assertions.assertEquals("file:///tmp/warehouse/people", targetTables.get(1).getBasePath());
+    Properties hudiProperties = new Properties();
+    hudiProperties.setProperty("xtable.hudi.target.secondary.index.column", "email");
+    Assertions.assertEquals(hudiProperties, targetTables.get(0).getAdditionalProperties());
+    Assertions.assertEquals(new Properties(), targetTables.get(1).getAdditionalProperties());
   }
 
   /** Tests that the default hadoop configs are loaded. */
