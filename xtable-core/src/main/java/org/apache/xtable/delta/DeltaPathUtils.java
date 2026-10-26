@@ -19,6 +19,7 @@
 package org.apache.xtable.delta;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Objects;
 
 import lombok.AccessLevel;
@@ -44,16 +45,18 @@ public class DeltaPathUtils {
    * non-existent location and silently drop records from the converted table.
    *
    * @param tableBasePath the table base path
-   * @param dataFilePath the path recorded in the Delta log (relative or absolute)
-   * @return the full absolute path to the file
+   * @param dataFilePath the path recorded in the Delta log (relative or absolute), URI-encoded as
+   *     the Delta protocol stores it
+   * @return the full absolute path to the file, decoded
    */
   public static String getFullPathToFile(String tableBasePath, String dataFilePath) {
+    String decodedPath = decode(dataFilePath);
     if (isAbsolutePath(dataFilePath)) {
-      return dataFilePath;
+      return decodedPath;
     }
     return tableBasePath.endsWith(Path.SEPARATOR)
-        ? tableBasePath + dataFilePath
-        : tableBasePath + Path.SEPARATOR + dataFilePath;
+        ? tableBasePath + decodedPath
+        : tableBasePath + Path.SEPARATOR + decodedPath;
   }
 
   /**
@@ -66,12 +69,50 @@ public class DeltaPathUtils {
    *
    * @param tableBasePath the table base path
    * @param dataFilePath the path to the data file, relative or absolute
-   * @return the path to record in the Delta log
+   * @return the path to record in the Delta log, URI-encoded as the Delta protocol expects
    */
   public static String getPathForDeltaLog(String tableBasePath, String dataFilePath) {
     return isUnderBasePath(tableBasePath, dataFilePath)
-        ? PathUtils.getRelativePath(dataFilePath, tableBasePath)
-        : dataFilePath;
+        ? encodeRelative(PathUtils.getRelativePath(dataFilePath, tableBasePath))
+        : encodeAbsolute(dataFilePath);
+  }
+
+  private static String decode(String deltaLogPath) {
+    URI uri;
+    try {
+      uri = new URI(deltaLogPath);
+    } catch (URISyntaxException e) {
+      return deltaLogPath;
+    }
+    String rawPath = uri.getRawPath();
+    if (rawPath == null
+        || uri.getRawQuery() != null
+        || uri.getRawFragment() != null
+        || !deltaLogPath.endsWith(rawPath)) {
+      return deltaLogPath;
+    }
+    return deltaLogPath.substring(0, deltaLogPath.length() - rawPath.length()) + uri.getPath();
+  }
+
+  private static String encodeRelative(String path) {
+    if (path.startsWith(Path.SEPARATOR)) {
+      return encodeAbsolute(path);
+    }
+    try {
+      String rawPath = new URI(null, null, Path.SEPARATOR + path, null).getRawPath();
+      return rawPath.substring(1).replace(":", "%3A");
+    } catch (URISyntaxException e) {
+      return path;
+    }
+  }
+
+  private static String encodeAbsolute(String path) {
+    URI uri = new Path(path).toUri();
+    String decodedPath = uri.getPath();
+    if (decodedPath == null || !path.endsWith(decodedPath)) {
+      return path;
+    }
+    return path.substring(0, path.length() - decodedPath.length()) + uri.getRawPath();
   }
 
   private static boolean isUnderBasePath(String tableBasePath, String dataFilePath) {

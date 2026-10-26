@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestDeltaPathUtils {
 
@@ -50,7 +51,23 @@ class TestDeltaPathUtils {
             "s3://other-bucket/x/part-0.parquet"),
         Arguments.of(
             "s3a://bucket/tab", "file:///local/t/part-0.parquet", "file:///local/t/part-0.parquet"),
-        Arguments.of("/tmp/tab", "/tmp/other/part-0.parquet", "/tmp/other/part-0.parquet"));
+        Arguments.of("/tmp/tab", "/tmp/other/part-0.parquet", "/tmp/other/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "level=level%201/part-0.parquet",
+            "s3a://bucket/tab/level=level 1/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "level=level%25252/part-0.parquet",
+            "s3a://bucket/tab/level=level%252/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3://bucket/tab/level=level%201/part-0.parquet",
+            "s3://bucket/tab/level=level 1/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "level=level 1/part-0.parquet",
+            "s3a://bucket/tab/level=level 1/part-0.parquet"));
   }
 
   @ParameterizedTest
@@ -82,12 +99,46 @@ class TestDeltaPathUtils {
         Arguments.of(
             "s3a://bucket/tab",
             "s3a://bucket/tab2/part-0.parquet",
-            "s3a://bucket/tab2/part-0.parquet"));
+            "s3a://bucket/tab2/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3a://bucket/tab/level=level 1/part-0.parquet",
+            "level=level%201/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3a://bucket/tab/level=level%252/part-0.parquet",
+            "level=level%25252/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/target/tab",
+            "s3://bucket/source/level=level 1/part-0.parquet",
+            "s3://bucket/source/level=level%201/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "s3a://bucket/tab/ts=2024-01-01 10:00:00/part-0.parquet",
+            "ts=2024-01-01%2010%3A00%3A00/part-0.parquet"));
   }
 
   @ParameterizedTest
   @MethodSource("deltaLogPathCases")
   void getPathForDeltaLog(String tableBasePath, String dataFilePath, String expected) {
     assertEquals(expected, DeltaPathUtils.getPathForDeltaLog(tableBasePath, dataFilePath));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "s3a://bucket/tab/part-0.parquet",
+        "s3a://bucket/tab/level=level 1/part-0.parquet",
+        "s3a://bucket/tab/level=level%252/part-0.parquet",
+        "s3a://bucket/tab/level=a+b&c/part-0.parquet",
+        "s3://bucket/source/level=level 1/part-0.parquet",
+        "s3a://bucket/tab/ts=2024-01-01 10:00:00/part-0.parquet"
+      })
+  void deltaLogPathRoundTrips(String dataFilePath) {
+    String tableBasePath = "s3a://bucket/tab";
+    assertEquals(
+        dataFilePath,
+        DeltaPathUtils.getFullPathToFile(
+            tableBasePath, DeltaPathUtils.getPathForDeltaLog(tableBasePath, dataFilePath)));
   }
 }
