@@ -968,7 +968,9 @@ public class ITConversionController {
     String tableName = getTableName();
     ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(DELTA);
     try (TestSparkDeltaTable table =
-        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, null)) {
+        // Partition by level so the integration test covers the column-mapping
+        // partition-value path (see #972): partition values are compared row by row.
+        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, "level")) {
       table.insertRows(20);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
@@ -979,7 +981,7 @@ public class ITConversionController {
               tableName,
               table,
               Collections.singletonList(ICEBERG),
-              null,
+              "level:VALUE",
               null);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       table.insertRows(10);
