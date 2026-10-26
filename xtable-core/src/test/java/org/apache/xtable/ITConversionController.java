@@ -1023,12 +1023,11 @@ public class ITConversionController {
   }
 
   /**
-   * The #977 scenario through a conversion source: column mapping enabled after data
-   * already exists, then a double rename that makes a logical name collide with
-   * another column's physical key (level -> tmp, street -> level), plus a row whose
-   * new level partition value is null. Before the storageName-authoritative fix, the
-   * null partition value fell back to the logical name and picked up tmp's value
-   * (tmp=X, level=X instead of tmp=X, level=null). Running the same scenario
+   * The #977 scenario through a conversion source: column mapping enabled after data already
+   * exists, then a double rename that makes a logical name collide with another column's physical
+   * key (level -> tmp, street -> level), plus a row whose new level partition value is null. Before
+   * the storageName-authoritative fix, the null partition value fell back to the logical name and
+   * picked up tmp's value (tmp=X, level=X instead of tmp=X, level=null). Running the same scenario
    * against both Delta sources also covers #886.
    */
   private void testLateColumnMappingRenameDeltaToIceberg(
