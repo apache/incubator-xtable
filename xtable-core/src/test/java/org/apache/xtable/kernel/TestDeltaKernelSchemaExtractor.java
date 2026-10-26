@@ -1251,6 +1251,31 @@ public class TestDeltaKernelSchemaExtractor {
   }
 
   @Test
+  public void testFromInternalSchemaOmitsUnconfiguredColumnMappingIds() {
+    InternalField field =
+        InternalField.builder()
+            .name("id")
+            .fieldId(1)
+            .schema(
+                InternalSchema.builder()
+                    .name("long")
+                    .dataType(InternalType.LONG)
+                    .isNullable(false)
+                    .build())
+            .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(Collections.singletonList(field))
+            .build();
+
+    StructField targetField = extractor.fromInternalSchema(internalSchema).fields().get(0);
+
+    Assertions.assertFalse(targetField.getMetadata().contains("delta.columnMapping.id"));
+  }
+
+  @Test
   public void testFromInternalSchemaWithUUID() {
     // Create an InternalSchema with UUID type
     InternalField uuidField =

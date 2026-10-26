@@ -18,7 +18,6 @@
  
 package org.apache.xtable.kernel;
 
-import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_ID;
 import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NAME;
 import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NESTED_IDS;
 import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
@@ -381,10 +380,9 @@ public class DeltaKernelSchemaExtractor {
   private FieldMetadata getFieldMetadata(InternalField field) {
     FieldMetadata.Builder metadataBuilder = FieldMetadata.builder();
 
-    // Propagate column mapping ID to maintain Delta column mapping
-    if (field.getFieldId() != null) {
-      metadataBuilder.putLong(DELTA_COLUMN_MAPPING_ID, field.getFieldId().longValue());
-    }
+    // Column-mapping IDs are only valid when the target enables Delta column mapping. This
+    // converter does not enable that feature, so source field IDs must not be written to the
+    // target schema.
 
     InternalSchema schema = field.getSchema();
 
