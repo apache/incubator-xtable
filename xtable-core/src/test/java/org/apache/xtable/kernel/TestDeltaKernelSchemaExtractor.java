@@ -412,6 +412,30 @@ public class TestDeltaKernelSchemaExtractor {
             "_one_field_element"));
   }
 
+  @Test
+  public void testColumnMappingPhysicalNamePropagatedAsStorageName() {
+    // Regression for #977: with column mapping enabled, a column renamed after files were
+    // written must keep its pre-rename physical name as storageName, so that the Iceberg name
+    // mapping can resolve files written before the rename. Without the fix, storageName is
+    // null and pre-rename files read NULL for the renamed column.
+    FieldMetadata renamedMetadata =
+        FieldMetadata.builder()
+            .putLong("delta.columnMapping.id", 3)
+            .putString("delta.columnMapping.physicalName", "name")
+            .build();
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add("new_name", StringType.STRING, true, renamedMetadata)
+            .add("id", IntegerType.INTEGER, false);
+
+    InternalSchema internalSchema =
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation);
+
+    Assertions.assertEquals(3, fieldId(internalSchema, "new_name"));
+    Assertions.assertEquals("name", storageName(internalSchema, "new_name"));
+    Assertions.assertNull(storageName(internalSchema, "id"));
+  }
+
   private static FieldMetadata columnMappingMetadata(
       long id, String physicalName, FieldMetadata nestedIds) {
     return FieldMetadata.builder()
@@ -444,6 +468,14 @@ public class TestDeltaKernelSchemaExtractor {
       current = found.getSchema();
     }
     return found.getFieldId();
+  }
+
+  private static String storageName(InternalSchema schema, String fieldName) {
+    return schema.getFields().stream()
+        .filter(field -> fieldName.equals(field.getName()))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("missing " + fieldName))
+        .getStorageName();
   }
 
   @Test
