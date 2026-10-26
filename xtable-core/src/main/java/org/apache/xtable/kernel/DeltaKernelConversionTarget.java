@@ -20,7 +20,9 @@ package org.apache.xtable.kernel;
 
 import static io.delta.kernel.utils.CloseableIterable.inMemoryIterable;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,13 +44,18 @@ import io.delta.kernel.Table;
 import io.delta.kernel.Transaction;
 import io.delta.kernel.TransactionBuilder;
 import io.delta.kernel.TransactionCommitResult;
+import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.data.Row;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.exceptions.TableNotFoundException;
 import io.delta.kernel.hook.PostCommitHook;
+import io.delta.kernel.internal.DeltaHistoryManager;
+import io.delta.kernel.internal.DeltaLogActionUtils;
 import io.delta.kernel.internal.SnapshotImpl;
+import io.delta.kernel.internal.TableImpl;
 import io.delta.kernel.internal.actions.AddFile;
+import io.delta.kernel.internal.actions.CommitInfo;
 import io.delta.kernel.internal.actions.Metadata;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
@@ -57,11 +64,13 @@ import io.delta.kernel.internal.util.Utils;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterable;
+import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.exception.ParseException;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -99,9 +108,6 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  * <p><strong>Known Limitations:</strong>
  *
  * <ul>
- *   <li><strong>Commit Tags:</strong> Delta Kernel 4.0.0 does not support commit tags in commitInfo
- *       (e.g., XTABLE_METADATA tags). This affects source-to-target commit identifier mapping.
- *       Tracked in: https://github.com/apache/incubator-xtable/issues/819
  *   <li><strong>Schema Evolution:</strong> Schema changes are handled through Delta Kernel's
  *       transaction API, which may have different semantics compared to Delta Standalone.
  *   <li><strong>Internal API Usage:</strong> This implementation casts to internal classes
@@ -125,6 +131,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 @Log4j2
 public class DeltaKernelConversionTarget implements ConversionTarget {
   private static final String DELTA_LOG_RETENTION_DURATION = "delta.logRetentionDuration";
+  private static final String XTABLE_ENGINE_INFO = "XTable Delta Sync";
 
   private DeltaKernelSchemaExtractor schemaExtractor;
   private DeltaKernelPartitionExtractor partitionExtractor;
@@ -317,24 +324,78 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
-    // Delta Kernel 4.0.0 does not support commit tags in commitInfo, which are required for
-    // source-to-target commit identifier mapping. This limitation is documented in:
-    // https://github.com/delta-io/delta/issues/6167
-    // XTable tracking issue: https://github.com/apache/incubator-xtable/issues/819
-    //
-    // Unlike DeltaConversionTarget (which uses Delta Standalone with commit tag support),
-    // DeltaKernelConversionTarget cannot retrieve commit tags from Delta Kernel's API.
-    // Rather than silently scanning all commits (O(n) performance cost) and always returning
-    // empty, we explicitly throw an exception to indicate this feature is unsupported.
-    //
-    // When Delta Kernel adds commit tag support, this method can be reimplemented to:
-    // 1. Scan commit history using tableImpl.getChanges(engine, 0, currentVersion, actionSet)
-    // 2. Extract tags from CommitInfo.tags MapValue
-    // 3. Parse XTABLE_METADATA from tags and match sourceIdentifier
-    throw new NotSupportedException(
-        "Source-to-target commit identifier mapping is not supported in DeltaKernelConversionTarget. "
-            + "Delta Kernel 4.0.0 does not support commit tags in commitInfo. "
-            + "See: https://github.com/delta-io/delta/issues/6167");
+    if (sourceIdentifier == null || sourceIdentifier.trim().isEmpty()) {
+      return Optional.empty();
+    }
+
+    Table table = Table.forPath(engine, basePath);
+    Snapshot latestSnapshot;
+    try {
+      latestSnapshot = table.getLatestSnapshot(engine);
+    } catch (TableNotFoundException e) {
+      return Optional.empty();
+    }
+
+    SnapshotImpl latestSnapshotImpl = (SnapshotImpl) latestSnapshot;
+    TableImpl tableImpl = (TableImpl) table;
+    long earliestVersion =
+        DeltaHistoryManager.getEarliestDeltaFile(engine, latestSnapshotImpl.getLogPath());
+    try (CloseableIterator<ColumnarBatch> changes =
+        tableImpl.getChanges(
+            engine,
+            earliestVersion,
+            latestSnapshot.getVersion(),
+            Collections.singleton(DeltaLogActionUtils.DeltaAction.METADATA))) {
+      while (changes.hasNext()) {
+        ColumnarBatch batch = changes.next();
+        int metadataIndex =
+            batch.getSchema().indexOf(DeltaLogActionUtils.DeltaAction.METADATA.colName);
+
+        try (CloseableIterator<Row> rows = batch.getRows()) {
+          while (rows.hasNext()) {
+            Row row = rows.next();
+            if (row.isNullAt(metadataIndex)) {
+              continue;
+            }
+
+            long targetVersion = row.getLong(0);
+            Metadata commitMetadata = Metadata.fromRow(row.getStruct(metadataIndex));
+            String metadataJson =
+                commitMetadata.getConfiguration().get(TableSyncMetadata.XTABLE_METADATA);
+
+            try {
+              Optional<TableSyncMetadata> optionalMetadata =
+                  TableSyncMetadata.fromJson(metadataJson);
+              if (optionalMetadata.isPresent()
+                  && sourceIdentifier.equals(optionalMetadata.get().getSourceIdentifier())
+                  && isXTableCommit(latestSnapshotImpl, targetVersion)) {
+                // Metadata actions contain the complete configuration, so a later unrelated
+                // metadata update can carry this value forward. Only accept XTable commits and
+                // return the first match where XTable originally recorded the source identifier.
+                return Optional.of(String.valueOf(targetVersion));
+              }
+            } catch (ParseException e) {
+              log.warn(
+                  "Failed to parse XTable metadata for Delta Kernel commit {}", targetVersion, e);
+            }
+          }
+        }
+      }
+    } catch (IOException e) {
+      throw new ReadException("Failed to read Delta Kernel commit history", e);
+    }
+
+    return Optional.empty();
+  }
+
+  private boolean isXTableCommit(SnapshotImpl snapshot, long version) {
+    return CommitInfo.getCommitInfoOpt(engine, snapshot.getLogPath(), version)
+        .map(CommitInfo::getEngineInfo)
+        .filter(
+            engineInfo ->
+                engineInfo.equals(XTABLE_ENGINE_INFO)
+                    || engineInfo.endsWith("/" + XTABLE_ENGINE_INFO))
+        .isPresent();
   }
 
   private class TransactionState {
@@ -412,7 +473,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
       Table table = Table.forPath(engine, basePath);
       TransactionBuilder txnBuilder =
-          table.createTransactionBuilder(engine, "XTable Delta Sync", operation);
+          table.createTransactionBuilder(engine, XTABLE_ENGINE_INFO, operation);
 
       // LIMITATION: Schema evolution for existing tables is NOT supported in Delta Kernel 4.0.0.
       // The withSchema() method only works during CREATE_TABLE operations. For existing tables:
@@ -474,7 +535,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       }
 
       // NOTE: Delta Kernel API limitations compared to Delta Standalone:
-      // - Commit tags (like XTABLE_METADATA in commitInfo.tags) are not yet supported
       // - Operation type metadata (like DeltaOperations.Update) is simplified to
       // Operation.WRITE/CREATE_TABLE
       // - The commit timestamp is managed by Delta Kernel automatically
