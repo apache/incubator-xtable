@@ -981,7 +981,7 @@ public class ITConversionController {
               tableName,
               table,
               Collections.singletonList(ICEBERG),
-              "level:VALUE",
+              null,
               null);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       table.insertRows(10);
