@@ -173,6 +173,9 @@ $SPARK_HOME/bin/spark-submit \
 
 `--datasetconfig` and `--basepath` are mutually exclusive — pass one or the other.
 
+A table entry can also set `targetProperties`, keyed by target format, for example the
+[secondary index settings](how-to-index-sql#keeping-the-index-current) of a Hudi target.
+
 | Option | Description |
 | --- | --- |
 | `--basepath` | Base path of the source table. |

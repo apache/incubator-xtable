@@ -67,6 +67,30 @@ DROP INDEX [IF EXISTS] email_idx ON prod.db.customer;
 - The index files are stored under `.hoodie/` in the data folder of the table. Dropping the index
   deletes that folder and keeps the data files.
 
+## Keeping the index current
+
+A sync job that already runs XTable keeps the index current. Add a Hudi target with the index
+settings to the `--datasetconfig` of `XTableSparkSync` in the runtime jar, or of `RunSync`:
+
+```yaml
+sourceFormat: ICEBERG
+targetFormats:
+  - HUDI
+datasets:
+  - tableBasePath: s3://bucket/warehouse/db.db/customer
+    tableDataPath: s3://bucket/warehouse/db.db/customer/data
+    tableName: customer
+    namespace: db
+    targetProperties:
+      HUDI:
+        xtable.hudi.target.table_version: '9'
+        xtable.hudi.target.execution.engine: spark
+        xtable.hudi.target.secondary.index.column: c_email_address
+```
+
+The column must match the column of `CREATE INDEX`, otherwise the sync fails. Without a sync job,
+run `REFRESH INDEX` after writes.
+
 ## Querying with an index
 
 Queries do not change. When a filter compares an indexed column with literals, for example
@@ -98,5 +122,4 @@ The driver log shows for each query whether the index was used and how many file
 
 - Only Spark sessions with the extensions use the index. Other engines read the table as usual.
 - Joins, subqueries, `MERGE`, `UPDATE` and `DELETE` do not use the index.
-- Indexes are kept up to date by `REFRESH INDEX`, or by a `RunSync` job with a Hudi target whose
-  `targetProperties` set `xtable.hudi.target.secondary.index.column` to the indexed column.
+
