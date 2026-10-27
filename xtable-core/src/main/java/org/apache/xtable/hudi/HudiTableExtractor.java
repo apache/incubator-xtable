@@ -130,7 +130,6 @@ public class HudiTableExtractor {
         .build();
   }
 
-
   private InternalSchema getCanonicalSchemaFromCommitMetadata(
       HoodieTableMetaClient metaClient, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
     // Prefer Hudi InternalSchema when available
@@ -181,7 +180,6 @@ public class HudiTableExtractor {
     }
   }
 
-
   private InternalSchema getCanonicalSchemaFromTimeline(
       HoodieTableMetaClient metaClient, HoodieInstant commit) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
@@ -197,8 +195,7 @@ public class HudiTableExtractor {
       }
 
       // Fallback to Avro schema (original behaviour)
-      Schema avroSchema =
-          tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
+      Schema avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
       return schemaExtractor.schema(avroSchema);
     } catch (Exception e) {
       throw new SchemaExtractorException(
@@ -207,9 +204,6 @@ public class HudiTableExtractor {
           e);
     }
   }
-
-
-
 
   private List<InternalField> getRecordKeyFields(
       HoodieTableMetaClient metaClient, InternalSchema canonicalSchema) {

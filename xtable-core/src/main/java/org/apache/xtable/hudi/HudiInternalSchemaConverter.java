@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.hudi;
 
 import java.util.ArrayList;
@@ -30,8 +30,8 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 
 /**
- * Converts Hudi's InternalSchema (used by schema-on-read) into XTable's InternalSchema
- * while preserving field IDs. This allows Iceberg to treat renames correctly.
+ * Converts Hudi's InternalSchema (used by schema-on-read) into XTable's InternalSchema while
+ * preserving field IDs. This allows Iceberg to treat renames correctly.
  */
 public final class HudiInternalSchemaConverter {
 
