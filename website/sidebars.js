@@ -20,7 +20,8 @@ module.exports = {
             items: [
                 'how-to',
                 'how-to-catalog-sync',
-                'how-to-spark-runtime'
+                'how-to-spark-runtime',
+                'how-to-index-sql'
             ],
         },
         {

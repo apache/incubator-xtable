@@ -50,6 +50,7 @@
         <module>xtable-api</module>
         <module>xtable-hudi-support</module>
         <module>xtable-core</module>
+        <module>xtable-spark-extensions</module>
         <module>xtable-utilities</module>
         <module>xtable-aws</module>
         <module>xtable-hive-metastore</module>
@@ -94,6 +95,8 @@
         <paimon.version>1.3.1</paimon.version>
         <jackson.version>2.18.2</jackson.version>
         <spotless.version>2.46.1</spotless.version>
+        <scala-maven-plugin.version>4.9.2</scala-maven-plugin.version>
+        <scalafmt.version>3.8.3</scalafmt.version>
         <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.10.0</google.java.format.version>
         <delta.standalone.version>3.3.0</delta.standalone.version>
@@ -680,6 +683,21 @@
         <pluginManagement>
             <plugins>
                 <plugin>
+                    <groupId>net.alchim31.maven</groupId>
+                    <artifactId>scala-maven-plugin</artifactId>
+                    <version>${scala-maven-plugin.version}</version>
+                    <configuration>
+                        <scalaVersion>${scala.version}</scalaVersion>
+                        <args>
+                            <arg>-unchecked</arg>
+                            <arg>-deprecation</arg>
+                            <arg>-feature</arg>
+                            <arg>-release</arg>
+                            <arg>${javaVersion}</arg>
+                        </args>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
                     <executions>
@@ -934,6 +952,19 @@
                             <file>style/license-header</file>
                         </licenseHeader>
                     </java>
+                    <scala>
+                        <includes>
+                            <include>src/main/scala/**/*.scala</include>
+                            <include>src/test/scala/**/*.scala</include>
+                        </includes>
+                        <scalafmt>
+                            <version>${scalafmt.version}</version>
+                            <file>style/scalafmt.conf</file>
+                        </scalafmt>
+                        <licenseHeader>
+                            <file>style/license-header</file>
+                        </licenseHeader>
+                    </scala>
                     <python>
                         <includes>
                             <include>**/*.py</include>
