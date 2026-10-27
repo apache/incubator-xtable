@@ -78,9 +78,10 @@ When adding, removing, or upgrading a dependency, always follow this sequence:
 
 1. Update the relevant `pom.xml` dependency declarations.
 2. If the module uses `maven-shade-plugin`, regenerate the runtime dependency tree and keep the shade `<artifactSet><includes>` list aligned to runtime dependencies only.
-3. Regenerate bundled license metadata for shaded modules.
-4. Run the shaded license validator.
-5. Run the narrowest Maven verification needed for the changed modules.
+3. Keep the module's `xtable.bundled.artifactIds` property in step with those includes; it decides which artifacts the bundled LICENSE lists.
+4. If a newly bundled artifact is not Apache-2.0, add its license text under `src/main/resources/META-INF/licenses/`. If its POM declares no license, add it to `release/license/bundled/supplemental-models.xml`.
+5. Build the shaded modules and run the bundled license validator.
+6. Run the narrowest Maven verification needed for the changed modules.
 
 Do not stop after updating the Maven dependency declaration alone.
 
@@ -100,9 +101,10 @@ Current shaded modules include:
 - `xtable-aws`
 - `xtable-hive-metastore`
 - `xtable-hudi-support/xtable-hudi-support-extensions`
+- `xtable-spark-runtime`
 - `xtable-utilities`
 
-`xtable-utilities` is intentionally skipped by `release/scripts/validate_shaded_license_coverage.sh` while it is not published. Keep its bundled metadata useful for local builds, but do not treat it as release-blocking until that artifact is published.
+`xtable-utilities` is not built by the License Check while it is not published. Keep its license texts useful for local builds, but do not treat it as release-blocking until that artifact is published.
 
 ## Required Commands For Dependency Work
 
@@ -112,16 +114,11 @@ Generate runtime dependency trees for changed shaded modules:
 ./mvnw -pl <module[,module...]> -am -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
 ```
 
-Regenerate bundled license metadata:
+Build the shaded bundles and check that every bundled non-Apache-2.0 dependency ships its license text:
 
 ```bash
-python3 release/scripts/generate_shaded_license_metadata.py
-```
-
-Validate shaded dependency license coverage and ASF license-family compliance:
-
-```bash
-release/scripts/validate_shaded_license_coverage.sh
+./mvnw -B -DskipTests -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions,xtable-spark-runtime -am package dependency:tree -DoutputType=text -DoutputFile=target/dependency-tree.txt
+python3 release/scripts/validate_bundled_license_texts.py
 ```
 
 If only one or two modules changed, prefer targeted Maven verification:
@@ -138,23 +135,14 @@ If broader confidence is needed, run:
 
 ## Bundled License Metadata
 
-Shaded modules must keep these files current:
+Nothing here is maintained by hand except the license texts and the artifact list:
 
-- `src/main/resources/META-INF/LICENSE-bundled`
-- `src/main/resources/META-INF/NOTICE-bundled`
+- `META-INF/LICENSE` is rendered at build time by `maven-remote-resources-plugin` from `release/license/bundled/META-INF/LICENSE.vm`. It carries the Apache License 2.0 and lists only the bundled non-Apache-2.0 components, each with a pointer to its text under `META-INF/licenses/`. Bundled Apache-2.0 dependencies need no entry.
+- `META-INF/NOTICE` is merged by the shade plugin's `ApacheNoticeResourceTransformer` from the bundled artifacts' own NOTICE files.
+- A module opts in with `xtable.bundled.resources.skip=false` and lists its bundled artifact IDs in `xtable.bundled.artifactIds`.
+- `release/license/bundled/supplemental-models.xml` supplies a license for artifacts whose POM declares none, and pins the license taken for a dual-licensed artifact.
 
-Do not manually rewrite large dependency/license sections unless necessary.
-Prefer regenerating with:
-
-```bash
-python3 release/scripts/generate_shaded_license_metadata.py
-```
-
-Notes:
-
-- The generator uses runtime dependency trees plus a small override table for old artifacts with incomplete Maven license metadata.
-- Category B licenses can be present in convenience binaries, but the validator will warn so they stay visible.
-- Missing bundled metadata is treated as a failure.
+A rendered LICENSE line starting `UNMAPPED-LICENSE:` names a bundled artifact whose POM declares no license; give it one in `supplemental-models.xml`. A new spelling of a known license is normalised in the `canonical` map in `LICENSE.vm`.
 
 ## GitHub Actions
 
@@ -166,7 +154,8 @@ Pull requests are expected to pass:
 The license workflow runs:
 
 - `./mvnw apache-rat:check -B`
-- `release/scripts/validate_shaded_license_coverage.sh`
+- a package build of the shaded modules
+- `python3 release/scripts/validate_bundled_license_texts.py`
 
 If you change dependency behavior, assume this workflow must still pass.
 
@@ -176,8 +165,8 @@ For non-dependency changes, expect the main Maven CI workflow to be the baseline
 
 - Keep generated dependency/license sections deterministic and sorted where the repo already expects that.
 - Prefer targeted edits and targeted Maven runs before broader builds.
-- Do not remove bundled metadata files from shaded modules.
-- If you add a new shaded module, update this guide and ensure the generator/validator cover it.
+- Do not remove license texts under `META-INF/licenses/` while the artifact they cover is still bundled.
+- If you add a new shaded module, set `xtable.bundled.resources.skip` and `xtable.bundled.artifactIds` in its POM, use the LICENSE and NOTICE transformers the other shaded modules use, add it to the License Check build, and update this guide.
 - Preserve ASF license headers in new source files and scripts when they are required by surrounding repo conventions.
 - Avoid unrelated formatting churn in large generated or metadata-heavy files.
 - Check for module-local resources under `src/main/resources` and `src/test/resources` when behavior depends on bundled configs or sample files.
@@ -188,14 +177,15 @@ For non-dependency changes, expect the main Maven CI workflow to be the baseline
 - Run targeted tests or `verify` for the affected module set.
 - Run `spotless:check` if Java formatting may have changed.
 - If you changed release tooling or CI-facing scripts, run those scripts directly when possible.
-- If you changed shaded modules incidentally, make sure bundled license metadata still matches the current shaded dependencies.
+- If you changed shaded modules incidentally, make sure `xtable.bundled.artifactIds` and the license texts still match the current shaded dependencies.
 
 ## Final Checklist For Dependency PRs
 
 - Dependency declarations updated.
 - Runtime tree regenerated for changed shaded modules.
 - Shade include lists match runtime dependencies only.
-- `python3 release/scripts/generate_shaded_license_metadata.py` run.
-- `release/scripts/validate_shaded_license_coverage.sh` run successfully.
+- `xtable.bundled.artifactIds` updated to match the includes.
+- A license text added for each newly bundled non-Apache-2.0 dependency.
+- `python3 release/scripts/validate_bundled_license_texts.py` run successfully on freshly built bundles.
 - Any expected Category B warnings reviewed.
 - Relevant Maven verification command run successfully.

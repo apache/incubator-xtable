@@ -976,7 +976,6 @@
                         </includes>
                         <excludes>
                             <exclude>${target.dir.pattern}</exclude>
-                            <exclude>release/scripts/generate_shaded_license_metadata.py</exclude>
                             <exclude>release/scripts/validate_bundled_license_texts.py</exclude>
                             <exclude>website/node_modules/**</exclude>
                             <exclude>website/build/**</exclude>

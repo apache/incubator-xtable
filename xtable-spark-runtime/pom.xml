@@ -28,6 +28,11 @@
 
     <artifactId>xtable-spark-runtime_${scala.binary.version}</artifactId>
     <name>XTable Project Spark Runtime</name>
+    <properties>
+        <!-- Mirrors the shade includes below; feeds the bundled LICENSE render. -->
+        <xtable.bundled.resources.skip>false</xtable.bundled.resources.skip>
+        <xtable.bundled.artifactIds>checker-qual,commons-cli,error_prone_annotations,failureaccess,guava,j2objc-annotations,listenablefuture,snakeyaml,xtable-api,xtable-core_${scala.binary.version},xtable-hudi-support-utils</xtable.bundled.artifactIds>
+    </properties>
     <description>Thin, relocated Spark bundle that runs XTable metadata sync.</description>
 
     <dependencies>
@@ -243,7 +248,7 @@
                         <configuration>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <!-- Must match the runtime dependency tree (validate_shaded_license_coverage.sh) -->
+                            <!-- Must match the runtime dependency tree; xtable.bundled.artifactIds mirrors this list. -->
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.xtable:xtable-api</include>
@@ -298,21 +303,24 @@
                             </filters>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                                <!-- Must run before DontIncludeResourceTransformer, or there are no NOTICEs left to merge. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <projectName>Apache XTable (incubating)</projectName>
+                                    <inceptionYear>2024</inceptionYear>
+                                </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                                     <resources>
                                         <resource>LICENSE</resource>
+                                        <resource>LICENSE.txt</resource>
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
+                                        <resource>META-INF/LICENSE.txt</resource>
                                     </resources>
                                 </transformer>
+                                <!-- ALv2 plus a pointer to each bundled non-ALv2 licence text. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE-bundled</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                    <file>target/bundled-archive-resources/META-INF/LICENSE</file>
                                 </transformer>
                             </transformers>
                         </configuration>
