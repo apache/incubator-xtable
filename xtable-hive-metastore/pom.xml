@@ -367,6 +367,8 @@
                                         <resource>LICENSE</resource>
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
+                                        <!-- Loose texts that duplicate one in META-INF/licenses (#701). -->
+                                        <resource>LICENSE.txt</resource>
                                     </resources>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
@@ -378,25 +380,6 @@
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
-                            <!--
-                              License texts dependencies ship outside META-INF/licenses (#701).
-                              Texts for code they embed are checked in there as LICENSE.*.txt;
-                              the rest duplicate a checked-in text or the Apache LICENSE.
-                            -->
-                            <filters combine.children="append">
-                                <filter>
-                                    <artifact>org.datanucleus:datanucleus-core</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/ASM_LICENSE.txt</exclude>
-                                    </excludes>
-                                </filter>
-                                <filter>
-                                    <artifact>org.apache.zookeeper:zookeeper</artifact>
-                                    <excludes>
-                                        <exclude>LICENSE.txt</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
                             <artifactSet>
                                 <includes>
                                     <include>com.fasterxml.jackson.core:jackson-annotations</include>

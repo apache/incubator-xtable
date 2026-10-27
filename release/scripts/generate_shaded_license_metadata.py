@@ -280,9 +280,7 @@ GROUP_OVERRIDES = {
     # jta and transaction-api declare no license in their poms. Both ship the
     # CDDL 1.0 text, which is what licenses/LICENSE-transaction-api reproduces.
     "javax.transaction": "CDDL",
-    # hadoop-project's pom is not namespace-well-formed -- it contains an
-    # <Xlint:-unchecked/> element that Maven tolerates and ElementTree rejects --
-    # so the licenses of everything inheriting from it cannot be read.
+    # hadoop-project's pom has an <Xlint:-unchecked/> element ElementTree rejects.
     "org.apache.hadoop": "Apache License 2.0",
     "org.apache.hbase": "Apache License 2.0",
     "org.apache.velocity": "Apache License 2.0",

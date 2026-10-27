@@ -168,7 +168,7 @@ The license workflow runs:
 
 - `./mvnw apache-rat:check -B`
 - `release/scripts/validate_shaded_license_coverage.sh`
-- `release/scripts/validate_bundled_license_texts.py` and `validate_bundled_jar_license_layout.py`, against the built bundles
+- `release/scripts/validate_bundled_license_texts.py`, against the built bundles
 
 If you change dependency behavior, assume this workflow must still pass.
 
