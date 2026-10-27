@@ -251,7 +251,7 @@
                                 <!-- ALv2 plus a pointer to each bundled non-ALv2 licence text. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>src/license/LICENSE</file>
+                                    <file>target/bundled-archive-resources/META-INF/LICENSE</file>
                                 </transformer>
                             </transformers>
                             <artifactSet>
