@@ -100,137 +100,6 @@ NOTICE:
 
 --------------------------------------------------------------------------------
 
-Group: org.eclipse.jetty Name: jetty-http Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-io Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-security Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-server Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-servlet Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-util-ajax Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-webapp Version: 9.4.54.v20240208
-Group: org.eclipse.jetty Name: jetty-xml Version: 9.4.54.v20240208
-
-NOTICE:
-| ==============================================================
-|  Jetty Web Container
-|  Copyright 1995-2018 Mort Bay Consulting Pty Ltd.
-| ==============================================================
-|
-| The Jetty Web Container is Copyright Mort Bay Consulting Pty Ltd
-| unless otherwise noted.
-|
-| Jetty is dual licensed under both
-|
-|   * The Apache 2.0 License
-|     http://www.apache.org/licenses/LICENSE-2.0.html
-|
-|       and
-|
-|   * The Eclipse Public 1.0 License
-|     http://www.eclipse.org/legal/epl-v10.html
-|
-| Jetty may be distributed under either license.
-|
-| ------
-| Eclipse
-|
-| The following artifacts are EPL.
-|  * org.eclipse.jetty.orbit:org.eclipse.jdt.core
-|
-| The following artifacts are EPL and ASL2.
-|  * org.eclipse.jetty.orbit:javax.security.auth.message
-|
-|
-| The following artifacts are EPL and CDDL 1.0.
-|  * org.eclipse.jetty.orbit:javax.mail.glassfish
-|
-|
-| ------
-| Oracle
-|
-| The following artifacts are CDDL + GPLv2 with classpath exception.
-| https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
-|
-|  * javax.servlet:javax.servlet-api
-|  * javax.annotation:javax.annotation-api
-|  * javax.transaction:javax.transaction-api
-|  * javax.websocket:javax.websocket-api
-|
-| ------
-| Oracle OpenJDK
-|
-| If ALPN is used to negotiate HTTP/2 connections, then the following
-| artifacts may be included in the distribution or downloaded when ALPN
-| module is selected.
-|
-|  * java.sun.security.ssl
-|
-| These artifacts replace/modify OpenJDK classes.  The modififications
-| are hosted at github and both modified and original are under GPL v2 with
-| classpath exceptions.
-| http://openjdk.java.net/legal/gplv2+ce.html
-|
-|
-| ------
-| OW2
-|
-| The following artifacts are licensed by the OW2 Foundation according to the
-| terms of http://asm.ow2.org/license.html
-|
-| org.ow2.asm:asm-commons
-| org.ow2.asm:asm
-|
-|
-| ------
-| Apache
-|
-| The following artifacts are ASL2 licensed.
-|
-| org.apache.taglibs:taglibs-standard-spec
-| org.apache.taglibs:taglibs-standard-impl
-|
-|
-| ------
-| MortBay
-|
-| The following artifacts are ASL2 licensed.  Based on selected classes from
-| following Apache Tomcat jars, all ASL2 licensed.
-|
-| org.mortbay.jasper:apache-jsp
-|   org.apache.tomcat:tomcat-jasper
-|   org.apache.tomcat:tomcat-juli
-|   org.apache.tomcat:tomcat-jsp-api
-|   org.apache.tomcat:tomcat-el-api
-|   org.apache.tomcat:tomcat-jasper-el
-|   org.apache.tomcat:tomcat-api
-|   org.apache.tomcat:tomcat-util-scan
-|   org.apache.tomcat:tomcat-util
-|
-| org.mortbay.jasper:apache-el
-|   org.apache.tomcat:tomcat-jasper-el
-|   org.apache.tomcat:tomcat-el-api
-|
-|
-| ------
-| Mortbay
-|
-| The following artifacts are CDDL + GPLv2 with classpath exception.
-|
-| https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
-|
-| org.eclipse.jetty.toolchain:jetty-schemas
-|
-| ------
-| Assorted
-|
-| The UnixCrypt.java code implements the one way cryptography used by
-| Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
-| modified April 2001  by Iris Van den Broeke, Daniel Deville.
-| Permission to use, copy, modify and distribute UnixCrypt
-| for non-commercial or commercial purposes and without fee is
-| granted provided that the copyright notice appears in all copies.
-
---------------------------------------------------------------------------------
-
 Group: org.apache.derby Name: derby Version: 10.14.1.0
 
 NOTICE:
@@ -702,17 +571,6 @@ NOTICE:
 
 --------------------------------------------------------------------------------
 
-Group: org.apache.geronimo.specs Name: geronimo-jcache_1.0_spec Version: 1.0-alpha-1
-
-NOTICE:
-| Apache Geronimo JCache Spec 1.0
-| Copyright 2003-2014 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
 Group: org.codehaus.groovy Name: groovy-all Version: 2.4.11
 
 NOTICE:
@@ -729,68 +587,6 @@ NOTICE:
 | http://www.famfamfam.com/lab/icons/silk/
 | Licensed under the Creative Commons Attribution Licence v2.5
 | http://creativecommons.org/licenses/by/2.5/
-
---------------------------------------------------------------------------------
-
-Group: org.apache.calcite.avatica Name: avatica Version: 1.11.0
-
-NOTICE:
-| Apache HttpCore
-| Copyright 2005-2015 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-|
-| Apache Calcite Avatica (Shaded)
-| Copyright 2012-2018 The Apache Software Foundation
-|
-| Apache Calcite Avatica
-| Copyright 2012-2018 The Apache Software Foundation
-|
-| Apache Calcite Avatica Metrics
-| Copyright 2012-2018 The Apache Software Foundation
-|
-| # Jackson JSON processor
-|
-| Jackson is a high-performance, Free/Open Source JSON processing library.
-| It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
-| been in development since 2007.
-| It is currently developed by a community of developers, as well as supported
-| commercially by FasterXML.com.
-|
-| ## Licensing
-|
-| Jackson core and extension components may licensed under different licenses.
-| To find the details that apply to this artifact see the accompanying LICENSE file.
-| For more information, including possible other licensing options, contact
-| FasterXML.com (http://fasterxml.com).
-|
-| ## Credits
-|
-| A list of contributors may be found from CREDITS file, which is included
-| in some artifacts (usually source distributions); but is always available
-| from the source code management (SCM) system project uses.
-|
-| Jackson core and extension components may be licensed under different licenses.
-| To find the details that apply to this artifact see the accompanying LICENSE file.
-| For more information, including possible other licensing options, contact
-| FasterXML.com (http://fasterxml.com).
-|
-| Apache HttpClient
-| Copyright 1999-2016 The Apache Software Foundation
-|
-| Apache Commons Logging
-| Copyright 2003-2014 The Apache Software Foundation
-|
-| Apache Commons Codec
-| Copyright 2002-2013 The Apache Software Foundation
-|
-| src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java
-| contains test data from http://aspell.net/test/orig/batch0.tab.
-| Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
-|
-| This project contains annotations derived from JCIP-ANNOTATIONS
-| Copyright (c) 2005 Brian Goetz and Tim Peierls. See http://www.jcip.net
 
 --------------------------------------------------------------------------------
 
@@ -888,28 +684,6 @@ NOTICE:
 
 --------------------------------------------------------------------------------
 
-Group: org.apache.calcite Name: calcite-druid Version: 1.16.0
-
-NOTICE:
-| Calcite Druid
-| Copyright 2012-2018 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.calcite Name: calcite-linq4j Version: 1.16.0
-
-NOTICE:
-| Calcite Linq4j
-| Copyright 2012-2018 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
 Group: com.github.joshelser Name: dropwizard-metrics-hadoop-metrics2-reporter Version: 0.1.2
 
 NOTICE:
@@ -922,28 +696,6 @@ Group: org.apache.curator Name: curator-framework Version: 2.12.0
 NOTICE:
 | Curator Framework
 | Copyright 2011-2017 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.ehcache Name: ehcache Version: 3.3.1
-
-NOTICE:
-| Ehcache V3
-| Copyright 2014-2016 Terracotta, Inc.
-|
-| The product includes software from the Apache Commons Lang project,
-| under the Apache License 2.0 (see: org.ehcache.impl.internal.classes.commonslang)
-
---------------------------------------------------------------------------------
-
-Group: org.apache.hive Name: hive-classification Version: 3.1.3
-
-NOTICE:
-| Hive Classifications
-| Copyright 2022 The Apache Software Foundation
 |
 | This product includes software developed at
 | The Apache Software Foundation (http://www.apache.org/).
@@ -1097,17 +849,6 @@ Group: org.apache.orc Name: orc-core Version: 1.5.8
 
 NOTICE:
 | ORC Core
-| Copyright 2013-2019 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.orc Name: orc-shims Version: 1.5.8
-
-NOTICE:
-| ORC Shims
 | Copyright 2013-2019 The Apache Software Foundation
 |
 | This product includes software developed at

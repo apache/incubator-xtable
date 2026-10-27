@@ -208,7 +208,6 @@ This section summarizes those components and their licenses. See licenses/ for t
 
 Apache License 2.0
 ------------------
-com.esri.geometry:esri-geometry-api:2.0.0
 com.fasterxml.jackson.core:jackson-annotations:2.18.2
 com.fasterxml.jackson.core:jackson-core:2.18.2
 com.fasterxml.jackson.core:jackson-databind:2.18.2
@@ -222,9 +221,6 @@ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
 com.google.j2objc:j2objc-annotations:2.8
 com.jolbox:bonecp:0.8.0.RELEASE
 com.tdunning:json:1.8
-com.yahoo.datasketches:memory:0.9.0
-com.yahoo.datasketches:sketches-core:0.9.0
-com.zaxxer:HikariCP-java7:2.4.12
 commons-dbcp:commons-dbcp:1.4
 commons-lang:commons-lang:2.6
 commons-pool:commons-pool:1.5.4
@@ -234,18 +230,13 @@ joda-time:joda-time:2.9.9
 org.apache.ant:ant:1.9.1
 org.apache.avro:avro:1.12.0
 org.apache.calcite:calcite-core:1.16.0
-org.apache.calcite:calcite-druid:1.16.0
-org.apache.calcite:calcite-linq4j:1.16.0
-org.apache.calcite.avatica:avatica:1.11.0
 org.apache.curator:curator-framework:2.12.0
 org.apache.derby:derby:10.14.1.0
-org.apache.geronimo.specs:geronimo-jcache_1.0_spec:1.0-alpha-1
 org.apache.hadoop:hadoop-yarn-registry:3.1.0
 org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice:3.1.0
 org.apache.hadoop:hadoop-yarn-server-common:3.1.0
 org.apache.hadoop:hadoop-yarn-server-resourcemanager:3.1.0
 org.apache.hadoop:hadoop-yarn-server-web-proxy:3.1.0
-org.apache.hive:hive-classification:3.1.3
 org.apache.hive:hive-common:3.1.3
 org.apache.hive:hive-exec:core
 org.apache.hive:hive-llap-client:3.1.3
@@ -264,7 +255,6 @@ org.apache.ivy:ivy:2.5.2
 org.apache.logging.log4j:log4j-1.2-api:2.22.0
 org.apache.logging.log4j:log4j-api:2.22.0
 org.apache.orc:orc-core:1.5.8
-org.apache.orc:orc-shims:1.5.8
 org.apache.parquet:parquet-avro:1.15.2
 org.apache.parquet:parquet-column:1.15.2
 org.apache.parquet:parquet-common:1.15.2
@@ -282,15 +272,6 @@ org.datanucleus:datanucleus-api-jdo:4.2.4
 org.datanucleus:datanucleus-core:4.1.17
 org.datanucleus:datanucleus-rdbms:4.1.19
 org.datanucleus:javax.jdo:3.2.0-m3
-org.eclipse.jetty:jetty-http:9.4.54.v20240208
-org.eclipse.jetty:jetty-io:9.4.54.v20240208
-org.eclipse.jetty:jetty-security:9.4.54.v20240208
-org.eclipse.jetty:jetty-server:9.4.54.v20240208
-org.eclipse.jetty:jetty-servlet:9.4.54.v20240208
-org.eclipse.jetty:jetty-util-ajax:9.4.54.v20240208
-org.eclipse.jetty:jetty-webapp:9.4.54.v20240208
-org.eclipse.jetty:jetty-xml:9.4.54.v20240208
-org.ehcache:ehcache:3.3.1
 org.scala-lang:scala-library:2.12.20
 stax:stax-api:1.0.1
 
