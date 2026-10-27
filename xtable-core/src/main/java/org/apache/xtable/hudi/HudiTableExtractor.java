@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.common.model.HoodieCommitMetadata.SCHEMA_KEY;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -25,12 +27,24 @@ import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
+import lombok.SneakyThrows;
+
 import org.apache.avro.Schema;
 
+import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.schema.HoodieSchemaUtils;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 import org.apache.hudi.common.util.Option;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.model.InternalTable;
@@ -47,6 +61,11 @@ import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
  */
 @Singleton
 public class HudiTableExtractor {
+  private static final ObjectMapper MAPPER =
+      new ObjectMapper()
+          .registerModule(new JavaTimeModule())
+          .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+          .setSerializationInclusion(JsonInclude.Include.NON_NULL);
   private final HudiSchemaExtractor schemaExtractor;
   private final SourcePartitionSpecExtractor partitionSpecExtractor;
 
@@ -58,18 +77,7 @@ public class HudiTableExtractor {
   }
 
   public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
-    TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
-    InternalSchema canonicalSchema;
-    Schema avroSchema;
-    try {
-      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
-      canonicalSchema = schemaExtractor.schema(avroSchema);
-    } catch (Exception e) {
-      throw new SchemaExtractorException(
-          String.format(
-              "Failed to convert table %s schema", metaClient.getTableConfig().getTableName()),
-          e);
-    }
+    InternalSchema canonicalSchema = getCanonicalSchemaFromTimeline(metaClient, commit);
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -88,6 +96,7 @@ public class HudiTableExtractor {
         .readSchema(canonicalSchema)
         .latestMetadataPath(metaClient.getMetaPath().toString())
         .latestCommitTime(HudiInstantUtils.getSyncInstant(metaClient, commit))
+        .latestTableOperationIdentifier(tableOperationIdentifier(commit))
         .build();
   }
 
@@ -121,25 +130,8 @@ public class HudiTableExtractor {
         .build();
   }
 
-
   private InternalSchema getCanonicalSchemaFromCommitMetadata(
       HoodieTableMetaClient metaClient, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
-    // Prefer Hudi InternalSchema when available
-    try {
-      TableSchemaResolver resolver = new TableSchemaResolver(metaClient);
-      Option<org.apache.hudi.internal.schema.InternalSchema> hudiInternalSchema =
-          resolver.getTableInternalSchemaFromCommitMetadata();
-      if (hudiInternalSchema.isPresent() && !hudiInternalSchema.get().isEmptySchema()) {
-        InternalSchema converted = HudiInternalSchemaConverter.convert(hudiInternalSchema.get());
-        if (converted != null) {
-          return converted;
-        }
-      }
-    } catch (Exception ignored) {
-      // fall through to Avro path
-    }
-
-    // Original Avro path
     String writerSchemaJson = commitMetadata.getExtraMetadata().get(SCHEMA_KEY);
     if (writerSchemaJson == null) {
       throw new SchemaExtractorException(
@@ -172,35 +164,22 @@ public class HudiTableExtractor {
     }
   }
 
-
   private InternalSchema getCanonicalSchemaFromTimeline(
       HoodieTableMetaClient metaClient, HoodieInstant commit) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
+    InternalSchema canonicalSchema;
+    Schema avroSchema;
     try {
-      // Prefer Hudi InternalSchema when schema-on-read is enabled (preserves field IDs on rename)
-      Option<org.apache.hudi.internal.schema.InternalSchema> hudiInternalSchema =
-          tableSchemaResolver.getTableInternalSchemaFromCommitMetadata();
-      if (hudiInternalSchema.isPresent() && !hudiInternalSchema.get().isEmptySchema()) {
-        InternalSchema converted = HudiInternalSchemaConverter.convert(hudiInternalSchema.get());
-        if (converted != null) {
-          return converted;
-        }
-      }
-
-      // Fallback to Avro schema (original behaviour)
-      Schema avroSchema =
-          tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
-      return schemaExtractor.schema(avroSchema);
+      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
+      canonicalSchema = schemaExtractor.schema(avroSchema);
     } catch (Exception e) {
       throw new SchemaExtractorException(
           String.format(
               "Failed to convert table %s schema", metaClient.getTableConfig().getTableName()),
           e);
     }
+    return canonicalSchema;
   }
-
-
-
 
   private List<InternalField> getRecordKeyFields(
       HoodieTableMetaClient metaClient, InternalSchema canonicalSchema) {
@@ -211,5 +190,15 @@ public class HudiTableExtractor {
     return Arrays.stream(recordKeyFieldNames.get())
         .map(name -> SchemaFieldFinder.getInstance().findFieldByPath(canonicalSchema, name))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * The serialized form of a Hudi instant that {@link
+   * InternalTable#getLatestTableOperationIdentifier()} carries, read back by the pluggable table
+   * format's timeline, archiver and rollback.
+   */
+  @SneakyThrows
+  public static String tableOperationIdentifier(HoodieInstant completedInstant) {
+    return MAPPER.writeValueAsString(InstantDTO.fromInstant(completedInstant));
   }
 }

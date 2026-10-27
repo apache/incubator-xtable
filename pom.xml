@@ -54,6 +54,7 @@
         <module>xtable-aws</module>
         <module>xtable-hive-metastore</module>
         <module>xtable-service</module>
+        <module>xtable-spark-runtime</module>
     </modules>
 
     <properties>
@@ -295,6 +296,22 @@
                 <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-java-client</artifactId>
                 <version>${hudi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hudi</groupId>
+                <artifactId>hudi-spark-client</artifactId>
+                <version>${hudi.version}</version>
+                <exclusions>
+                    <!-- Lance and Vortex file format support is compiled against Spark 3.5 -->
+                    <exclusion>
+                        <groupId>org.lance</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>dev.vortex</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- Iceberg -->
@@ -970,6 +987,8 @@
                         <excludes>
                             <exclude>.idea/**</exclude>
                             <exclude>${target.dir.pattern}</exclude>
+                            <!-- Written by maven-shade-plugin in xtable-spark-runtime -->
+                            <exclude>**/dependency-reduced-pom.xml</exclude>
                             <exclude>website/node_modules/**</exclude>
                             <exclude>website/build/**</exclude>
                             <exclude>website/.docusaurus/**</exclude>
