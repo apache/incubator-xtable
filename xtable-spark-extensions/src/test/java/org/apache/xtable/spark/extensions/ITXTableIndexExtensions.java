@@ -363,6 +363,94 @@ public class ITXTableIndexExtensions {
     }
   }
 
+  /**
+   * A rollback and a rebuild of the index after the lookup bring the index back to the checked
+   * snapshot, but the lookup read the files of a newer index. The rule must compare the version of
+   * the index, not only its snapshot, and read the table as usual.
+   */
+  @Test
+  void rebuildDuringLookupKeepsTheRows() throws Exception {
+    createTable(false);
+    appendRows(0, 400, 4);
+    syncIndex("email");
+    long checkedSnapshot = icebergTable().currentSnapshot().snapshotId();
+    String email = emails(7).get(0);
+    String sql = "SELECT id FROM " + TABLE + " WHERE email = '" + email + "'";
+    long neighbor = neighborOf(7);
+
+    // before the lookup: a copy-on-write delete rewrites the file of row 7, and a sync indexes it
+    IndexPruningRule$.MODULE$.beforeLookup_$eq(
+        () -> {
+          IndexPruningRule$.MODULE$.beforeLookup_$eq(() -> null);
+          spark.sql("DELETE FROM " + TABLE + " WHERE id = " + neighbor);
+          syncIndex("email");
+          return null;
+        });
+    // after the lookup: the table rolls back to the checked snapshot, and the index is rebuilt
+    IndexPruningRule$.MODULE$.afterLookup_$eq(
+        () -> {
+          IndexPruningRule$.MODULE$.afterLookup_$eq(() -> null);
+          icebergTable().manageSnapshots().rollbackTo(checkedSnapshot).commit();
+          try {
+            deleteIndex();
+          } catch (Exception e) {
+            throw new IllegalStateException(e);
+          }
+          syncIndex("email");
+          return null;
+        });
+    try {
+      assertEquals(
+          Collections.singletonList(7L),
+          spark.sql(sql).collectAsList().stream()
+              .map(row -> row.getLong(0))
+              .collect(Collectors.toList()));
+    } finally {
+      IndexPruningRule$.MODULE$.beforeLookup_$eq(() -> null);
+      IndexPruningRule$.MODULE$.afterLookup_$eq(() -> null);
+    }
+    assertEquals(checkedSnapshot, icebergTable().currentSnapshot().snapshotId());
+    // the next query sees the rebuilt index
+    assertUsesIndex(sql);
+  }
+
+  /**
+   * Renames keep the snapshot of the table, so the index stays current, but after a swap of two
+   * column names the index of a column describes the values of another field.
+   */
+  @Test
+  void swappedColumnNamesDoNotUseIndex() throws Exception {
+    createTable(false);
+    appendRows(0, 400, 4);
+    syncIndex("email");
+    assertUsesIndex("SELECT id, email FROM " + TABLE + " WHERE email = '" + emails(7).get(0) + "'");
+
+    spark.sql("ALTER TABLE " + TABLE + " RENAME COLUMN email TO old_email");
+    spark.sql("ALTER TABLE " + TABLE + " RENAME COLUMN level TO email");
+    String sql = "SELECT id, email FROM " + TABLE + " WHERE email = 'level_1'";
+    assertDoesNotUseIndex(sql);
+    // ids 1, 4, ..., 397
+    assertEquals(133, spark.sql(sql).count());
+  }
+
+  /** Returns another row in the file of the row, which a copy-on-write delete rewrites. */
+  private static long neighborOf(long id) {
+    return spark
+        .sql(
+            "SELECT id FROM "
+                + TABLE
+                + " WHERE id <> "
+                + id
+                + " AND _file = (SELECT _file FROM "
+                + TABLE
+                + " WHERE id = "
+                + id
+                + ") LIMIT 1")
+        .collectAsList()
+        .get(0)
+        .getLong(0);
+  }
+
   /** Builds or updates the index of the column the way an XTable sync job does. */
   private static void syncIndex(String column) {
     Table table = icebergTable();

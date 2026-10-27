@@ -81,7 +81,8 @@ import org.apache.xtable.model.storage.TableFormat;
 /**
  * Runs a sync with the shaded bundle through {@code $SPARK_HOME/bin/spark-submit}, one case per
  * direction, and checks the target data equals the source. The engines come from {@code
- * target/engine-classpath.txt}. Skipped when {@code SPARK_HOME} is not set.
+ * target/engine-classpath.txt} and the Hudi bundle from {@code target/engine-jars}. Skipped when
+ * {@code SPARK_HOME} is not set.
  */
 class ITXTableSparkRuntimeBundle {
 
@@ -454,7 +455,13 @@ class ITXTableSparkRuntimeBundle {
             + " (dependency:build-classpath)");
     String cp = new String(Files.readAllBytes(cpFile.toPath()), StandardCharsets.UTF_8).trim();
     assertTrue(!cp.isEmpty(), "engine classpath file is empty");
-    return cp;
+    // The Hudi bundle is built for the Spark of spark-submit (-Dengine.spark.version.prefix), not
+    // for the Spark the module compiles against.
+    File hudiBundle = new File("target/engine-jars/hudi-spark-bundle.jar");
+    assertTrue(
+        hudiBundle.isFile(),
+        "Hudi Spark bundle not copied to " + hudiBundle.getAbsolutePath() + " (dependency:copy)");
+    return cp + File.pathSeparator + hudiBundle.getAbsolutePath();
   }
 
   // The shaded jar is the main artifact; skip original-* and the sources, javadoc and tests jars.

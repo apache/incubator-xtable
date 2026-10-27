@@ -49,6 +49,7 @@ import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
 import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexReader
+import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexUtils.SyncedVersion
 import org.apache.xtable.spark.extensions.{XTableIndex, XTableIndexConf}
 
 /**
@@ -59,7 +60,7 @@ import org.apache.xtable.spark.extensions.{XTableIndex, XTableIndexConf}
  * The rule looks the keys up in the index, keeps the files that Iceberg's own partition and min/max
  * pruning also keeps, and stages them as the task set of the scan. The filter stays in the plan, so
  * the query returns the same rows as without the rule. The rule leaves the plan unchanged when the
- * index is behind the table, when the query reads an older snapshot, a branch, a tag or the changes
+ * index is behind the table, when the indexed column was renamed or its name reused, when the query reads an older snapshot, a branch, a tag or the changes
  * between snapshots, or when the scan is too small for a lookup to pay off.
  */
 case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
@@ -99,17 +100,20 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       XTableIndex.of(spark, table, relation.catalog.map(_.name()), relation.identifier)
     for {
       (column, keys) <- findIndexedFilter(table, index, keyFilters)
+      if hasStableIdentity(table, column)
       if withinKeyLimit(table, column, keys)
       snapshot <- Option(table.currentSnapshot())
-      if isCurrent(table, column, index.lastSyncedSnapshot, snapshot.snapshotId())
+      version = index.syncedVersion
+      if isCurrent(table, column, version, snapshot.snapshotId())
       // the files a scan reads after Iceberg's partition and min/max pruning
       candidates = planFiles(table, snapshot.snapshotId(), column, keys)
       if isLargeEnough(table, column, candidates)
       indexedFiles = lookup(index, column, keys)
-      // A sync that completes between the check above and the lookup can point the index at files
-      // of a newer snapshot than the candidates. The index stays at the checked snapshot until the
-      // next sync commits, so an unchanged snapshot after the lookup shows that it read that one.
-      if isUnchanged(table, column, index.lastSyncedSnapshot, snapshot.snapshotId())
+      // A sync, rollback or rebuild that completes between the check above and the end of the
+      // lookup can point the index at other files than the candidates, even at the same snapshot.
+      // Each of them completes a new action on the index, so an equal version after the lookup
+      // shows that the lookup read the checked version.
+      if isUnchanged(table, column, version, index.syncedVersion)
     } yield {
       val tasks = candidates.filter(task =>
         indexedFiles.contains(IndexPruningRule.normalizePath(task.file().location())))
@@ -160,13 +164,34 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       .find { case (column, _) => index.isIndexed(column) }
   }
 
+  /**
+   * Whether the column names the same field in every schema of the table. The index keys a column
+   * by name, so a rename that gives the name to another field, or a type change, makes the index
+   * describe other values than the column holds now.
+   */
+  private def hasStableIdentity(table: Table, column: String): Boolean = {
+    val current = table.schema().findField(column)
+    val stable = table.schemas().values().asScala.forall { schema =>
+      Option(schema.findField(column)).forall(field =>
+        field.fieldId() == current.fieldId() && field.`type`() == current.`type`()) &&
+      Option(schema.findColumnName(current.fieldId())).forall(_ == column)
+    }
+    if (!stable) {
+      logWarning(
+        s"Not using the index of ${table.name()} on $column: a schema of the table gives the " +
+          "name to another field, renames the field or changes its type, so the index can hold " +
+          "other values than the column")
+    }
+    stable
+  }
+
   private def lookup(index: XTableIndex, column: String, keys: Seq[Any]): Set[String] = {
     IndexPruningRule.beforeLookup()
     val keyColumn = spark
       .createDataset(keys.map(_.toString).distinct.asJava)(Encoders.STRING)
       .toDF(column)
     // collect through the RDD, so the lookup runs as plain Spark jobs inside the planning query
-    index.reader
+    val files = index.reader
       .lookup(index.sourceTable, keyColumn, column)
       .select(HudiBackedSecondaryIndexReader.FILE_COLUMN)
       .rdd
@@ -175,6 +200,8 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       .collect()
       .map(IndexPruningRule.normalizePath)
       .toSet
+    IndexPruningRule.afterLookup()
+    files
   }
 
   private def withinKeyLimit(table: Table, column: String, keys: Seq[Any]): Boolean = {
@@ -188,8 +215,9 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   private def isCurrent(
       table: Table,
       column: String,
-      syncedSnapshot: Option[String],
+      version: Option[SyncedVersion],
       currentSnapshot: Long): Boolean = {
+    val syncedSnapshot = version.map(_.getSourceIdentifier)
     val current = syncedSnapshot.contains(currentSnapshot.toString)
     if (!current) {
       logWarning(
@@ -203,13 +231,13 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   private def isUnchanged(
       table: Table,
       column: String,
-      syncedSnapshot: Option[String],
-      checkedSnapshot: Long): Boolean = {
-    val unchanged = syncedSnapshot.contains(checkedSnapshot.toString)
+      checkedVersion: Option[SyncedVersion],
+      versionAfterLookup: Option[SyncedVersion]): Boolean = {
+    val unchanged = versionAfterLookup == checkedVersion
     if (!unchanged) {
       logInfo(
-        s"Not using the index of ${table.name()} on $column: a sync updated it to snapshot " +
-          s"${syncedSnapshot.getOrElse("none")} during the lookup of snapshot $checkedSnapshot")
+        s"Not using the index of ${table.name()} on $column: it changed from $checkedVersion " +
+          s"to ${versionAfterLookup.getOrElse("none")} during the lookup")
     }
     unchanged
   }
@@ -282,6 +310,9 @@ object IndexPruningRule {
 
   /** Runs after the freshness check and before the lookup. Tests use it to run a sync between. */
   @volatile private[extensions] var beforeLookup: () => Unit = () => ()
+
+  /** Runs after the lookup and before the second check. Tests use it to change the index there. */
+  @volatile private[extensions] var afterLookup: () => Unit = () => ()
 
   /**
    * Finds the conjuncts of the condition that compare a column of the relation with literals, and

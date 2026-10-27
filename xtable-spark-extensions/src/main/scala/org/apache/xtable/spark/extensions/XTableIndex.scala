@@ -29,6 +29,7 @@ import scala.collection.JavaConverters._
 import org.apache.xtable.catalog.TableFormatUtils
 import org.apache.xtable.conversion.SourceTable
 import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexReader
+import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexUtils.SyncedVersion
 import org.apache.xtable.iceberg.{IcebergCatalogConfig, IcebergConversionSourceProvider}
 import org.apache.xtable.model.storage.TableFormat
 
@@ -46,10 +47,13 @@ case class XTableIndex(spark: SparkSession, sourceTable: SourceTable) {
   /** Whether the index of the column is built. */
   def isIndexed(column: String): Boolean = reader.doesIndexExist(column)
 
-  /** The id of the Iceberg snapshot that the index was last synced with, if any. */
-  def lastSyncedSnapshot: Option[String] = {
-    val identifier = reader.getLastSyncedSourceIdentifier
-    if (identifier.isPresent) Some(identifier.get()) else None
+  /**
+   * The version of the index, if it is built. Its source identifier is the id of the Iceberg
+   * snapshot that the index was last synced with.
+   */
+  def syncedVersion: Option[SyncedVersion] = {
+    val version = reader.getLastSyncedVersion
+    if (version.isPresent) Some(version.get()) else None
   }
 }
 

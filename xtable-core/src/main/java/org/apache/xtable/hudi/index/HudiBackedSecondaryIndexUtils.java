@@ -30,10 +30,12 @@ import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.Value;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.TimelineUtils;
 import org.apache.hudi.exception.TableNotFoundException;
@@ -142,11 +144,24 @@ public final class HudiBackedSecondaryIndexUtils {
   }
 
   /**
-   * Returns the source commit identifier in the sync metadata of the last completed commit, or
-   * empty when there is no Hudi table or no completed commit yet. A sync without a new source
-   * commit makes no Hudi commit, so the identifier stays at the last synced source commit.
+   * A version of the index: the latest completion time on the timeline of the Hudi target, and the
+   * source commit that the last completed commit synced. Every action on the target completes at a
+   * new time, including a sync, a rollback, a restore and a rebuild of a deleted target, so two
+   * reads that return equal versions read the same index, even when a rebuilt index syncs a source
+   * commit that an earlier version synced as well.
    */
-  static Optional<String> getLastSyncedSourceIdentifier(
+  @Value
+  public static class SyncedVersion {
+    String latestCompletionTime;
+    String sourceIdentifier;
+  }
+
+  /**
+   * Returns the version of the index, or empty when there is no Hudi table, no completed commit or
+   * no sync metadata yet. A sync without a new source commit makes no Hudi commit, so the source
+   * identifier stays at the last synced source commit.
+   */
+  static Optional<SyncedVersion> getLastSyncedVersion(
       String dataPath, Configuration configuration) {
     HoodieTableMetaClient metaClient;
     try {
@@ -154,20 +169,36 @@ public final class HudiBackedSecondaryIndexUtils {
     } catch (TableNotFoundException e) {
       return Optional.empty();
     }
+    // one load of the timeline for both fields, so they describe the same version
+    HoodieActiveTimeline timeline = metaClient.getActiveTimeline();
     Optional<HoodieInstant> lastCommit =
-        metaClient.getCommitsTimeline().filterCompletedInstants().lastInstant().toJavaOptional();
-    if (!lastCommit.isPresent()) {
+        timeline.getCommitsTimeline().filterCompletedInstants().lastInstant().toJavaOptional();
+    Optional<String> latestCompletionTime =
+        timeline.filterCompletedInstants().getLatestCompletionTime().toJavaOptional();
+    if (!lastCommit.isPresent() || !latestCompletionTime.isPresent()) {
       return Optional.empty();
     }
     try {
       String syncMetadata =
-          TimelineUtils.getCommitMetadata(lastCommit.get(), metaClient.getActiveTimeline())
+          TimelineUtils.getCommitMetadata(lastCommit.get(), timeline)
               .getExtraMetadata()
               .get(TableSyncMetadata.XTABLE_METADATA);
-      return TableSyncMetadata.fromJson(syncMetadata).map(TableSyncMetadata::getSourceIdentifier);
+      return TableSyncMetadata.fromJson(syncMetadata)
+          .map(
+              metadata ->
+                  new SyncedVersion(latestCompletionTime.get(), metadata.getSourceIdentifier()));
     } catch (IOException e) {
       throw new UncheckedIOException(
           "Failed to read the XTable sync metadata of " + lastCommit.get() + " in " + dataPath, e);
     }
+  }
+
+  /**
+   * Returns the source commit identifier in the sync metadata of the last completed commit, or
+   * empty when there is no Hudi table or no completed commit yet.
+   */
+  static Optional<String> getLastSyncedSourceIdentifier(
+      String dataPath, Configuration configuration) {
+    return getLastSyncedVersion(dataPath, configuration).map(SyncedVersion::getSourceIdentifier);
   }
 }

@@ -30,6 +30,11 @@
     <name>XTable Project Spark Runtime</name>
     <description>Thin, relocated Spark bundle that runs XTable metadata sync and the XTable Spark SQL extensions.</description>
 
+    <properties>
+        <!-- Spark version of the Hudi bundle that ITXTableSparkRuntimeBundle passes to spark-submit -->
+        <engine.spark.version.prefix>${spark.version.prefix}</engine.spark.version.prefix>
+    </properties>
+
     <dependencies>
         <!-- Bundled -->
         <dependency>
@@ -227,7 +232,29 @@
                         <configuration>
                             <includeScope>provided</includeScope>
                             <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j,org.scala-lang,com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.module</excludeGroupIds>
+                            <!-- The Hudi bundle must match the Spark of spark-submit; see engine-hudi-bundle -->
+                            <excludeArtifactIds>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</excludeArtifactIds>
                             <outputFile>${project.build.directory}/engine-classpath.txt</outputFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>engine-hudi-bundle</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.apache.hudi</groupId>
+                                    <artifactId>hudi-spark${engine.spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
+                                    <version>${hudi.version}</version>
+                                    <!-- one name, so a build for another Spark version replaces the jar -->
+                                    <destFileName>hudi-spark-bundle.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}/engine-jars</outputDirectory>
+                            <overWriteReleases>true</overWriteReleases>
                         </configuration>
                     </execution>
                 </executions>

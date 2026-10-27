@@ -39,8 +39,8 @@ jobs:
   build:
     name: Maven CI Build
     runs-on: ubuntu-latest
-    # A cold build is ~27 min, which left no headroom under the previous 30.
-    timeout-minutes: 40
+    # A cold build is ~40 min (the xtable-core ITs alone take ~30), so 40 left no headroom.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 

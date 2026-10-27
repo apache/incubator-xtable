@@ -107,7 +107,10 @@ The query reads the table as usual, so results stay correct, when:
 
 - the index was not synced with the current snapshot of the table. The driver log has a warning
   that names the snapshot of the index and of the table; run the sync job to use the index again.
-- a sync updates the index while the query looks keys up in it.
+- a sync, a rollback or a rebuild changes the index while the query looks keys up in it.
+- a schema of the table gives the name of the indexed column to another field, renames the
+  indexed field or changes its type. The driver log has a warning. Old schemas stay in the table
+  metadata, so a rebuild of the index does not make it usable again.
 - the query reads an older snapshot (`VERSION AS OF`, `TIMESTAMP AS OF`, `snapshot-id`,
   `as-of-timestamp`), a branch, a tag, or the changes between snapshots (`start-snapshot-id`,
   `end-snapshot-id`).
