@@ -28,13 +28,19 @@
 
     <artifactId>xtable-spark-runtime_${scala.binary.version}</artifactId>
     <name>XTable Project Spark Runtime</name>
-    <description>Thin, relocated Spark bundle that runs XTable metadata sync.</description>
+    <description>Thin, relocated Spark bundle that runs XTable metadata sync and the XTable Spark SQL extensions.</description>
 
     <dependencies>
         <!-- Bundled -->
         <dependency>
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-spark-extensions_${scala.binary.version}</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -249,6 +255,7 @@
                                     <include>org.apache.xtable:xtable-api</include>
                                     <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
                                     <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>org.apache.xtable:xtable-spark-extensions_${scala.binary.version}</include>
                                     <include>com.google.guava:guava</include>
                                     <include>com.google.guava:failureaccess</include>
                                     <include>com.google.guava:listenablefuture</include>

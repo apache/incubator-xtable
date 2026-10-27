@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -150,6 +151,20 @@ class ITXTableSparkRuntimeBundle {
 
     assertDatasetEquivalence(
         sourceFormat, targetFormat, basePath, dataPath, columns, orderByColumn, output);
+  }
+
+  /**
+   * Users name the Spark SQL extensions in {@code spark.sql.extensions}, so the bundle must ship
+   * them under their own package, not relocated.
+   */
+  @Test
+  void bundleShipsSparkSqlExtensions() throws Exception {
+    try (JarFile bundle = new JarFile(findBundleJar())) {
+      assertTrue(
+          bundle.getEntry("org/apache/xtable/spark/extensions/XTableSparkSessionExtensions.class")
+              != null,
+          "XTableSparkSessionExtensions is missing from the bundle");
+    }
   }
 
   /**

@@ -20,20 +20,18 @@ SELECT * FROM prod.db.customer WHERE email IN ('a@example.com', 'b@example.com')
 ## Setting up Spark
 
 The extensions need Spark 3.4 with Scala 2.12, the Iceberg Spark runtime and the Hudi Spark bundle.
-Build the XTable jars from source:
+They ship in the [XTable Spark runtime jar](how-to-spark-runtime), so no other XTable jar is needed.
+Until a release includes them, build the jar from source:
 
 ```shell
-./mvnw -pl xtable-spark-extensions -am package -DskipTests
+./mvnw -pl xtable-spark-runtime -am package -DskipTests
 ```
 
 Put these jars on the classpath of the driver and the executors. Use
 `spark.driver.extraClassPath` and `spark.executor.extraClassPath` rather than `--jars`, so that
 XTable and Hudi are loaded by the same class loader:
 
-- `xtable-spark-extensions/target/xtable-spark-extensions_2.12-<version>.jar`
-- `xtable-core/target/xtable-core_2.12-<version>.jar`
-- `xtable-api/target/xtable-api-<version>.jar`
-- `xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-<version>.jar`
+- `xtable-spark-runtime/target/xtable-spark-runtime_2.12-<version>.jar`
 - `org.apache.hudi:hudi-spark3.4-bundle_2.12:1.2.1`
 - `org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2`
 
