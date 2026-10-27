@@ -30,6 +30,7 @@ import lombok.NoArgsConstructor;
 
 import org.apache.avro.Schema;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Type;
@@ -319,9 +320,8 @@ public class ParquetSchemaExtractor {
         // RECORD Type (non-nullable elements)
         if (!schema.asGroupType().getName().equals("list")
             && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
-          boolean isNullable =
-              subFields.stream().anyMatch(ele -> ele.getSchema().isNullable())
-                  && isNullable(schema.asGroupType());
+          // The root message is the row itself and is never null; parquet marks it REPEATED.
+          boolean isNullable = !(schema instanceof MessageType) && isNullable(schema);
           return InternalSchema.builder()
               .name(schema.getName())
               .comment(null)
