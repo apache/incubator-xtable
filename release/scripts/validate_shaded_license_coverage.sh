@@ -242,12 +242,8 @@ for module in "${SHADE_MODULES[@]}"; do
     printf '  - %s\n' "${missing[@]}"
   fi
 
-  # LICENSE-bundled opens with "See licenses/ for text of these licenses", so
-  # every bundled dependency outside Apache 2.0 has to ship its text, and every
-  # text has to have such a dependency behind it. Both directions are checked:
-  # a text with nothing behind it is what https://github.com/apache/incubator-xtable/issues/865
-  # reported. The families come from LICENSE-bundled, which the check above has
-  # already confirmed covers every shaded include.
+  # Every bundled non-Apache-2.0 dependency needs its text under licenses/, and
+  # every text there needs such a dependency; families come from LICENSE-bundled.
   licenses_dir="${module}/src/main/resources/META-INF/licenses"
   family_file="${scratch_dir}/families"
   text_family_file="${scratch_dir}/text-families"

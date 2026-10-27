@@ -238,7 +238,7 @@ org.apache.hadoop:hadoop-yarn-server-common:3.1.0
 org.apache.hadoop:hadoop-yarn-server-resourcemanager:3.1.0
 org.apache.hadoop:hadoop-yarn-server-web-proxy:3.1.0
 org.apache.hive:hive-common:3.1.3
-org.apache.hive:hive-exec:core
+org.apache.hive:hive-exec:3.1.3
 org.apache.hive:hive-llap-client:3.1.3
 org.apache.hive:hive-llap-common:3.1.3
 org.apache.hive:hive-llap-tez:3.1.3

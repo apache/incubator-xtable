@@ -281,7 +281,10 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
 
     result: dict[str, list] = {"missing": [], "mismatched": [], "unresolved": [], "partial": [], "absent": []}
     in_tree = {f"{group}:{artifact}" for group, artifact, _, _ in coords}
-    result["untracked"] = [i for i in includes - in_tree if not i.startswith("org.apache.xtable:")]
+    result["stale_includes"] = [
+        f"{i}  (present in shade <includes> but missing from runtime dependency tree)"
+        for i in includes - in_tree
+    ]
     bundled = []
     for group, artifact, version, classifier in coords:
         if group == "org.apache.xtable" or f"{group}:{artifact}" not in includes:
@@ -330,7 +333,7 @@ REPORTS = [
     ("partial", "dependencies only partly present, so they cannot be classified"),
     ("unresolved", "dependencies that could not be resolved or have no license"),
     ("absent", "shade includes resolved by Maven but with no classes in the jar"),
-    ("untracked", "shade includes missing from the dependency tree, so never checked"),
+    ("stale_includes", "shade <include> entries that no longer exist in the runtime dependency tree"),
 ]
 
 # Published shaded modules; xtable-utilities is not published yet (see AGENTS.md).

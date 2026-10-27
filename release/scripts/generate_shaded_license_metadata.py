@@ -278,7 +278,7 @@ GROUP_OVERRIDES = {
     "javax.servlet": "Apache License 2.0",
     "javax.servlet.jsp": "CDDL + GPLv2 with classpath exception",
     # jta and transaction-api declare no license in their poms. Both ship the
-    # CDDL 1.0 text, which is what licenses/LICENSE-jta reproduces.
+    # CDDL 1.0 text, which is what licenses/LICENSE-transaction-api reproduces.
     "javax.transaction": "CDDL",
     # hadoop-project's pom is not namespace-well-formed -- it contains an
     # <Xlint:-unchecked/> element that Maven tolerates and ElementTree rejects --
@@ -312,8 +312,9 @@ def tree_coords(module: pathlib.Path) -> list[tuple[str, str, str]]:
     for line in (module / "target" / "dependency-tree-runtime.txt").read_text().splitlines():
         line = re.sub(r"^[| +\\-]+", "", line)
         parts = line.split(":")
+        # group:artifact:type[:classifier]:version:scope
         if len(parts) >= 5 and parts[2] not in ("pom", "test-jar"):
-            coords.add((parts[0], parts[1], parts[3]))
+            coords.add((parts[0], parts[1], parts[-2]))
     return sorted(coords)
 
 
