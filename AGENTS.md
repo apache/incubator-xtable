@@ -121,6 +121,12 @@ Build the shaded bundles and check that every bundled non-Apache-2.0 dependency 
 python3 release/scripts/validate_bundled_license_texts.py
 ```
 
+Then check that the shade includes match the runtime dependency tree, that `xtable.bundled.artifactIds` matches the includes, that each bundle has one `META-INF/LICENSE` and one `META-INF/NOTICE`, and that every bundled license family is allowed:
+
+```bash
+release/scripts/validate_shaded_license_coverage.sh
+```
+
 If only one or two modules changed, prefer targeted Maven verification:
 
 ```bash
@@ -156,6 +162,7 @@ The license workflow runs:
 - `./mvnw apache-rat:check -B`
 - a package build of the shaded modules
 - `python3 release/scripts/validate_bundled_license_texts.py`
+- `release/scripts/validate_shaded_license_coverage.sh`
 
 If you change dependency behavior, assume this workflow must still pass.
 
@@ -186,6 +193,6 @@ For non-dependency changes, expect the main Maven CI workflow to be the baseline
 - Shade include lists match runtime dependencies only.
 - `xtable.bundled.artifactIds` updated to match the includes.
 - A license text added for each newly bundled non-Apache-2.0 dependency.
-- `python3 release/scripts/validate_bundled_license_texts.py` run successfully on freshly built bundles.
+- `python3 release/scripts/validate_bundled_license_texts.py` and `release/scripts/validate_shaded_license_coverage.sh` run successfully on freshly built bundles.
 - Any expected Category B warnings reviewed.
 - Relevant Maven verification command run successfully.

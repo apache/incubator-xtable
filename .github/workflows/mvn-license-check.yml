@@ -104,6 +104,10 @@ jobs:
       - name: Validate Bundled License Texts
         run: python3 release/scripts/validate_bundled_license_texts.py
 
+      # Runs after the build: it reads each module's rendered LICENSE and its built jars.
+      - name: Validate Shaded Dependency License Metadata
+        run: release/scripts/validate_shaded_license_coverage.sh
+
       # Nothing above this line resolves xtable-utilities or xtable-service:
       # `apache-rat:check` requires no dependency resolution, `dependency:tree`
       # collects poms rather than jars, and the shaded-bundle build reaches only
