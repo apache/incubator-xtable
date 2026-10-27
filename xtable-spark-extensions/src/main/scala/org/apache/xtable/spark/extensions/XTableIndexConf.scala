@@ -22,6 +22,8 @@ import org.apache.spark.sql.internal.SQLConf
 
 /** Session settings for the XTable index rule. */
 object XTableIndexConf {
+
+  /** Whether queries use XTable indexes. Set it to false to read tables without their index. */
   val PruningEnabled = "spark.xtable.index.pruning.enabled"
 
   /**

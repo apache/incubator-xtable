@@ -21,7 +21,7 @@ module.exports = {
                 'how-to',
                 'how-to-catalog-sync',
                 'how-to-spark-runtime',
-                'how-to-index-sql'
+                'how-to-index'
             ],
         },
         {

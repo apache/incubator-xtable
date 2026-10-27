@@ -20,9 +20,7 @@ package org.apache.xtable.spark.extensions
 
 import org.apache.spark.sql.SparkSessionExtensions
 
-import org.apache.xtable.spark.extensions.execution.XTableIndexStrategy
 import org.apache.xtable.spark.extensions.optimizer.IndexPruningRule
-import org.apache.xtable.spark.extensions.parser.XTableSqlParser
 
 /**
  * Spark SQL extensions for XTable. Add them after Iceberg's extensions:
@@ -32,14 +30,12 @@ import org.apache.xtable.spark.extensions.parser.XTableSqlParser
  *   org.apache.xtable.spark.extensions.XTableSparkSessionExtensions
  * }}}
  *
- * They add the commands {@code CREATE INDEX ... USING xtable}, {@code DROP INDEX} and
- * {@code REFRESH INDEX} for Iceberg tables, and a rule that uses the index to read only the files
- * that hold the keys of an equality or {@code IN} filter.
+ * They add a rule that uses the XTable index of an Iceberg table to read only the files that hold
+ * the keys of an equality or {@code IN} filter, in SQL queries and DataFrame reads alike. An XTable
+ * sync to a Hudi target with a secondary index builds the index and keeps it current.
  */
 class XTableSparkSessionExtensions extends (SparkSessionExtensions => Unit) {
   override def apply(extensions: SparkSessionExtensions): Unit = {
-    extensions.injectParser { case (_, delegate) => new XTableSqlParser(delegate) }
-    extensions.injectPlannerStrategy(_ => XTableIndexStrategy)
     extensions.injectOptimizerRule(spark => IndexPruningRule(spark))
   }
 }

@@ -40,24 +40,27 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 import org.apache.iceberg.{FileScanTask, Table}
 import org.apache.iceberg.expressions.{Expression => IcebergExpression, Expressions}
+import org.apache.iceberg.spark.SparkReadOptions
 import org.apache.iceberg.spark.source.SparkTable
 import org.apache.iceberg.types.Type.TypeID
+import org.apache.iceberg.types.Types.NestedField
 
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
 import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexReader
-import org.apache.xtable.spark.extensions.{IndexDefinition, XTableIndexConf}
+import org.apache.xtable.spark.extensions.{XTableIndex, XTableIndexConf}
 
 /**
  * Uses an XTable index to read only the files that hold the keys of a filter such as
- * {@code col = 'x'} or {@code col IN ('x', 'y')} on an indexed column of an Iceberg table.
+ * {@code col = 'x'} or {@code col IN ('x', 'y')} on an indexed column of an Iceberg table. The rule
+ * runs for SQL queries and DataFrame reads alike.
  *
  * The rule looks the keys up in the index, keeps the files that Iceberg's own partition and min/max
  * pruning also keeps, and stages them as the task set of the scan. The filter stays in the plan, so
  * the query returns the same rows as without the rule. The rule leaves the plan unchanged when the
- * index is behind the table, when the query reads an older snapshot or a branch, or when the scan
- * is too small for a lookup to pay off.
+ * index is behind the table, when the query reads an older snapshot, a branch, a tag or the changes
+ * between snapshots, or when the scan is too small for a lookup to pay off.
  */
 case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   private val listenerRegistered = new AtomicBoolean(false)
@@ -70,7 +73,7 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       case filter @ Filter(
             condition,
             relation @ DataSourceV2Relation(table: SparkTable, _, _, _, options))
-          if !options.containsKey(StagedScans.ScanTaskSetIdOption) &&
+          if !IndexPruningRule.SnapshotReadOptions.exists(options.containsKey) &&
             table.snapshotId() == null && table.branch() == null =>
         try {
           prune(filter, condition, relation, table).getOrElse(filter)
@@ -87,87 +90,140 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       condition: Expression,
       relation: DataSourceV2Relation,
       sparkTable: SparkTable): Option[LogicalPlan] = {
-    val definitions = IndexDefinition.fromProperties(sparkTable.properties())
+    val keyFilters = IndexPruningRule.findKeyFilters(condition, relation.output)
+    if (keyFilters.isEmpty) {
+      return None
+    }
     val table = sparkTable.table()
+    val index =
+      XTableIndex.of(spark, table, relation.catalog.map(_.name()), relation.identifier)
     for {
-      (definition, keys) <- IndexPruningRule
-        .findIndexedKeys(condition, relation.output, definitions, conf.resolver)
-      if withinKeyLimit(table, definition, keys)
+      (column, keys) <- findIndexedFilter(table, index, keyFilters)
+      if withinKeyLimit(table, column, keys)
       snapshot <- Option(table.currentSnapshot())
-      index = IndexDefinition.newIndex(
-        spark,
-        table,
-        relation.catalog.map(_.name()),
-        relation.identifier,
-        definition)
-      reader = index.reader
-      if isCurrent(table, definition, reader.getLastSyncedSourceIdentifier, snapshot.snapshotId())
+      if isCurrent(table, column, index.lastSyncedSnapshot, snapshot.snapshotId())
       // the files a scan reads after Iceberg's partition and min/max pruning
-      candidates = planFiles(table, snapshot.snapshotId(), definition.column, keys)
-      if isLargeEnough(table, definition, candidates)
+      candidates = planFiles(table, snapshot.snapshotId(), column, keys)
+      if isLargeEnough(table, column, candidates)
+      indexedFiles = lookup(index, column, keys)
+      // A sync that completes between the check above and the lookup can point the index at files
+      // of a newer snapshot than the candidates. The index stays at the checked snapshot until the
+      // next sync commits, so an unchanged snapshot after the lookup shows that it read that one.
+      if isUnchanged(table, column, index.lastSyncedSnapshot, snapshot.snapshotId())
     } yield {
-      val keyColumn = spark
-        .createDataset(keys.map(_.toString).distinct.asJava)(Encoders.STRING)
-        .toDF(definition.column)
-      // collect through the RDD, so the lookup runs as plain Spark jobs inside the planning query
-      val indexedFiles = reader
-        .lookup(index.sourceTable, keyColumn, definition.column)
-        .select(HudiBackedSecondaryIndexReader.FILE_COLUMN)
-        .rdd
-        .map(_.getString(0))
-        .distinct()
-        .collect()
-        .map(IndexPruningRule.normalizePath)
-        .toSet
       val tasks = candidates.filter(task =>
         indexedFiles.contains(IndexPruningRule.normalizePath(task.file().location())))
-      logInfo(
-        s"Using index ${definition.name} of ${table.name()} for ${keys.size} keys: reading " +
-          s"${tasks.size} of ${candidates.size} candidate files")
       if (tasks.isEmpty) {
+        logInfo(
+          s"Using the index of ${table.name()} on $column for ${keys.size} keys: no file of " +
+            s"${candidates.size} candidate files holds them")
         filter.copy(child = LocalRelation(relation.output, Nil, isStreaming = false))
       } else {
-        registerCleanupListener()
-        val setId = StagedScans.stage(table, tasks)
-        val stagedOptions = new java.util.HashMap[String, String](options(relation))
-        stagedOptions.put(StagedScans.ScanTaskSetIdOption, setId)
-        filter.copy(child = relation.copy(options = new CaseInsensitiveStringMap(stagedOptions)))
+        StagedScans.stage(table, tasks) match {
+          case Some(setId) =>
+            logInfo(
+              s"Using the index of ${table.name()} on $column for ${keys.size} keys: reading " +
+                s"${tasks.size} of ${candidates.size} candidate files")
+            registerCleanupListener()
+            val stagedOptions = new java.util.HashMap[String, String](options(relation))
+            stagedOptions.put(StagedScans.ScanTaskSetIdOption, setId)
+            filter.copy(child =
+              relation.copy(options = new CaseInsensitiveStringMap(stagedOptions)))
+          case None =>
+            logWarning(
+              s"Not using the index of ${table.name()} on $column: too many staged scans are " +
+                "live, which happens when plans are optimized but not run")
+            filter
+        }
       }
     }
   }
 
-  private def withinKeyLimit(table: Table, definition: IndexDefinition, keys: Seq[Any]): Boolean = {
+  /**
+   * Returns the first filter on an indexed column, with the name of the column in the table
+   * schema. Hudi records the indexed column under that name.
+   */
+  private def findIndexedFilter(
+      table: Table,
+      index: XTableIndex,
+      keyFilters: Seq[(String, Seq[Any])]): Option[(String, Seq[Any])] = {
+    val schema = table.schema()
+    keyFilters.iterator
+      .flatMap { case (attribute, keys) =>
+        val field: NestedField =
+          if (conf.caseSensitiveAnalysis) schema.findField(attribute)
+          else schema.caseInsensitiveFindField(attribute)
+        Option(field)
+          .filter(field => XTableIndex.SupportedTypes.contains(field.`type`().typeId()))
+          .map(field => field.name() -> keys)
+      }
+      .find { case (column, _) => index.isIndexed(column) }
+  }
+
+  private def lookup(index: XTableIndex, column: String, keys: Seq[Any]): Set[String] = {
+    IndexPruningRule.beforeLookup()
+    val keyColumn = spark
+      .createDataset(keys.map(_.toString).distinct.asJava)(Encoders.STRING)
+      .toDF(column)
+    // collect through the RDD, so the lookup runs as plain Spark jobs inside the planning query
+    index.reader
+      .lookup(index.sourceTable, keyColumn, column)
+      .select(HudiBackedSecondaryIndexReader.FILE_COLUMN)
+      .rdd
+      .map(_.getString(0))
+      .distinct()
+      .collect()
+      .map(IndexPruningRule.normalizePath)
+      .toSet
+  }
+
+  private def withinKeyLimit(table: Table, column: String, keys: Seq[Any]): Boolean = {
     val withinLimit = keys.size <= XTableIndexConf.maxKeys(conf)
     if (!withinLimit) {
-      logInfo(s"Not using index ${definition.name} of ${table.name()}: ${keys.size} keys")
+      logInfo(s"Not using the index of ${table.name()} on $column: ${keys.size} keys")
     }
     withinLimit
   }
 
   private def isCurrent(
       table: Table,
-      definition: IndexDefinition,
-      syncedSnapshot: java.util.Optional[String],
+      column: String,
+      syncedSnapshot: Option[String],
       currentSnapshot: Long): Boolean = {
-    val current = syncedSnapshot.isPresent && syncedSnapshot.get() == currentSnapshot.toString
+    val current = syncedSnapshot.contains(currentSnapshot.toString)
     if (!current) {
-      logInfo(
-        s"Not using index ${definition.name} of ${table.name()}: it is synced to snapshot " +
-          s"${syncedSnapshot.orElse("none")}, but the table is at $currentSnapshot")
+      logWarning(
+        s"Not using the index of ${table.name()} on $column: it is synced to snapshot " +
+          s"${syncedSnapshot.getOrElse("none")}, but the table is at $currentSnapshot. Run the " +
+          "XTable sync of the table to update the index")
     }
     current
   }
 
+  private def isUnchanged(
+      table: Table,
+      column: String,
+      syncedSnapshot: Option[String],
+      checkedSnapshot: Long): Boolean = {
+    val unchanged = syncedSnapshot.contains(checkedSnapshot.toString)
+    if (!unchanged) {
+      logInfo(
+        s"Not using the index of ${table.name()} on $column: a sync updated it to snapshot " +
+          s"${syncedSnapshot.getOrElse("none")} during the lookup of snapshot $checkedSnapshot")
+    }
+    unchanged
+  }
+
   private def isLargeEnough(
       table: Table,
-      definition: IndexDefinition,
+      column: String,
       candidates: Seq[FileScanTask]): Boolean = {
     val candidateBytes = candidates.map(_.file().fileSizeInBytes()).sum
     val largeEnough = candidates.size >= XTableIndexConf.minCandidateFiles(conf) ||
       candidateBytes >= XTableIndexConf.minCandidateBytes(conf)
     if (!largeEnough) {
       logInfo(
-        s"Not using index ${definition.name} of ${table.name()}: the scan reads only " +
+        s"Not using the index of ${table.name()} on $column: the scan reads only " +
           s"${candidates.size} files of $candidateBytes bytes")
     }
     largeEnough
@@ -207,35 +263,49 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
 object IndexPruningRule {
 
   /**
-   * Finds a conjunct of the condition that compares an indexed column with literals, and returns
-   * the index and the non-null literal values in Spark's internal representation.
+   * Read options that select other rows than the current snapshot of the table, or that already
+   * select the tasks of the scan. The rule leaves scans with any of them unchanged.
    */
-  def findIndexedKeys(
-      condition: Expression,
-      output: Seq[Attribute],
-      definitions: Seq[IndexDefinition],
-      resolver: (String, String) => Boolean): Option[(IndexDefinition, Seq[Any])] = {
-    def indexOn(attribute: AttributeReference): Option[IndexDefinition] =
-      if (output.exists(_.exprId == attribute.exprId)) {
-        definitions.find(definition => resolver(attribute.name, definition.column))
-      } else {
-        None
-      }
+  val SnapshotReadOptions: Seq[String] = Seq(
+    SparkReadOptions.SNAPSHOT_ID,
+    SparkReadOptions.AS_OF_TIMESTAMP,
+    SparkReadOptions.VERSION_AS_OF,
+    SparkReadOptions.TIMESTAMP_AS_OF,
+    SparkReadOptions.BRANCH,
+    SparkReadOptions.TAG,
+    SparkReadOptions.START_SNAPSHOT_ID,
+    SparkReadOptions.END_SNAPSHOT_ID,
+    SparkReadOptions.START_TIMESTAMP,
+    SparkReadOptions.END_TIMESTAMP,
+    StagedScans.ScanTaskSetIdOption
+  )
 
-    splitConjuncts(condition).iterator
+  /** Runs after the freshness check and before the lookup. Tests use it to run a sync between. */
+  @volatile private[extensions] var beforeLookup: () => Unit = () => ()
+
+  /**
+   * Finds the conjuncts of the condition that compare a column of the relation with literals, and
+   * returns the name of each column with its non-null literal values in Spark's internal
+   * representation.
+   */
+  def findKeyFilters(condition: Expression, output: Seq[Attribute]): Seq[(String, Seq[Any])] = {
+    def column(attribute: AttributeReference): Option[String] =
+      if (output.exists(_.exprId == attribute.exprId)) Some(attribute.name) else None
+
+    splitConjuncts(condition)
       .flatMap {
         case EqualTo(attribute: AttributeReference, Literal(value, _)) if value != null =>
-          indexOn(attribute).map(_ -> Seq(value))
+          column(attribute).map(_ -> Seq(value))
         case EqualTo(Literal(value, _), attribute: AttributeReference) if value != null =>
-          indexOn(attribute).map(_ -> Seq(value))
+          column(attribute).map(_ -> Seq(value))
         case In(attribute: AttributeReference, values) if values.forall(_.isInstanceOf[Literal]) =>
           val keys = values.map(_.asInstanceOf[Literal].value).filter(_ != null)
-          indexOn(attribute).map(_ -> keys)
+          column(attribute).map(_ -> keys)
         case InSet(attribute: AttributeReference, values) =>
-          indexOn(attribute).map(_ -> values.filter(_ != null).toSeq)
+          column(attribute).map(_ -> values.filter(_ != null).toSeq)
         case _ => None
       }
-      .find(_._2.nonEmpty)
+      .filter(_._2.nonEmpty)
   }
 
   private def splitConjuncts(condition: Expression): Seq[Expression] = condition match {

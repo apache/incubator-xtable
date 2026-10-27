@@ -37,27 +37,31 @@ import scala.util.Try
 /**
  * Stages the file scan tasks that an index lookup selects. Iceberg reads a staged task set when a
  * scan has the {@code scan-task-set-id} option. Staged tasks live in a process wide registry until
- * they are removed, so this object removes them when the query that uses them ends, and removes the
- * oldest sets when too many are live (for example from plans that are only explained).
+ * they are removed, so this object removes them when the query that uses them ends. Iceberg reads
+ * the tasks of a scan only when Spark plans its partitions, so a set is never removed before its
+ * query ends. Plans that are only explained never end and leave their sets staged, so this object
+ * stages no new set once too many are live, and the scans that would use them read the table as
+ * usual.
  */
 object StagedScans {
   val ScanTaskSetIdOption = "scan-task-set-id"
 
-  private val MaxLiveSets = 1000
+  val MaxLiveSets = 1000
 
-  // insertion ordered, so the oldest set is evicted first
-  private val liveSets = new java.util.LinkedHashMap[String, Table]()
+  private val liveSets = new java.util.HashMap[String, Table]()
 
-  def stage(table: Table, tasks: Seq[FileScanTask]): String = {
+  /** Stages the tasks and returns the id of their set, or nothing when too many sets are live. */
+  def stage(table: Table, tasks: Seq[FileScanTask]): Option[String] = {
     val setId = UUID.randomUUID().toString
-    ScanTaskSetManager.get().stageTasks(table, setId, tasks.asJava)
-    val evicted = liveSets.synchronized {
-      liveSets.put(setId, table)
-      val oldest = liveSets.keySet().asScala.take(math.max(0, liveSets.size() - MaxLiveSets)).toList
-      oldest.map(id => id -> liveSets.remove(id))
+    val reserved = liveSets.synchronized {
+      liveSets.size() < MaxLiveSets && liveSets.put(setId, table) == null
     }
-    evicted.foreach { case (id, evictedTable) => removeTasks(evictedTable, id) }
-    setId
+    if (reserved) {
+      ScanTaskSetManager.get().stageTasks(table, setId, tasks.asJava)
+      Some(setId)
+    } else {
+      None
+    }
   }
 
   def release(setId: String): Unit = {

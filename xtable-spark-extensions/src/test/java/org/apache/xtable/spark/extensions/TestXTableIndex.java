@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -36,50 +35,7 @@ import scala.collection.JavaConverters;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 
-public class TestIndexDefinition {
-
-  @Test
-  void readsDefinitionsFromTableProperties() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put("format", "iceberg/parquet");
-    properties.put("xtable.index.email_idx.column", "email");
-    properties.put(
-        "xtable.index.email_idx.option.xtable.hudi.target.metadata.record.index.min.filegroup.count",
-        "8");
-    properties.put("xtable.index.id_idx.column", "id");
-    // an option without a column is not an index
-    properties.put("xtable.index.orphan.option.k", "v");
-
-    List<IndexDefinition> definitions =
-        JavaConverters.seqAsJavaList(IndexDefinition.fromProperties(properties));
-
-    Map<String, String> emailOptions = new HashMap<>();
-    emailOptions.put("xtable.hudi.target.metadata.record.index.min.filegroup.count", "8");
-    assertEquals(
-        Arrays.asList(
-            new IndexDefinition("email_idx", "email", toScala(emailOptions)),
-            new IndexDefinition("id_idx", "id", toScala(new HashMap<>()))),
-        definitions);
-  }
-
-  @Test
-  void writesTheSamePropertiesItReads() {
-    Map<String, String> options = new HashMap<>();
-    options.put("k", "v");
-    IndexDefinition definition = new IndexDefinition("email_idx", "email", toScala(options));
-    Map<String, String> properties =
-        new HashMap<>(JavaConverters.mapAsJavaMap(definition.properties()));
-    assertEquals(
-        Arrays.asList(definition),
-        JavaConverters.seqAsJavaList(IndexDefinition.fromProperties(properties)));
-  }
-
-  @Test
-  void rejectsNamesThatBreakThePropertyKeys() {
-    IndexDefinition.validateName("email_idx_2");
-    assertThrows(IllegalArgumentException.class, () -> IndexDefinition.validateName("email.idx"));
-    assertThrows(IllegalArgumentException.class, () -> IndexDefinition.validateName("email idx"));
-  }
+public class TestXTableIndex {
 
   @Test
   void loadsTableFromTheSparkCatalogOptions() {
@@ -90,7 +46,7 @@ public class TestIndexDefinition {
     sparkConf.put("spark.sql.catalog.other.type", "rest");
 
     SourceTable sourceTable =
-        IndexDefinition.sourceTable(
+        XTableIndex.toSourceTable(
             "cat.db.orders",
             "file:///warehouse/db/orders",
             "file:///warehouse/db/orders/data",
@@ -129,7 +85,7 @@ public class TestIndexDefinition {
   @Test
   void loadsTableReadByPathFromItsLocation() {
     SourceTable sourceTable =
-        IndexDefinition.sourceTable(
+        XTableIndex.toSourceTable(
             "file:///tables/orders",
             "file:///tables/orders",
             "file:///tables/orders/data",
@@ -143,7 +99,7 @@ public class TestIndexDefinition {
 
   private static String catalogImpl(Map<String, String> sparkConf) {
     SourceTable sourceTable =
-        IndexDefinition.sourceTable(
+        XTableIndex.toSourceTable(
             "cat.db.orders",
             "file:///warehouse/db/orders",
             "file:///warehouse/db/orders/data",
