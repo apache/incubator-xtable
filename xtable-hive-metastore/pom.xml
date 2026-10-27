@@ -29,7 +29,7 @@
     <name>XTable HMS</name>
     <properties>
         <!--
-          This module produces a large bundled jar (~100 MB). Keep it out of the
+          This module produces a large bundled jar (~90 MB). Keep it out of the
           maven-build-cache entirely: the property disables both restore and save
           for this project, so the artifact never enters the cache directory that
           CI persists between runs. Shading is cheap relative to the test suites
@@ -160,6 +160,22 @@
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-upgrade-acid</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.geronimo.specs</groupId>
+                    <artifactId>geronimo-jcache_1.0_spec</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.zaxxer</groupId>
+                    <artifactId>HikariCP-java7</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hive</groupId>
+                    <artifactId>hive-classification</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -186,6 +202,46 @@
                 <exclusion>
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-upgrade-acid</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hive</groupId>
+                    <artifactId>hive-classification</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.orc</groupId>
+                    <artifactId>orc-shims</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-http</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-io</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-server</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-servlet</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-security</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-util-ajax</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-webapp</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-xml</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -226,6 +282,30 @@
                 <exclusion>
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-upgrade-acid</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.calcite</groupId>
+                    <artifactId>calcite-druid</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.calcite</groupId>
+                    <artifactId>calcite-linq4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.calcite.avatica</groupId>
+                    <artifactId>avatica</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.esri.geometry</groupId>
+                    <artifactId>esri-geometry-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.yahoo.datasketches</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hive</groupId>
+                    <artifactId>hive-classification</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -319,7 +399,6 @@
                             </filters>
                             <artifactSet>
                                 <includes>
-                                    <include>com.esri.geometry:esri-geometry-api</include>
                                     <include>com.fasterxml.jackson.core:jackson-annotations</include>
                                     <include>com.fasterxml.jackson.core:jackson-core</include>
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
@@ -336,9 +415,6 @@
                                     <include>com.sun.jersey:jersey-json</include>
                                     <include>com.tdunning:json</include>
                                     <include>com.thoughtworks.paranamer:paranamer</include>
-                                    <include>com.yahoo.datasketches:memory</include>
-                                    <include>com.yahoo.datasketches:sketches-core</include>
-                                    <include>com.zaxxer:HikariCP-java7</include>
                                     <include>commons-dbcp:commons-dbcp</include>
                                     <include>commons-lang:commons-lang</include>
                                     <include>commons-pool:commons-pool</include>
@@ -353,13 +429,9 @@
                                     <include>org.antlr:antlr-runtime</include>
                                     <include>org.apache.ant:ant</include>
                                     <include>org.apache.avro:avro</include>
-                                    <include>org.apache.calcite.avatica:avatica</include>
                                     <include>org.apache.calcite:calcite-core</include>
-                                    <include>org.apache.calcite:calcite-druid</include>
-                                    <include>org.apache.calcite:calcite-linq4j</include>
                                     <include>org.apache.curator:curator-framework</include>
                                     <include>org.apache.derby:derby</include>
-                                    <include>org.apache.geronimo.specs:geronimo-jcache_1.0_spec</include>
                                     <include>org.apache.hadoop:hadoop-yarn-registry</include>
                                     <include>org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice</include>
                                     <include>org.apache.hadoop:hadoop-yarn-server-common</include>
@@ -368,7 +440,6 @@
                                     <include>org.apache.hive.shims:hive-shims-0.23</include>
                                     <include>org.apache.hive.shims:hive-shims-common</include>
                                     <include>org.apache.hive.shims:hive-shims-scheduler</include>
-                                    <include>org.apache.hive:hive-classification</include>
                                     <include>org.apache.hive:hive-common</include>
                                     <include>org.apache.hive:hive-exec</include>
                                     <include>org.apache.hive:hive-llap-client</include>
@@ -384,7 +455,6 @@
                                     <include>org.apache.logging.log4j:log4j-1.2-api</include>
                                     <include>org.apache.logging.log4j:log4j-api</include>
                                     <include>org.apache.orc:orc-core</include>
-                                    <include>org.apache.orc:orc-shims</include>
                                     <include>org.apache.parquet:parquet-avro</include>
                                     <include>org.apache.parquet:parquet-column</include>
                                     <include>org.apache.parquet:parquet-common</include>
@@ -406,15 +476,6 @@
                                     <include>org.datanucleus:datanucleus-core</include>
                                     <include>org.datanucleus:datanucleus-rdbms</include>
                                     <include>org.datanucleus:javax.jdo</include>
-                                    <include>org.eclipse.jetty:jetty-http</include>
-                                    <include>org.eclipse.jetty:jetty-io</include>
-                                    <include>org.eclipse.jetty:jetty-security</include>
-                                    <include>org.eclipse.jetty:jetty-server</include>
-                                    <include>org.eclipse.jetty:jetty-servlet</include>
-                                    <include>org.eclipse.jetty:jetty-util-ajax</include>
-                                    <include>org.eclipse.jetty:jetty-webapp</include>
-                                    <include>org.eclipse.jetty:jetty-xml</include>
-                                    <include>org.ehcache:ehcache</include>
                                     <include>org.fusesource.leveldbjni:leveldbjni-all</include>
                                     <include>org.scala-lang:scala-library</include>
                                     <include>stax:stax-api</include>
