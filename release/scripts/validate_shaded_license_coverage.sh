@@ -86,14 +86,12 @@ while IFS= read -r module; do
       SHADE_MODULES+=("${module_dir}")
     fi
   fi
-done < <(
-  rg -l '<artifactId>maven-shade-plugin</artifactId>' --glob 'pom.xml' \
-    | sort
-)
+done < <(git grep -l '<artifactId>maven-shade-plugin</artifactId>' -- 'pom.xml' '*/pom.xml')
 
+# Finding nothing means discovery broke, so fail rather than pass vacuously.
 if [[ ${#SHADE_MODULES[@]} -eq 0 ]]; then
-  echo "No modules with maven-shade-plugin were found."
-  exit 0
+  echo "FAIL no modules with maven-shade-plugin were found."
+  exit 1
 fi
 
 missing_runtime_trees=()
