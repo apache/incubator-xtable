@@ -542,6 +542,26 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     public void commit() {
+      // Make repeated FULL / snapshot sync of an unchanged source commit idempotent.
+      // The target instant is derived from source.getLatestCommitTime(). When the source
+      // has not advanced, the same instant already exists as a completed replace-commit.
+      // Creating it again throws FileAlreadyExistsException on the .inflight file.
+      HoodieInstant completedInstant =
+          new HoodieInstant(
+              HoodieInstant.State.COMPLETED,
+              HoodieTimeline.REPLACE_COMMIT_ACTION,
+              instantTime,
+              InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+
+      if (metaClient.getActiveTimeline().containsInstant(completedInstant)) {
+        log.info(
+            "Replace-commit instant {} already completed on Hudi table at {}; "
+                + "skipping re-commit (idempotent snapshot sync of unchanged source).",
+            instantTime,
+            metaClient.getBasePath());
+        return;
+      }
+
       if (schema == null) {
         try {
           // reuse existing table schema if no schema is provided as part of this commit
