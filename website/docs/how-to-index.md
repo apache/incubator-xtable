@@ -108,9 +108,6 @@ The query reads the table as usual, so results stay correct, when:
 - the index was not synced with the current snapshot of the table. The driver log has a warning
   that names the snapshot of the index and of the table; run the sync job to use the index again.
 - a sync, a rollback or a rebuild changes the index while the query looks keys up in it.
-- a schema of the table gives the name of the indexed column to another field, renames the
-  indexed field or changes its type. The driver log has a warning. Old schemas stay in the table
-  metadata, so a rebuild of the index does not make it usable again.
 - the query reads an older snapshot (`VERSION AS OF`, `TIMESTAMP AS OF`, `snapshot-id`,
   `as-of-timestamp`), a branch, a tag, or the changes between snapshots (`start-snapshot-id`,
   `end-snapshot-id`).
@@ -119,6 +116,13 @@ The query reads the table as usual, so results stay correct, when:
   `spark.xtable.index.pruning.minCandidateFiles` files or `spark.xtable.index.pruning.minCandidateBytes`
   bytes to read.
 - the filter has more than `spark.xtable.index.pruning.maxKeys` values.
+
+### When a query fails
+
+A query with a filter on the indexed column fails when the column was renamed, or its name given to
+another field, after the index was synced. The index keys the column by name, so it would select
+the files of the old field. Remove the index and rebuild it after the next commit to the table, or
+turn the index off for the session.
 
 ### Settings
 

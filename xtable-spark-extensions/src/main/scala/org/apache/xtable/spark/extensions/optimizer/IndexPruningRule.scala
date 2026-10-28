@@ -38,7 +38,7 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
-import org.apache.iceberg.{FileScanTask, Table}
+import org.apache.iceberg.{FileScanTask, Snapshot, Table}
 import org.apache.iceberg.expressions.{Expression => IcebergExpression, Expressions}
 import org.apache.iceberg.spark.SparkReadOptions
 import org.apache.iceberg.spark.source.SparkTable
@@ -60,8 +60,9 @@ import org.apache.xtable.spark.extensions.{XTableIndex, XTableIndexConf}
  * The rule looks the keys up in the index, keeps the files that Iceberg's own partition and min/max
  * pruning also keeps, and stages them as the task set of the scan. The filter stays in the plan, so
  * the query returns the same rows as without the rule. The rule leaves the plan unchanged when the
- * index is behind the table, when the indexed column was renamed or its name reused, when the query reads an older snapshot, a branch, a tag or the changes
- * between snapshots, or when the scan is too small for a lookup to pay off.
+ * index is behind the table, when the query reads an older snapshot, a branch, a tag or the changes
+ * between snapshots, or when the scan is too small for a lookup to pay off. The rule fails the query
+ * when the indexed column was renamed after the index was synced.
  */
 case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   private val listenerRegistered = new AtomicBoolean(false)
@@ -79,6 +80,7 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
         try {
           prune(filter, condition, relation, table).getOrElse(filter)
         } catch {
+          case e: IndexedColumnRenamedException => throw e
           case NonFatal(e) =>
             logWarning(s"Not using the XTable index for ${table.name()}", e)
             filter
@@ -100,11 +102,11 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       XTableIndex.of(spark, table, relation.catalog.map(_.name()), relation.identifier)
     for {
       (column, keys) <- findIndexedFilter(table, index, keyFilters)
-      if hasStableIdentity(table, column)
       if withinKeyLimit(table, column, keys)
       snapshot <- Option(table.currentSnapshot())
       version = index.syncedVersion
       if isCurrent(table, column, version, snapshot.snapshotId())
+      _ = checkNotRenamed(table, column, snapshot)
       // the files a scan reads after Iceberg's partition and min/max pruning
       candidates = planFiles(table, snapshot.snapshotId(), column, keys)
       if isLargeEnough(table, column, candidates)
@@ -165,24 +167,22 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   }
 
   /**
-   * Whether the column names the same field in every schema of the table. The index keys a column
-   * by name, so a rename that gives the name to another field, or a type change, makes the index
-   * describe other values than the column holds now.
+   * Fails when the column names another field than in the schema of the synced snapshot. A rename
+   * keeps the snapshot, so the index stays current, but it keys the column by name and then holds
+   * the values of another field.
    */
-  private def hasStableIdentity(table: Table, column: String): Boolean = {
-    val current = table.schema().findField(column)
-    val stable = table.schemas().values().asScala.forall { schema =>
-      Option(schema.findField(column)).forall(field =>
-        field.fieldId() == current.fieldId() && field.`type`() == current.`type`()) &&
-      Option(schema.findColumnName(current.fieldId())).forall(_ == column)
+  private def checkNotRenamed(table: Table, column: String, snapshot: Snapshot): Unit = {
+    val syncedField =
+      Option(snapshot.schemaId())
+        .flatMap(id => Option(table.schemas().get(id)))
+        .map(_.findField(column))
+    if (syncedField.exists(field =>
+        field == null || field.fieldId() != table.schema().findField(column).fieldId())) {
+      throw new IndexedColumnRenamedException(
+        s"The index of ${table.name()} on $column was synced when $column named another field. " +
+          s"Rebuild the index after the next commit to the table, or set " +
+          s"${XTableIndexConf.PruningEnabled} to false.")
     }
-    if (!stable) {
-      logWarning(
-        s"Not using the index of ${table.name()} on $column: a schema of the table gives the " +
-          "name to another field, renames the field or changes its type, so the index can hold " +
-          "other values than the column")
-    }
-    stable
   }
 
   private def lookup(index: XTableIndex, column: String, keys: Seq[Any]): Set[String] = {
@@ -287,6 +287,9 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
     }
   }
 }
+
+/** Thrown when the indexed column was renamed after the index was synced. */
+class IndexedColumnRenamedException(message: String) extends IllegalStateException(message)
 
 object IndexPruningRule {
 

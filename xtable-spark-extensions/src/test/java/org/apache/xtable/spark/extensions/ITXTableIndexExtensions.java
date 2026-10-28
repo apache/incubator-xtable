@@ -21,6 +21,7 @@ package org.apache.xtable.spark.extensions;
 import static org.apache.spark.sql.functions.col;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -75,6 +76,7 @@ import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.spark.extensions.optimizer.IndexPruningRule;
 import org.apache.xtable.spark.extensions.optimizer.IndexPruningRule$;
+import org.apache.xtable.spark.extensions.optimizer.IndexedColumnRenamedException;
 import org.apache.xtable.spark.extensions.optimizer.StagedScans;
 
 /**
@@ -416,10 +418,11 @@ public class ITXTableIndexExtensions {
 
   /**
    * Renames keep the snapshot of the table, so the index stays current, but after a swap of two
-   * column names the index of a column describes the values of another field.
+   * column names the index of a column describes the values of another field. The query fails
+   * instead of returning the rows of the other field.
    */
   @Test
-  void swappedColumnNamesDoNotUseIndex() throws Exception {
+  void swappedColumnNamesFailQuery() throws Exception {
     createTable(false);
     appendRows(0, 400, 4);
     syncIndex("email");
@@ -428,9 +431,10 @@ public class ITXTableIndexExtensions {
     spark.sql("ALTER TABLE " + TABLE + " RENAME COLUMN email TO old_email");
     spark.sql("ALTER TABLE " + TABLE + " RENAME COLUMN level TO email");
     String sql = "SELECT id, email FROM " + TABLE + " WHERE email = 'level_1'";
-    assertDoesNotUseIndex(sql);
+    assertThrows(IndexedColumnRenamedException.class, () -> spark.sql(sql).count());
     // ids 1, 4, ..., 397
-    assertEquals(133, spark.sql(sql).count());
+    withConf(
+        XTableIndexConf.PruningEnabled(), "false", () -> assertEquals(133, spark.sql(sql).count()));
   }
 
   /** Returns another row in the file of the row, which a copy-on-write delete rewrites. */
