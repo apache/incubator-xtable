@@ -28,6 +28,7 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -106,6 +107,7 @@ import org.apache.xtable.hudi.HudiTargetConfig;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
@@ -968,7 +970,9 @@ public class ITConversionController {
     String tableName = getTableName();
     ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(DELTA);
     try (TestSparkDeltaTable table =
-        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, null)) {
+        // Partition by level so the integration test covers the column-mapping
+        // partition-value path (see #972): partition values are compared row by row.
+        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, "level")) {
       table.insertRows(20);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
@@ -1002,6 +1006,79 @@ public class ITConversionController {
       table.insertRows(10);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 70);
+    }
+  }
+
+  @Test
+  public void testLateColumnMappingRenameDeltaToIcebergWithKernelSource() {
+    DeltaKernelConversionSourceProvider conversionSourceProvider =
+        new DeltaKernelConversionSourceProvider();
+    conversionSourceProvider.init(jsc.hadoopConfiguration());
+    testLateColumnMappingRenameDeltaToIceberg(conversionSourceProvider);
+  }
+
+  @Test
+  public void testLateColumnMappingRenameDeltaToIcebergWithStandaloneSource() {
+    testLateColumnMappingRenameDeltaToIceberg(getConversionSourceProvider(DELTA));
+  }
+
+  /**
+   * The #977 scenario through a conversion source: column mapping enabled after data already
+   * exists, then a double rename that makes a logical name collide with another column's physical
+   * key (level -> tmp, street -> level), plus a row whose new level partition value is null. Before
+   * the storageName-authoritative fix, the null partition value fell back to the logical name and
+   * picked up tmp's value (tmp=X, level=X instead of tmp=X, level=null). Running the same scenario
+   * against both Delta sources also covers #886.
+   */
+  private void testLateColumnMappingRenameDeltaToIceberg(
+      ConversionSourceProvider<?> conversionSourceProvider) {
+    String tableName = getTableName();
+    try (TestSparkDeltaTable table =
+        TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
+            tableName, tempDir, sparkSession, "level")) {
+      table.insertRows(20);
+      // Enable column mapping only after data exists (late-enabled mapping).
+      sparkSession.sql(
+          String.format(
+              "ALTER TABLE delta.`%s` SET TBLPROPERTIES "
+                  + "('delta.minReaderVersion'='2','delta.minWriterVersion'='5',"
+                  + "'delta.columnMapping.mode'='name')",
+              table.getBasePath()));
+      // Double rename: tmp carries physical "level", level carries physical "street".
+      table.renameColumn("level", "tmp");
+      table.renameColumn("street", "level");
+      // Row with tmp=X and a null level partition value. id and birthDate are the
+      // only other non-nullable columns, so they are the only ones named here.
+      sparkSession.sql(
+          String.format(
+              "INSERT INTO delta.`%s` (id, birthDate, tmp, level) "
+                  + "VALUES (999999, TIMESTAMP '2020-01-01 00:00:00', 'X', NULL)",
+              table.getBasePath()));
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              DELTA,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Collections.singletonList(ICEBERG),
+              null,
+              null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 21);
+
+      // Pin the null down: the Iceberg row must read level NULL, not tmp's value.
+      Dataset<Row> icebergDataset =
+          sparkSession.read().format(ICEBERG.toLowerCase()).load(table.getDataPath());
+      List<Row> icebergRows = icebergDataset.collectAsList();
+      Row nullLevelRow =
+          icebergRows.stream()
+              .filter(row -> row.getInt(row.fieldIndex("id")) == 999999)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("Row 999999 missing from Iceberg target"));
+      assertEquals("X", nullLevelRow.getAs("tmp"));
+      assertNull(nullLevelRow.getAs("level"));
     }
   }
 

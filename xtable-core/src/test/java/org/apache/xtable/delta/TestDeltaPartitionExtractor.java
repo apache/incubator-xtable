@@ -376,6 +376,87 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
+  public void testPartitionValueExtractionWithColumnMappingPhysicalName() {
+    // With delta.columnMapping.mode=name, add actions key partition values by the physical
+    // column name (e.g. "col-<uuid>"), while the partition field carries the logical name and
+    // exposes the physical name as its storage name (issue #972).
+    String physicalName = "col-1a2b3c4d-5e6f-4a5b-8c9d-0e1f2a3b4c5d";
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put(physicalName, "USA");
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    InternalPartitionField internalPartitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("country")
+                    .storageName(physicalName)
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField)
+                .range(Range.scalar("USA"))
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  public void testPartitionValueExtractionWithColumnMappingNullValueIsAuthoritative() {
+    // A null partition value under the storage key must stay null: falling back to
+    // the logical name can resolve to a different column's value (vaibhavk1992's
+    // repro on #973: tmp=X, a=null came back as tmp=X, a=X).
+    String physicalName = "col-1a2b3c4d-5e6f-4a5b-8c9d-0e1f2a3b4c5d";
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put(physicalName, null);
+            put("country", "USA");
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    InternalPartitionField internalPartitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("country")
+                    .storageName(physicalName)
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField)
+                .range(Range.scalar(null))
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
   public void testDateFormatGeneratedPartitionValueExtraction() {
     // date_partition_column is generated in the table as DATE_FORMAT(some_date_column,
     // 'yyyy-MM-dd-HH')

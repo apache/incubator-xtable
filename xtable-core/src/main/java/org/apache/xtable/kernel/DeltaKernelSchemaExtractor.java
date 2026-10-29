@@ -176,6 +176,7 @@ public class DeltaKernelSchemaExtractor {
                         .fieldId(fieldId)
                         .parentPath(parentPath)
                         .schema(schema)
+                        .storageName(storageName)
                         .defaultValue(
                             field.isNullable() ? InternalField.Constants.NULL_DEFAULT_VALUE : null)
                         .build();
