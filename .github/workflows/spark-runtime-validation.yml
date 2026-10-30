@@ -83,4 +83,5 @@ jobs:
       - name: Run xtable-spark-runtime bundle IT
         env:
           SPARK_LOCAL_IP: "127.0.0.1"
-        run: ./mvnw verify -ntp -B -pl xtable-spark-runtime
+        # spark-submit gets the Hudi bundle built for its own Spark version, as users pass it
+        run: ./mvnw verify -ntp -B -pl xtable-spark-runtime -Dengine.spark.version.prefix="${SPARK_VERSION%.*}"

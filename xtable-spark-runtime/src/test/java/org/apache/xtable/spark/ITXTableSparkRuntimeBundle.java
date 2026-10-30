@@ -38,11 +38,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.ArrayType;
@@ -62,17 +64,25 @@ import org.apache.hudi.client.HoodieReadClient;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.spark.SparkSchemaUtil;
 
 import org.apache.xtable.GenericTable;
+import org.apache.xtable.catalog.TableFormatUtils;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.hudi.HudiTargetConfig;
 import org.apache.xtable.hudi.HudiTestUtil;
+import org.apache.xtable.hudi.index.HudiBackedSecondaryIndexReader;
+import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+import org.apache.xtable.model.storage.TableFormat;
 
 /**
  * Runs a sync with the shaded bundle through {@code $SPARK_HOME/bin/spark-submit}, one case per
  * direction, and checks the target data equals the source. The engines come from {@code
- * target/engine-classpath.txt}. Skipped when {@code SPARK_HOME} is not set.
+ * target/engine-classpath.txt} and the Hudi bundle from {@code target/engine-jars}. Skipped when
+ * {@code SPARK_HOME} is not set.
  */
 class ITXTableSparkRuntimeBundle {
 
@@ -153,6 +163,95 @@ class ITXTableSparkRuntimeBundle {
   }
 
   /**
+   * Users name the Spark SQL extensions in {@code spark.sql.extensions}, so the bundle must ship
+   * them under their own package, not relocated.
+   */
+  @Test
+  void bundleShipsSparkSqlExtensions() throws Exception {
+    try (JarFile bundle = new JarFile(findBundleJar())) {
+      assertTrue(
+          bundle.getEntry("org/apache/xtable/spark/extensions/XTableSparkSessionExtensions.class")
+              != null,
+          "XTableSparkSessionExtensions is missing from the bundle");
+    }
+  }
+
+  /**
+   * A sync job keeps the secondary index current: the dataset config passes the index settings to
+   * the Hudi target, and the index is read back at the data path of the Iceberg table.
+   */
+  @Test
+  void datasetConfigTargetPropertiesBuildTheSecondaryIndex() throws Exception {
+    String sparkHome = System.getenv("SPARK_HOME");
+    assumeTrue(sparkHome != null && !sparkHome.trim().isEmpty(), "SPARK_HOME is not set");
+
+    String tableName = "iceberg_indexed_by_sync";
+    String basePath = tempDir.resolve(tableName).toUri().toString();
+    Dataset<Row> rows =
+        sparkSession
+            .range(100)
+            .selectExpr("id", "concat('user', cast(id % 40 AS string), '@example.com') AS email");
+    Schema schema = SparkSchemaUtil.convert(rows.schema());
+    Table table =
+        new HadoopTables(jsc.hadoopConfiguration())
+            .create(schema, PartitionSpec.unpartitioned(), basePath);
+    rows.write().format("iceberg").mode("append").save(basePath);
+    table.refresh();
+    String dataPath =
+        TableFormatUtils.getTableDataLocation(
+            TableFormat.ICEBERG, table.location(), table.properties());
+
+    Path datasetConfig = tempDir.resolve(tableName + ".yaml");
+    Files.write(
+        datasetConfig,
+        Arrays.asList(
+            "sourceFormat: ICEBERG",
+            "targetFormats:",
+            "  - HUDI",
+            "datasets:",
+            "  - tableBasePath: " + basePath,
+            "    tableDataPath: " + dataPath,
+            "    tableName: " + tableName,
+            "    targetProperties:",
+            "      HUDI:",
+            "        " + HudiTargetConfig.HUDI_TABLE_VERSION + ": '9'",
+            "        "
+                + HudiTargetConfig.EXECUTION_ENGINE
+                + ": "
+                + HudiTargetConfig.ExecutionEngine.SPARK.getConfigValue(),
+            "        " + HudiTargetConfig.SECONDARY_INDEX_COLUMN + ": email"),
+        StandardCharsets.UTF_8);
+    String output =
+        runBundleSync(
+            sparkHome,
+            Collections.singletonList(
+                "spark.serializer=org.apache.spark.serializer.KryoSerializer"),
+            Arrays.asList("--datasetconfig", datasetConfig.toUri().toString()));
+
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath)
+            .dataPath(dataPath)
+            .formatName(TableFormat.ICEBERG)
+            .build();
+    HudiBackedSecondaryIndexReader reader =
+        new HudiBackedSecondaryIndexReader(
+            sourceTable, new IcebergConversionSourceProvider(), sparkSession);
+    assertTrue(reader.doesIndexExist("email"), "index not built. spark-submit output:\n" + output);
+    assertEquals(
+        String.valueOf(table.currentSnapshot().snapshotId()),
+        reader.getLastSyncedSourceIdentifier().orElse(null));
+    Dataset<Row> keys =
+        sparkSession
+            .createDataset(
+                Arrays.asList("user7@example.com", "missing@example.com"), Encoders.STRING())
+            .toDF("email");
+    // ids 7, 47 and 87 hold user7@example.com
+    assertEquals(3, reader.lookup(sourceTable, keys, "email").count());
+  }
+
+  /**
    * Iceberg keeps its metadata at the base path but writes data files to a separate {@code
    * write.data.path}. The Hudi target goes to the data path, so {@code .hoodie} lands next to the
    * Iceberg data files and nothing is written under the Iceberg base path.
@@ -219,6 +318,11 @@ class ITXTableSparkRuntimeBundle {
 
   /** Runs {@code XTableSparkSync} from the bundle through spark-submit and returns its output. */
   private String runBundleSync(String sparkHome, List<String> syncArgs) throws Exception {
+    return runBundleSync(sparkHome, Collections.emptyList(), syncArgs);
+  }
+
+  private String runBundleSync(String sparkHome, List<String> sparkConfs, List<String> syncArgs)
+      throws Exception {
     File bundleJar = findBundleJar();
     File sparkSubmit = new File(sparkHome, "bin/spark-submit");
     assertTrue(sparkSubmit.canExecute(), "spark-submit not executable at " + sparkSubmit);
@@ -234,6 +338,10 @@ class ITXTableSparkRuntimeBundle {
     command.add("spark.driver.extraClassPath=" + engineClasspath);
     command.add("--conf");
     command.add("spark.executor.extraClassPath=" + engineClasspath);
+    for (String sparkConf : sparkConfs) {
+      command.add("--conf");
+      command.add(sparkConf);
+    }
     command.add("--class");
     command.add("org.apache.xtable.spark.XTableSparkSync");
     command.add(bundleJar.getAbsolutePath());
@@ -347,7 +455,13 @@ class ITXTableSparkRuntimeBundle {
             + " (dependency:build-classpath)");
     String cp = new String(Files.readAllBytes(cpFile.toPath()), StandardCharsets.UTF_8).trim();
     assertTrue(!cp.isEmpty(), "engine classpath file is empty");
-    return cp;
+    // The Hudi bundle is built for the Spark of spark-submit (-Dengine.spark.version.prefix), not
+    // for the Spark the module compiles against.
+    File hudiBundle = new File("target/engine-jars/hudi-spark-bundle.jar");
+    assertTrue(
+        hudiBundle.isFile(),
+        "Hudi Spark bundle not copied to " + hudiBundle.getAbsolutePath() + " (dependency:copy)");
+    return cp + File.pathSeparator + hudiBundle.getAbsolutePath();
   }
 
   // The shaded jar is the main artifact; skip original-* and the sources, javadoc and tests jars.
