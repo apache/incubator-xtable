@@ -68,6 +68,12 @@ public class ParquetSourceConfig {
       PartitionTransformType type =
           PartitionTransformType.valueOf(parts[1].toUpperCase(Locale.ROOT));
       String format = parts.length == 3 ? parts[2] : null;
+      if (type.isTimeBased() && format == null) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Partition field %s with transform %s needs a path format, e.g. %s:%s:%s=yyyy-MM-dd",
+                path, type, path, type, path));
+      }
 
       partitionFields.add(new PartitionFieldSpec(path, type, format));
     }

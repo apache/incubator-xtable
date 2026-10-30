@@ -63,6 +63,7 @@ import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.parquet.ParquetSourceConfig;
 import org.apache.xtable.reflection.ReflectionUtils;
 
 /**
@@ -178,6 +179,20 @@ public class RunSync {
     return targetProperties;
   }
 
+  /** Puts the partition spec under the config key that the given source format reads. */
+  @VisibleForTesting
+  static Properties sourceProperties(String sourceFormat, String partitionSpec) {
+    Properties sourceProperties = new Properties();
+    if (partitionSpec != null) {
+      String key =
+          TableFormat.PARQUET.equals(sourceFormat)
+              ? ParquetSourceConfig.PARTITION_FIELD_SPEC_CONFIG
+              : HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
+      sourceProperties.put(key, partitionSpec);
+    }
+    return sourceProperties;
+  }
+
   static void syncTableMetdata(
       DatasetConfig datasetConfig,
       List<String> tableFormatList,
@@ -190,11 +205,8 @@ public class RunSync {
           "Running sync for basePath {} for following table formats {}",
           table.getTableBasePath(),
           tableFormatList);
-      Properties sourceProperties = new Properties();
-      if (table.getPartitionSpec() != null) {
-        sourceProperties.put(
-            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
-      }
+      Properties sourceProperties =
+          sourceProperties(datasetConfig.getSourceFormat(), table.getPartitionSpec());
 
       SourceTable sourceTable =
           sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties);
