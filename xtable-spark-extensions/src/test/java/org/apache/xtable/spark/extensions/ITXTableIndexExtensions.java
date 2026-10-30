@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -315,8 +316,7 @@ public class ITXTableIndexExtensions {
     try {
       Dataset<Row> query = spark.sql(sql);
       // The rule must not intersect the candidates of the checked snapshot with the files of the
-      // newer index, which share no file and would read nothing. A later optimizer iteration may
-      // use the index again, once the table and the index are at the same snapshot.
+      // newer index, which share no file and would read nothing.
       assertFalse(
           leaves(query.queryExecution().optimizedPlan()).stream()
               .allMatch(leaf -> leaf instanceof LocalRelation),
@@ -435,6 +435,61 @@ public class ITXTableIndexExtensions {
     // ids 1, 4, ..., 397
     withConf(
         XTableIndexConf.PruningEnabled(), "false", () -> assertEquals(133, spark.sql(sql).count()));
+  }
+
+  /**
+   * Metadata tables report the snapshot of their table, but their scans plan metadata rows instead
+   * of data files. A filter on a metadata column that has the name of the indexed column must read
+   * the metadata table as usual, without a lookup.
+   */
+  @Test
+  void metadataTablesDoNotUseIndex() throws Exception {
+    // the files table of the table has a column named content too
+    spark.sql(
+        "CREATE TABLE "
+            + TABLE
+            + " (id BIGINT, content INT) USING iceberg TBLPROPERTIES ('format-version'='2')");
+    spark.range(0, 100).selectExpr("id", "0 AS content").repartition(4).writeTo(TABLE).append();
+    syncIndex("content");
+    assertUsesIndex("SELECT * FROM " + TABLE + " WHERE content = 0");
+    AtomicInteger lookups = new AtomicInteger();
+    IndexPruningRule$.MODULE$.beforeLookup_$eq(
+        () -> {
+          lookups.incrementAndGet();
+          return null;
+        });
+    try {
+      assertDoesNotUseIndex("SELECT file_path FROM " + TABLE + ".files WHERE content = 0");
+      assertEquals(0, lookups.get());
+    } finally {
+      IndexPruningRule$.MODULE$.beforeLookup_$eq(() -> null);
+    }
+    assertEquals(4, spark.sql("SELECT * FROM " + TABLE + ".files WHERE content = 0").count());
+  }
+
+  /**
+   * The optimizer runs the rule in several batches until the plan stops changing. Once the rule
+   * leaves a scan unchanged after a lookup, it must not look the same keys up again in the query.
+   */
+  @Test
+  void declinedLookupRunsOnce() throws Exception {
+    createTable(false);
+    appendRows(0, 400, 4);
+    syncIndex("email");
+    String sql = "SELECT id FROM " + TABLE + " WHERE email = '" + emails(7).get(0) + "'";
+    AtomicInteger lookups = new AtomicInteger();
+    IndexPruningRule$.MODULE$.afterLookup_$eq(
+        () -> {
+          lookups.incrementAndGet();
+          throw new IllegalStateException("lookup failed");
+        });
+    try {
+      assertDoesNotUseIndex(sql);
+      // assertDoesNotUseIndex plans the query once with the rule
+      assertEquals(1, lookups.get());
+    } finally {
+      IndexPruningRule$.MODULE$.afterLookup_$eq(() -> null);
+    }
   }
 
   /** Returns another row in the file of the row, which a copy-on-write delete rewrites. */

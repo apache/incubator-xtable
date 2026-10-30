@@ -34,11 +34,12 @@ import org.apache.spark.sql.catalyst.expressions.{
 }
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LocalRelation, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
-import org.apache.iceberg.{FileScanTask, Snapshot, Table}
+import org.apache.iceberg.{BaseMetadataTable, FileScanTask, Schema, Snapshot, Table}
 import org.apache.iceberg.expressions.{Expression => IcebergExpression, Expressions}
 import org.apache.iceberg.spark.SparkReadOptions
 import org.apache.iceberg.spark.source.SparkTable
@@ -60,9 +61,9 @@ import org.apache.xtable.spark.extensions.{XTableIndex, XTableIndexConf}
  * The rule looks the keys up in the index, keeps the files that Iceberg's own partition and min/max
  * pruning also keeps, and stages them as the task set of the scan. The filter stays in the plan, so
  * the query returns the same rows as without the rule. The rule leaves the plan unchanged when the
- * index is behind the table, when the query reads an older snapshot, a branch, a tag or the changes
- * between snapshots, or when the scan is too small for a lookup to pay off. The rule fails the query
- * when the indexed column was renamed after the index was synced.
+ * index is behind the table, when the query reads an older snapshot, a branch, a tag, the changes
+ * between snapshots or a metadata table, or when the scan is too small for a lookup to pay off. The
+ * rule fails the query when the indexed column was renamed after the index was synced.
  */
 case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   private val listenerRegistered = new AtomicBoolean(false)
@@ -76,27 +77,39 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
             condition,
             relation @ DataSourceV2Relation(table: SparkTable, _, _, _, options))
           if !IndexPruningRule.SnapshotReadOptions.exists(options.containsKey) &&
-            table.snapshotId() == null && table.branch() == null =>
-        try {
-          prune(filter, condition, relation, table).getOrElse(filter)
-        } catch {
-          case e: IndexedColumnRenamedException => throw e
-          case NonFatal(e) =>
-            logWarning(s"Not using the XTable index for ${table.name()}", e)
-            filter
+            table.snapshotId() == null && table.branch() == null &&
+            !table.table().isInstanceOf[BaseMetadataTable] =>
+        val keyFilters = IndexPruningRule.findKeyFilters(condition, relation.output)
+        // The optimizer runs the rule in several batches until the plan stops changing, so the
+        // relation remembers the filters it declined, and the lookup runs once for them. The
+        // optimizer works on a copy of the analyzed plan, so the tag lives for this query only.
+        val declined =
+          relation.getTagValue(IndexPruningRule.DeclinedKeyFilters).getOrElse(Set.empty)
+        if (keyFilters.isEmpty || declined.contains(keyFilters)) {
+          filter
+        } else {
+          val pruned =
+            try {
+              prune(filter, keyFilters, relation, table)
+            } catch {
+              case e: IndexedColumnRenamedException => throw e
+              case NonFatal(e) =>
+                logWarning(s"Not using the XTable index for ${table.name()}", e)
+                None
+            }
+          if (pruned.isEmpty) {
+            relation.setTagValue(IndexPruningRule.DeclinedKeyFilters, declined + keyFilters)
+          }
+          pruned.getOrElse(filter)
         }
     }
   }
 
   private def prune(
       filter: Filter,
-      condition: Expression,
+      keyFilters: Seq[(String, Seq[Any])],
       relation: DataSourceV2Relation,
       sparkTable: SparkTable): Option[LogicalPlan] = {
-    val keyFilters = IndexPruningRule.findKeyFilters(condition, relation.output)
-    if (keyFilters.isEmpty) {
-      return None
-    }
     val table = sparkTable.table()
     val index =
       XTableIndex.of(spark, table, relation.catalog.map(_.name()), relation.identifier)
@@ -106,7 +119,8 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
       snapshot <- Option(table.currentSnapshot())
       version = index.syncedVersion
       if isCurrent(table, column, version, snapshot.snapshotId())
-      _ = checkNotRenamed(table, column, snapshot)
+      syncedSchema <- schemaOf(table, column, snapshot)
+      _ = checkNotRenamed(table, column, syncedSchema)
       // the files a scan reads after Iceberg's partition and min/max pruning
       candidates = planFiles(table, snapshot.snapshotId(), column, keys)
       if isLargeEnough(table, column, candidates)
@@ -167,17 +181,28 @@ case class IndexPruningRule(spark: SparkSession) extends Rule[LogicalPlan] {
   }
 
   /**
+   * Returns the schema of the synced snapshot. Snapshots written before Iceberg tracked the schema
+   * of each snapshot have none, and then a rename of the column cannot be detected.
+   */
+  private def schemaOf(table: Table, column: String, snapshot: Snapshot): Option[Schema] = {
+    val schema = Option(snapshot.schemaId()).flatMap(id => Option(table.schemas().get(id)))
+    if (schema.isEmpty) {
+      logInfo(
+        s"Not using the index of ${table.name()} on $column: snapshot ${snapshot.snapshotId()} " +
+          "has no schema id")
+    }
+    schema
+  }
+
+  /**
    * Fails when the column names another field than in the schema of the synced snapshot. A rename
    * keeps the snapshot, so the index stays current, but it keys the column by name and then holds
    * the values of another field.
    */
-  private def checkNotRenamed(table: Table, column: String, snapshot: Snapshot): Unit = {
-    val syncedField =
-      Option(snapshot.schemaId())
-        .flatMap(id => Option(table.schemas().get(id)))
-        .map(_.findField(column))
-    if (syncedField.exists(field =>
-        field == null || field.fieldId() != table.schema().findField(column).fieldId())) {
+  private def checkNotRenamed(table: Table, column: String, syncedSchema: Schema): Unit = {
+    val syncedField = syncedSchema.findField(column)
+    val currentFieldId = table.schema().findField(column).fieldId()
+    if (syncedField == null || syncedField.fieldId() != currentFieldId) {
       throw new IndexedColumnRenamedException(
         s"The index of ${table.name()} on $column was synced when $column named another field. " +
           s"Rebuild the index after the next commit to the table, or set " +
@@ -310,6 +335,10 @@ object IndexPruningRule {
     SparkReadOptions.END_TIMESTAMP,
     StagedScans.ScanTaskSetIdOption
   )
+
+  /** The key filters for which the rule left a relation unchanged during the current query. */
+  private val DeclinedKeyFilters =
+    TreeNodeTag[Set[Seq[(String, Seq[Any])]]]("xtable.declinedKeyFilters")
 
   /** Runs after the freshness check and before the lookup. Tests use it to run a sync between. */
   @volatile private[extensions] var beforeLookup: () => Unit = () => ()

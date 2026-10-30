@@ -20,6 +20,7 @@ package org.apache.xtable.spark.extensions.optimizer
 
 import java.util.UUID
 
+import org.apache.spark.sql.catalyst.QueryPlanningTracker
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.datasources.v2.{
@@ -32,7 +33,6 @@ import org.apache.iceberg.{FileScanTask, Table}
 import org.apache.iceberg.spark.ScanTaskSetManager
 
 import scala.collection.JavaConverters._
-import scala.util.Try
 
 /**
  * Stages the file scan tasks that an index lookup selects. Iceberg reads a staged task set when a
@@ -98,7 +98,10 @@ class StagedScanCleanupListener extends QueryExecutionListener {
   override def onFailure(funcName: String, qe: QueryExecution, exception: Exception): Unit =
     release(qe)
 
-  // a query that failed during optimization has no optimized plan, and nothing was staged for it
+  // A query that failed during optimization has no optimized plan, and reading it would run the
+  // optimizer and its index lookups again. Spark records the phase only when it completes.
   private def release(qe: QueryExecution): Unit =
-    Try(qe.optimizedPlan).foreach(StagedScans.releaseAll)
+    if (qe.tracker.phases.contains(QueryPlanningTracker.OPTIMIZATION)) {
+      StagedScans.releaseAll(qe.optimizedPlan)
+    }
 }
