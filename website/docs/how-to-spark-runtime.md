@@ -216,6 +216,27 @@ Delta Standalone doesn't run on Spark 3.5, so on 3.5 and newer a Delta source or
 through Delta Kernel with no flag needed. If you want Kernel on Spark 3.4 as well, pass
 `--usedeltakernel`, or set `.useDeltaKernel(true)` on the `TableSyncSpec`.
 
+## Running on AWS Glue
+
+From 0.5.0, the jar is built against Hudi 1.2.x, and a sync job with a Hudi source or target uses
+Hudi 1.2.x. AWS Glue 5.1 includes Hudi 1.0.2, and Glue documents how to
+[use a different Hudi version](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-hudi.html)
+in a job. For the sync job:
+
+- Pass the XTable jar and `hudi-spark3.5-bundle_2.12` 1.2.x with `--extra-jars`.
+- Set `--user-jars-first` to `true`.
+- Leave `hudi` out of `--datalake-formats`, so that Glue does not add its own Hudi jars.
+
+```text md title="Glue job parameters"
+--extra-jars       s3://<bucket>/jars/xtable-spark-runtime_2.12-<version>.jar,s3://<bucket>/jars/hudi-spark3.5-bundle_2.12-1.2.1.jar
+--user-jars-first  true
+--conf             spark.serializer=org.apache.spark.serializer.KryoSerializer
+```
+
+The sync also needs the Iceberg or Delta libraries for its targets, as it does on any other Spark
+cluster. Your other Glue jobs can keep writing the table with the Hudi version they already use,
+because Hudi 1.2.x reads tables written by Hudi 0.15.x and 1.0.x without upgrading them.
+
 ## Next steps
 
 - See the [Quickstart](/docs/how-to) for an end-to-end interoperability walkthrough.
