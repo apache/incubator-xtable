@@ -63,6 +63,7 @@ classify_license_family() {
 }
 
 SCALA_BINARY_VERSION="$(sed -n 's:.*<scala.binary.version>\(.*\)</scala.binary.version>.*:\1:p' pom.xml | head -n 1)"
+# Keep in sync with SKIPPED_SHADE_MODULES in validate_bundled_license_texts.py.
 SKIPPED_SHADE_MODULES=(
   "xtable-utilities"
 )
@@ -86,14 +87,12 @@ while IFS= read -r module; do
       SHADE_MODULES+=("${module_dir}")
     fi
   fi
-done < <(
-  rg -l '<artifactId>maven-shade-plugin</artifactId>' --glob 'pom.xml' \
-    | sort
-)
+done < <(git grep -l '<artifactId>maven-shade-plugin</artifactId>' -- 'pom.xml' '*/pom.xml')
 
+# Finding nothing means discovery broke, so fail rather than pass vacuously.
 if [[ ${#SHADE_MODULES[@]} -eq 0 ]]; then
-  echo "No modules with maven-shade-plugin were found."
-  exit 0
+  echo "FAIL no modules with maven-shade-plugin were found."
+  exit 1
 fi
 
 missing_runtime_trees=()
