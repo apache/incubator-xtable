@@ -18,6 +18,7 @@
  
 package org.apache.xtable.spark;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -79,31 +80,7 @@ public class XTableSyncService {
             .additionalProperties(sourceProperties)
             .build();
 
-    // Read by ConversionTargetFactory to pick the Delta Kernel target.
-    List<TargetTable> targetTables =
-        spec.getTargets().stream()
-            .map(
-                targetFormat -> {
-                  Properties targetProperties = new Properties();
-                  if (spec.isUseDeltaKernel()) {
-                    targetProperties.setProperty(
-                        DeltaConversionTargetConfig.USE_KERNEL, Boolean.TRUE.toString());
-                  }
-                  // Hudi resolves partitions relative to its base path, so a Hudi target sits
-                  // at the data path. Other targets sit at the table root.
-                  String targetPath =
-                      TableFormat.HUDI.equalsIgnoreCase(targetFormat)
-                          ? dataPath
-                          : spec.getBasePath();
-                  return TargetTable.builder()
-                      .name(spec.getKey())
-                      .basePath(targetPath)
-                      .namespace(spec.getNamespace())
-                      .formatName(targetFormat)
-                      .additionalProperties(targetProperties)
-                      .build();
-                })
-            .collect(Collectors.toList());
+    List<TargetTable> targetTables = targetTables(spec, dataPath);
 
     ConversionConfig conversionConfig =
         ConversionConfig.builder()
@@ -123,6 +100,39 @@ public class XTableSyncService {
         spec.getTargets(),
         spec.getBasePath());
     return new ConversionController(hadoopConf).sync(conversionConfig, sourceProvider);
+  }
+
+  /**
+   * The target tables of a spec. Each target gets the properties configured for its format, and the
+   * Delta Kernel flag, which ConversionTargetFactory reads to pick the Delta Kernel target.
+   */
+  // package-private for unit testing
+  static List<TargetTable> targetTables(TableSyncSpec spec, String dataPath) {
+    return spec.getTargets().stream()
+        .map(
+            targetFormat -> {
+              Properties targetProperties = new Properties();
+              if (spec.getTargetProperties() != null) {
+                targetProperties.putAll(
+                    spec.getTargetProperties().getOrDefault(targetFormat, Collections.emptyMap()));
+              }
+              if (spec.isUseDeltaKernel()) {
+                targetProperties.setProperty(
+                    DeltaConversionTargetConfig.USE_KERNEL, Boolean.TRUE.toString());
+              }
+              // Hudi resolves partitions relative to its base path, so a Hudi target sits
+              // at the data path. Other targets sit at the table root.
+              String targetPath =
+                  TableFormat.HUDI.equalsIgnoreCase(targetFormat) ? dataPath : spec.getBasePath();
+              return TargetTable.builder()
+                  .name(spec.getKey())
+                  .basePath(targetPath)
+                  .namespace(spec.getNamespace())
+                  .formatName(targetFormat)
+                  .additionalProperties(targetProperties)
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   private static ConversionSourceProvider<?> sourceProviderFor(

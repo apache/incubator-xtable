@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.model.sync.ErrorDetails;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncStatusCode;
@@ -204,6 +207,61 @@ class XTableSparkSyncTest {
     assertEquals("/data/customers", config.datasets.get(1).tableBasePath);
     assertEquals("db.sales", config.datasets.get(1).namespace);
     assertNull(config.datasets.get(1).tableName);
+  }
+
+  @Test
+  void parseDatasetConfigReadsTargetPropertiesKeyedByUpperCaseFormat() {
+    XTableSparkSync.DatasetConfig config =
+        XTableSparkSync.parseDatasetConfig(
+            yaml(
+                "sourceFormat: ICEBERG\n"
+                    + "targetFormats:\n"
+                    + "  - HUDI\n"
+                    + "datasets:\n"
+                    + "  - tableBasePath: /data/customer\n"
+                    + "    targetProperties:\n"
+                    + "      hudi:\n"
+                    + "        xtable.hudi.target.secondary.index.column: c_email_address\n"));
+
+    assertEquals(
+        Collections.singletonMap(
+            "HUDI",
+            Collections.singletonMap(
+                "xtable.hudi.target.secondary.index.column", "c_email_address")),
+        config.datasets.get(0).targetProperties);
+  }
+
+  @Test
+  void targetTablesGetThePropertiesOfTheirFormat() {
+    Map<String, Map<String, String>> targetProperties = new HashMap<>();
+    targetProperties.put(
+        "HUDI",
+        Collections.singletonMap("xtable.hudi.target.secondary.index.column", "c_email_address"));
+    TableSyncSpec spec =
+        TableSyncSpec.builder()
+            .key("customer")
+            .basePath("/warehouse/customer")
+            .sourceFormat("ICEBERG")
+            .targets(Arrays.asList("HUDI", "DELTA"))
+            .targetProperties(targetProperties)
+            .useDeltaKernel(true)
+            .build();
+
+    List<TargetTable> targetTables =
+        XTableSyncService.targetTables(spec, "/warehouse/customer/data");
+
+    TargetTable hudi = targetTables.get(0);
+    assertEquals("file:///warehouse/customer/data", hudi.getBasePath());
+    assertEquals(
+        "c_email_address",
+        hudi.getAdditionalProperties().getProperty("xtable.hudi.target.secondary.index.column"));
+    TargetTable delta = targetTables.get(1);
+    assertEquals("file:///warehouse/customer", delta.getBasePath());
+    assertNull(
+        delta.getAdditionalProperties().getProperty("xtable.hudi.target.secondary.index.column"));
+    assertEquals(
+        "true",
+        delta.getAdditionalProperties().getProperty(DeltaConversionTargetConfig.USE_KERNEL));
   }
 
   @Test

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -226,6 +227,7 @@ public final class XTableSparkSync {
                   .dataPath(table.tableDataPath)
                   .namespace(table.namespace == null ? null : table.namespace.split("\\."))
                   .partitionSpec(table.partitionSpec)
+                  .targetProperties(table.targetProperties)
                   .sourceFormat(sourceFormat)
                   .targets(targetFormats));
         }
@@ -392,6 +394,14 @@ public final class XTableSparkSync {
         throw new IllegalArgumentException("--datasetconfig 'datasets' entries must be mappings");
       }
       requireField(table.tableBasePath, "tableBasePath");
+      if (table.targetProperties != null) {
+        // keyed like targetFormats, which are upper case
+        Map<String, Map<String, String>> targetProperties = new HashMap<>();
+        table.targetProperties.forEach(
+            (format, properties) ->
+                targetProperties.put(format.trim().toUpperCase(Locale.ROOT), properties));
+        table.targetProperties = targetProperties;
+      }
     }
     return config;
   }
@@ -421,6 +431,12 @@ public final class XTableSparkSync {
       String tableName;
       String partitionSpec;
       String namespace;
+
+      /**
+       * Properties of the target tables, keyed by the target format, for example {@code
+       * xtable.hudi.target.secondary.index.column} for a {@code HUDI} target.
+       */
+      Map<String, Map<String, String>> targetProperties;
     }
   }
 

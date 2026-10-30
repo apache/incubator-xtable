@@ -19,6 +19,7 @@
 package org.apache.xtable.spark;
 
 import java.util.List;
+import java.util.Map;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -55,4 +56,10 @@ public class TableSyncSpec {
 
   /** Use the Spark-free Delta Kernel implementation for the Delta source and/or target. */
   boolean useDeltaKernel;
+
+  /**
+   * Optional properties of the target tables, keyed by the target format, for example {@code
+   * xtable.hudi.target.secondary.index.column} for a {@code HUDI} target.
+   */
+  Map<String, Map<String, String>> targetProperties;
 }

@@ -186,6 +186,16 @@ public class HudiBackedSecondaryIndexReader
         dataPath, javaSparkContext.hadoopConfiguration());
   }
 
+  /**
+   * Returns the version of the index. A caller that compares the source commit of the index with
+   * its own view of the table can read the version before and after a lookup, and trust the lookup
+   * only when both versions are equal.
+   */
+  public Optional<HudiBackedSecondaryIndexUtils.SyncedVersion> getLastSyncedVersion() {
+    return HudiBackedSecondaryIndexUtils.getLastSyncedVersion(
+        dataPath, javaSparkContext.hadoopConfiguration());
+  }
+
   @Override
   public Dataset<Row> lookup(SourceTable table, Dataset<Row> keys, String columnName) {
     HudiBackedSecondaryIndexUtils.checkIndexedTable(tableLocation, table);
