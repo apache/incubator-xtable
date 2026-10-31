@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -171,9 +172,9 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   /**
-   * Create a name mapping from the given schema, add storage names in {@link
-   * IcebergSchemaExtractor#getIdToStorageName()}, if any exist, to the name mapping, and apply the
-   * updated mapping to the table.
+   * Create a name mapping from the given schema, use storage names in {@link
+   * IcebergSchemaExtractor#getIdToStorageName()}, if any exist, in place of field names, and apply
+   * the updated mapping to the table.
    *
    * <p>This method should only be called when the name mapping is not set, or when field IDs are
    * provided in the source schema
@@ -199,10 +200,12 @@ public class IcebergConversionTarget implements ConversionTarget {
     }
     List<MappedField> fieldResults = new ArrayList<>();
     for (MappedField field : mapping.fields()) {
-      Set<String> fieldNames = new HashSet<>(field.names());
-      if (idToStorageName.containsKey(field.id())) {
-        fieldNames.add(idToStorageName.get(field.id()));
-      }
+      // Files are written with the storage name, so map only that; the logical name can collide
+      // with another field's storage name after renames.
+      Set<String> fieldNames =
+          idToStorageName.containsKey(field.id())
+              ? Collections.singleton(idToStorageName.get(field.id()))
+              : new HashSet<>(field.names());
       MappedFields nestedMapping = updateNameMapping(field.nestedMapping(), idToStorageName);
       fieldResults.add(MappedField.of(field.id(), fieldNames, nestedMapping));
     }
