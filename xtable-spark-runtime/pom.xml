@@ -348,7 +348,6 @@
                                     <resource>META-INF/NOTICE</resource>
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
-                                <!-- Not packaged in the thin jar, so each text is added back here (#701). -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/licenses/LICENSE-checker-qual</resource>
                                     <file>target/classes/META-INF/licenses/LICENSE-checker-qual</file>
