@@ -414,16 +414,14 @@ public class TestDeltaKernelSchemaExtractor {
 
   @Test
   public void testColumnMappingPhysicalNamePropagatedAsStorageName() {
-    // Regression for #977: with column mapping enabled, a column renamed after files were
-    // written must keep its pre-rename physical name as storageName, so that the Iceberg name
-    // mapping can resolve files written before the rename. Without the fix, storageName is
-    // null and pre-rename files read NULL for the renamed column.
+    // A renamed column keeps its pre-rename physical name, which Iceberg's name mapping needs to
+    // read files written before the rename.
     FieldMetadata renamedMetadata =
         FieldMetadata.builder()
             .putLong("delta.columnMapping.id", 3)
             .putString("delta.columnMapping.physicalName", "name")
             .build();
-    io.delta.kernel.types.StructType structRepresentation =
+    StructType structRepresentation =
         new StructType()
             .add("new_name", StringType.STRING, true, renamedMetadata)
             .add("id", IntegerType.INTEGER, false);

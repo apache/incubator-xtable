@@ -46,6 +46,8 @@ import org.apache.xtable.model.stat.Range;
 
 /** Validates the partition extraction logic from Delta tables. */
 public class TestDeltaPartitionExtractor {
+  private static final String PHYSICAL_NAME = "col-1a2b3c4d-5e6f-4a5b-8c9d-0e1f2a3b4c5d";
+
   private static final Map<String, StructField> STRUCT_FIELD_MAP =
       new HashMap<String, StructField>() {
         {
@@ -377,83 +379,40 @@ public class TestDeltaPartitionExtractor {
 
   @Test
   public void testPartitionValueExtractionWithColumnMappingPhysicalName() {
-    // With delta.columnMapping.mode=name, add actions key partition values by the physical
-    // column name (e.g. "col-<uuid>"), while the partition field carries the logical name and
-    // exposes the physical name as its storage name (issue #972).
-    String physicalName = "col-1a2b3c4d-5e6f-4a5b-8c9d-0e1f2a3b4c5d";
-    Map<String, String> partitionValuesMap =
-        new HashMap<String, String>() {
-          {
-            put(physicalName, "USA");
-          }
-        };
-    scala.collection.mutable.Map<String, String> scalaMap =
-        convertJavaMapToScalaMap(partitionValuesMap);
-    InternalPartitionField internalPartitionField =
-        InternalPartitionField.builder()
-            .sourceField(
-                InternalField.builder()
-                    .name("country")
-                    .storageName(physicalName)
-                    .schema(
-                        InternalSchema.builder()
-                            .name("string")
-                            .dataType(InternalType.STRING)
-                            .build())
-                    .build())
-            .transformType(PartitionTransformType.VALUE)
-            .build();
-    List<PartitionValue> expectedPartitionValues =
-        Arrays.asList(
-            PartitionValue.builder()
-                .partitionField(internalPartitionField)
-                .range(Range.scalar("USA"))
-                .build());
+    // With column mapping, partition values are keyed by the physical name, not the logical one.
+    InternalPartitionField partitionField = columnMappedPartitionField("country", PHYSICAL_NAME);
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
-            scalaMap, Arrays.asList(internalPartitionField));
-    assertEquals(expectedPartitionValues, partitionValues);
+            convertJavaMapToScalaMap(Collections.singletonMap(PHYSICAL_NAME, "USA")),
+            Collections.singletonList(partitionField));
+    assertEquals(
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar("USA"))
+                .build()),
+        partitionValues);
   }
 
   @Test
   public void testPartitionValueExtractionWithColumnMappingNullValueIsAuthoritative() {
-    // A null partition value under the storage key must stay null: falling back to
-    // the logical name can resolve to a different column's value (vaibhavk1992's
-    // repro on #973: tmp=X, a=null came back as tmp=X, a=X).
-    String physicalName = "col-1a2b3c4d-5e6f-4a5b-8c9d-0e1f2a3b4c5d";
-    Map<String, String> partitionValuesMap =
-        new HashMap<String, String>() {
-          {
-            put(physicalName, null);
-            put("country", "USA");
-          }
-        };
-    scala.collection.mutable.Map<String, String> scalaMap =
-        convertJavaMapToScalaMap(partitionValuesMap);
-    InternalPartitionField internalPartitionField =
-        InternalPartitionField.builder()
-            .sourceField(
-                InternalField.builder()
-                    .name("country")
-                    .storageName(physicalName)
-                    .schema(
-                        InternalSchema.builder()
-                            .name("string")
-                            .dataType(InternalType.STRING)
-                            .build())
-                    .build())
-            .transformType(PartitionTransformType.VALUE)
-            .build();
-    List<PartitionValue> expectedPartitionValues =
-        Arrays.asList(
-            PartitionValue.builder()
-                .partitionField(internalPartitionField)
-                .range(Range.scalar(null))
-                .build());
+    // A null under the physical key must not fall back to the logical name, which can be another
+    // column's physical name after renames.
+    Map<String, String> partitionValuesMap = new HashMap<>();
+    partitionValuesMap.put(PHYSICAL_NAME, null);
+    partitionValuesMap.put("country", "USA");
+    InternalPartitionField partitionField = columnMappedPartitionField("country", PHYSICAL_NAME);
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
-            scalaMap, Arrays.asList(internalPartitionField));
-    assertEquals(expectedPartitionValues, partitionValues);
+            convertJavaMapToScalaMap(partitionValuesMap),
+            Collections.singletonList(partitionField));
+    assertEquals(
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(null))
+                .build()),
+        partitionValues);
   }
 
   @Test
@@ -671,6 +630,20 @@ public class TestDeltaPartitionExtractor {
                 true,
                 expectedPartitionFieldMetadata));
     assertEquals(expected, actual);
+  }
+
+  private static InternalPartitionField columnMappedPartitionField(
+      String name, String physicalName) {
+    return InternalPartitionField.builder()
+        .sourceField(
+            InternalField.builder()
+                .name(name)
+                .storageName(physicalName)
+                .schema(
+                    InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
+                .build())
+        .transformType(PartitionTransformType.VALUE)
+        .build();
   }
 
   private scala.collection.mutable.Map<String, String> convertJavaMapToScalaMap(
