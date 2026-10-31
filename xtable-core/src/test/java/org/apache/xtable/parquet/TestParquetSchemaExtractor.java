@@ -396,6 +396,39 @@ public class TestParquetSchemaExtractor {
     Assertions.assertEquals(internalSchema, schemaExtractor.toInternalSchema(messageType, null));
   }
 
+  static Stream<Arguments> recordNullability() {
+    return Stream.of(
+        Arguments.of(
+            "root message with an optional column",
+            Types.buildMessage()
+                .required(PrimitiveTypeName.INT64)
+                .named("id")
+                .optional(PrimitiveTypeName.INT32)
+                .named("name")
+                .named("my_record"),
+            false),
+        Arguments.of(
+            "optional group with only required fields",
+            Types.optionalGroup().required(PrimitiveTypeName.INT64).named("id").named("my_group"),
+            true),
+        Arguments.of(
+            "optional group with an optional field",
+            Types.optionalGroup().optional(PrimitiveTypeName.INT64).named("id").named("my_group"),
+            true),
+        Arguments.of(
+            "required group with an optional field",
+            Types.requiredGroup().optional(PrimitiveTypeName.INT64).named("id").named("my_group"),
+            false));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("recordNullability")
+  void testRecordNullability(String description, GroupType parquetSchema, boolean nullable) {
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(parquetSchema, null);
+    Assertions.assertEquals(InternalType.RECORD, internalSchema.getDataType());
+    Assertions.assertEquals(nullable, internalSchema.isNullable());
+  }
+
   static Stream<Arguments> listEncodings() {
     return Stream.of(
         Arguments.of(

@@ -228,7 +228,7 @@ public class ITParquetConversionSource {
             RowFactory.create(
                 3, "Charlie", true, 35.2, new Timestamp(System.currentTimeMillis() + 2000)),
             RowFactory.create(
-                4, "David", false, 29.5, new Timestamp(System.currentTimeMillis() + 3000)),
+                4, null, false, 29.5, new Timestamp(System.currentTimeMillis() + 3000)),
             RowFactory.create(
                 5, "Eve", true, 22.2, new Timestamp(System.currentTimeMillis() + 4000)));
 
@@ -236,7 +236,8 @@ public class ITParquetConversionSource {
         DataTypes.createStructType(
             new StructField[] {
               DataTypes.createStructField("id", DataTypes.IntegerType, false),
-              DataTypes.createStructField("name", DataTypes.StringType, false),
+              // nullable, as Spark writes most columns; covers #958
+              DataTypes.createStructField("name", DataTypes.StringType, true),
               DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
               DataTypes.createStructField("age", DataTypes.DoubleType, false),
               DataTypes.createStructField(

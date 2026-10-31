@@ -74,6 +74,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private final DeltaKernelTableExtractor tableExtractor =
       DeltaKernelTableExtractor.builder().build();
 
+  @Builder.Default
   private Optional<DeltaKernelIncrementalChangesState> deltaKernelIncrementalChangesState =
       Optional.empty();
 

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -145,14 +146,36 @@ public class RunSync {
                 tableFormat ->
                     TargetTable.builder()
                         .name(table.getTableName())
-                        .basePath(table.getTableBasePath())
+                        .basePath(getTargetBasePath(table, tableFormat))
                         .namespace(
                             table.getNamespace() == null ? null : table.getNamespace().split("\\."))
                         .catalogConfig(catalogConfig)
                         .formatName(tableFormat)
+                        .additionalProperties(getTargetProperties(table, tableFormat))
                         .build())
             .collect(Collectors.toList());
     return targetTables;
+  }
+
+  /**
+   * Hudi resolves partitions relative to its base path, so a Hudi target sits at the data path of
+   * the source, for example the {@code data} directory of an Iceberg table. Other targets sit at
+   * the table root.
+   */
+  private static String getTargetBasePath(DatasetConfig.Table table, String tableFormat) {
+    String tableDataPath = table.getTableDataPath();
+    return TableFormat.HUDI.equals(tableFormat) && tableDataPath != null && !tableDataPath.isEmpty()
+        ? tableDataPath
+        : table.getTableBasePath();
+  }
+
+  private static Properties getTargetProperties(DatasetConfig.Table table, String tableFormat) {
+    Properties targetProperties = new Properties();
+    if (table.getTargetProperties() != null) {
+      targetProperties.putAll(
+          table.getTargetProperties().getOrDefault(tableFormat, Collections.emptyMap()));
+    }
+    return targetProperties;
   }
 
   static void syncTableMetdata(
@@ -378,6 +401,12 @@ public class RunSync {
       String tableName;
       String partitionSpec;
       String namespace;
+
+      /**
+       * Properties of the target tables, keyed by the target format, for example {@code
+       * xtable.hudi.target.secondary.index.column} for a {@link TableFormat#HUDI} target.
+       */
+      Map<String, Map<String, String>> targetProperties;
     }
   }
 

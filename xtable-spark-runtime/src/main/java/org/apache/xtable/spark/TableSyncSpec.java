@@ -19,6 +19,7 @@
 package org.apache.xtable.spark;
 
 import java.util.List;
+import java.util.Map;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -40,7 +41,11 @@ public class TableSyncSpec {
   /** Optional namespace segments for the table. */
   String[] namespace;
 
-  /** Optional partition spec for a partitioned Hudi source, e.g. {@code level:VALUE}. */
+  /**
+   * Optional source partition spec (e.g. {@code level:VALUE}); applies to partitioned Hudi and
+   * Parquet sources. Maps to {@code xtable.hudi.source.partition_field_spec_config} for Hudi and
+   * {@code xtable.parquet.source.partition_field_spec_config} for Parquet.
+   */
   String partitionSpec;
 
   /** The source table format, e.g. {@code HUDI} (see {@code TableFormat}). */
@@ -51,4 +56,10 @@ public class TableSyncSpec {
 
   /** Use the Spark-free Delta Kernel implementation for the Delta source and/or target. */
   boolean useDeltaKernel;
+
+  /**
+   * Optional properties of the target tables, keyed by the target format, for example {@code
+   * xtable.hudi.target.secondary.index.column} for a {@code HUDI} target.
+   */
+  Map<String, Map<String, String>> targetProperties;
 }
