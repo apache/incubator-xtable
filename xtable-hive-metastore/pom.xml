@@ -379,6 +379,55 @@
                                     <resource>META-INF/NOTICE</resource>
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
+                                <!-- Not packaged in the thin jar, so each text is added back here (#701). -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-ST4</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-ST4</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-antlr-runtime</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-antlr-runtime</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-checker-qual</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-checker-qual</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-javax.annotation-api</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-javax.annotation-api</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-javolution</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-javolution</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-jersey-json</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-jersey-json</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-jline</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-jline</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-leveldbjni-all</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-leveldbjni-all</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-paranamer</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-paranamer</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-transaction-api</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-transaction-api</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-zstd-jni</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-zstd-jni</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE.datanucleus-asm.txt</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE.datanucleus-asm.txt</file>
+                                </transformer>
                             </transformers>
                             <artifactSet>
                                 <includes>
