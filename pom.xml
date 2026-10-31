@@ -683,8 +683,9 @@
         <pluginManagement>
             <plugins>
                 <!--
-                  LICENSE-bundled and NOTICE-bundled are shade transformer inputs, read
-                  from target/classes; packaging them too duplicated each jar's LICENSE (#701).
+                  LICENSE-bundled, NOTICE-bundled and META-INF/licenses are shade transformer
+                  inputs, read from target/classes; packaging them too put the bundle's
+                  licensing in the thin jar, which bundles nothing (#701).
                 -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -693,6 +694,7 @@
                         <excludes>
                             <exclude>META-INF/LICENSE-bundled</exclude>
                             <exclude>META-INF/NOTICE-bundled</exclude>
+                            <exclude>META-INF/licenses/**</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
