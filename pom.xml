@@ -691,6 +691,8 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
                     <configuration>
+                        <!-- Shade replaces xtable-spark-runtime's jar in place; never feed that back in. -->
+                        <forceCreation>true</forceCreation>
                         <excludes>
                             <exclude>META-INF/LICENSE-bundled</exclude>
                             <exclude>META-INF/NOTICE-bundled</exclude>
