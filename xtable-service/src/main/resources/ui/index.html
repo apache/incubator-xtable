@@ -1,0 +1,132 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apache XTable (Incubating)</title>
+  <link rel="stylesheet" href="/ui/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">X</span>
+    <span>
+      <strong>XTable</strong>
+      <em>Incubating</em>
+    </span>
+  </div>
+  <nav>
+    <a href="#/conversions" data-route="conversions">Conversions</a>
+    <a href="#/new" data-route="new">New conversion</a>
+  </nav>
+  <div class="posture" title="This service ships with no authentication or authorization.">
+    local developer utility
+  </div>
+</header>
+
+<main id="view"></main>
+
+<!-- Conversions list -->
+<template id="tpl-conversions">
+  <section>
+    <div class="section-head">
+      <h1>Conversions</h1>
+      <div class="actions">
+        <label class="auto"><input type="checkbox" id="auto-refresh" checked> Auto refresh</label>
+        <button class="primary" data-action="new">New conversion</button>
+      </div>
+    </div>
+    <p class="note">
+      Run history is held in memory and bounded, so it is a view of the running service rather
+      than an audit log. It is lost on restart.
+    </p>
+    <div id="runs"></div>
+  </section>
+</template>
+
+<!-- New conversion -->
+<template id="tpl-new">
+  <section class="narrow">
+    <div class="section-head"><h1>New conversion</h1></div>
+    <form id="convert-form">
+      <label>
+        Source format
+        <select name="source-format" required>
+          <option value="HUDI">Hudi</option>
+          <option value="ICEBERG">Iceberg</option>
+          <option value="DELTA">Delta</option>
+          <option value="PARQUET" disabled>Parquet (not reachable through the service)</option>
+          <option value="PAIMON" disabled>Paimon (not reachable through the service)</option>
+        </select>
+      </label>
+      <label>
+        Source table name
+        <input name="source-table-name" required placeholder="people">
+      </label>
+      <label>
+        Source table path
+        <input name="source-table-path" required placeholder="file:///tmp/hudi-dataset/people">
+      </label>
+      <label>
+        Source data path
+        <span class="hint">Where the data files are, when that is not the table path.</span>
+        <input name="source-data-path" placeholder="file:///tmp/hudi-dataset/people">
+      </label>
+      <fieldset>
+        <legend>Target formats</legend>
+        <label class="inline"><input type="checkbox" name="target" value="ICEBERG"> Iceberg</label>
+        <label class="inline"><input type="checkbox" name="target" value="DELTA"> Delta</label>
+        <label class="inline"><input type="checkbox" name="target" value="HUDI"> Hudi</label>
+      </fieldset>
+      <label id="partition-spec-field">
+        Partition spec
+        <span class="hint">
+          Hudi sources only. Without it a partitioned source produces unpartitioned targets.
+        </span>
+        <input name="partition-spec" placeholder="city:VALUE">
+      </label>
+      <p class="note">
+        Sync mode is chosen by the server from the target's sync metadata, so there is no full
+        versus incremental switch here. The run reports which mode was used.
+      </p>
+      <div class="form-actions">
+        <button type="submit" class="primary">Start conversion</button>
+        <span id="form-error" class="error"></span>
+      </div>
+    </form>
+  </section>
+</template>
+
+<!-- Run detail -->
+<template id="tpl-run">
+  <section>
+    <div class="section-head">
+      <h1>Run <span class="mono" id="run-id"></span></h1>
+      <a href="#/conversions" class="back">Back to conversions</a>
+    </div>
+    <div id="run-summary"></div>
+    <h2>Progress</h2>
+    <div id="run-events" class="events"></div>
+    <div id="run-result"></div>
+  </section>
+</template>
+
+<script src="/ui/app.js"></script>
+</body>
+</html>
