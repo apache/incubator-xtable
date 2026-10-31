@@ -66,6 +66,8 @@ EMBEDDED_TEXTS = {"LICENSE.datanucleus-asm.txt": "org.datanucleus:datanucleus-co
 # One canonical LICENSE and NOTICE per jar, and META-INF/licenses as the only home for texts (#701).
 CANONICAL = ("META-INF/LICENSE", "META-INF/NOTICE")
 NOT_PACKAGED = ("META-INF/LICENSE-bundled", "META-INF/NOTICE-bundled")
+# The texts this project curates; shade adds each to the bundle, never the thin jar.
+CURATED_TEXTS = pathlib.Path("src/main/resources/META-INF/licenses")
 LICENSE_LIKE = re.compile(r"licen[cs]e|notice", re.IGNORECASE)
 
 # Shade cannot merge module descriptors, so it drops them from every dependency.
@@ -309,6 +311,12 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         "partial": [],
         "stale_includes": [],
         "layout": layout_problems(names),
+        # A curated text whose IncludeResourceTransformer was forgotten.
+        "not_shaded": sorted(
+            f"META-INF/licenses/{text.name}"
+            for text in (module / CURATED_TEXTS).glob("*")
+            if f"META-INF/licenses/{text.name}" not in names
+        ),
     }
     bundled = []
     for group, artifact, version, classifier in coords:
@@ -368,6 +376,7 @@ REPORTS = [
     ("unresolved", "dependencies that could not be resolved or have no license"),
     ("stale_includes", "shade <include> entries that no longer exist in the runtime dependency tree"),
     ("layout", "license files outside one canonical LICENSE, NOTICE and META-INF/licenses/"),
+    ("not_shaded", "curated license texts with no IncludeResourceTransformer in the module's pom"),
 ]
 
 # Published shaded modules; xtable-utilities is not published yet (see AGENTS.md).
@@ -386,6 +395,7 @@ def module_jars(module: pathlib.Path) -> list[pathlib.Path]:
 def main() -> None:
     """Check every bundled jar, or only those named on the command line."""
     jars = [pathlib.Path(a) for a in sys.argv[1:]]
+    thin = []
     unbuilt = []
     if not jars:
         for module in shade_modules():
@@ -393,6 +403,9 @@ def main() -> None:
                 continue
             found = module_jars(module)
             jars += found
+            # The unshaded jar published beside the bundle; none where shade replaces it.
+            thin += [jar for jar in (module / "target").glob(f"{module.name}*.jar")
+                     if not jar.name.endswith(NOT_BUNDLES) and jar not in found]
             if not found:
                 unbuilt.append(module.relative_to(ROOT))
     if not jars:
@@ -418,6 +431,18 @@ def main() -> None:
                     print(f"  - {entry}")
         if not failed:
             print(f"OK   {jar_path.name}: {result['count']} bundled non-Apache-2.0 dependencies, all with license texts.")
+    for jar_path in thin:
+        with zipfile.ZipFile(jar_path) as jar:
+            names = [name for name in jar.namelist() if not name.endswith("/")]
+        # It bundles nothing, so it carries none of the bundle's texts either.
+        problems = layout_problems(names) + [n for n in names if n.startswith("META-INF/licenses/")]
+        if problems:
+            status = 1
+            print(f"FAIL {jar_path.name}: thin jar license layout problems:")
+            for problem in problems:
+                print(f"  - {problem}")
+        else:
+            print(f"OK   {jar_path.name}: thin jar, no third-party license texts.")
 
     raise SystemExit(status)
 

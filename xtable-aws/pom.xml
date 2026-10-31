@@ -142,6 +142,27 @@
                                     <resource>META-INF/NOTICE</resource>
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
+                                <!-- Not packaged in the thin jar, so each text is added back here (#701). -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-checker-qual</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-checker-qual</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-javax.annotation-api</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-javax.annotation-api</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-paranamer</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-paranamer</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-reactive-streams</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-reactive-streams</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/LICENSE-zstd-jni</resource>
+                                    <file>target/classes/META-INF/licenses/LICENSE-zstd-jni</file>
+                                </transformer>
                             </transformers>
                             <artifactSet>
                                 <includes>

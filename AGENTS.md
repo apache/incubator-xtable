@@ -156,6 +156,7 @@ Notes:
 - The generator uses runtime dependency trees plus a small override table for old artifacts with incomplete Maven license metadata.
 - Category B licenses can be present in convenience binaries, but the validator will warn so they stay visible.
 - Missing bundled metadata is treated as a failure.
+- Texts under `src/main/resources/META-INF/licenses/` are kept out of the thin jar, so each new one also needs an `IncludeResourceTransformer` in the module's shade config; the validator fails if one is missing.
 
 ## GitHub Actions
 
