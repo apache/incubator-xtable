@@ -320,6 +320,12 @@ public class DeltaPartitionExtractor {
       Map<String, String> values, InternalPartitionField partitionField) {
     if (partitionField.getPartitionFieldNames() == null
         || partitionField.getPartitionFieldNames().isEmpty()) {
+      // With column mapping, partition values are keyed by physical name. That key wins even when
+      // its value is null, since the logical name may match another column's physical name.
+      String storageName = partitionField.getSourceField().getStorageName();
+      if (storageName != null && values.containsKey(storageName)) {
+        return values.get(storageName);
+      }
       return values.getOrDefault(partitionField.getSourceField().getName(), null);
     }
     List<String> partitionFieldNames = partitionField.getPartitionFieldNames();
