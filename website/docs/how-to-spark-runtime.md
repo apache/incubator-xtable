@@ -189,6 +189,20 @@ A table entry can also set `targetProperties`, keyed by target format, for examp
 | `--usedeltakernel` | Force Delta Kernel for a Delta source or target. |
 | `--help` | Print the usage text. |
 
+## Hudi targets
+
+A sync to a Hudi target writes the Hudi commit with Hudi's Java client by default, and the Hudi
+Spark bundle doesn't include it. When the sync has a Hudi target, do one of these:
+
+- Add `org.apache.hudi:hudi-java-client:1.2.1` to the classpath, next to the Hudi Spark bundle.
+- Use Hudi's Spark client, which the bundle includes, by setting
+  `xtable.hudi.target.execution.engine: spark` in the `targetProperties` of each table in
+  `--datasetconfig`, or in the `targetProperties` of the `TableSyncSpec`.
+
+Without either, the sync fails with
+`NoClassDefFoundError: org/apache/hudi/client/common/HoodieJavaEngineContext`. See
+[Hudi](/docs/features-and-limitations#hudi) for the other Hudi target properties.
+
 ## Supported formats
 
 Paimon and Parquet are read-only sources; XTable does not write either format as a target.
@@ -234,7 +248,7 @@ in a job. For the sync job:
 ```
 
 The sync also needs the Iceberg or Delta libraries for its targets, as it does on any other Spark
-cluster. Your other Glue jobs can keep writing the table with the Hudi version they already use,
+cluster, and a sync to a Hudi target needs the setup in [Hudi targets](#hudi-targets). Your other Glue jobs can keep writing the table with the Hudi version they already use,
 because Hudi 1.2.x reads tables written by Hudi 0.15.x and 1.0.x without upgrading them.
 
 ## Next steps

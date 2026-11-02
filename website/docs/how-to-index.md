@@ -1,9 +1,9 @@
 ---
 sidebar_position: 4
-title: "Index Iceberg tables"
+title: "Secondary index for Iceberg tables"
 ---
 
-# Index Iceberg tables
+# Secondary index for Iceberg tables
 
 Apache XTable™ (Incubating) can keep a secondary index on a column of an Apache Iceberg table. The
 index maps each value of the column to the data files that hold it, and is stored as an Apache Hudi
@@ -35,6 +35,27 @@ datasets:
         xtable.hudi.target.execution.engine: spark
         xtable.hudi.target.secondary.index.column: c_email_address
 ```
+
+Run the sync with either jar, for example:
+
+```shell md title="shell"
+# utilities jar, which starts a local Spark session for the index build. It
+# bundles Spark 3.4, so add the Hudi Spark 3.4 bundle for the Spark engine.
+java -cp xtable-utilities/target/xtable-utilities_2.12-<version>-bundled.jar:hudi-spark3.4-bundle_2.12-1.2.1.jar \
+  org.apache.xtable.utilities.RunSync \
+  --datasetConfig index_config.yaml
+
+# Spark runtime jar, on a Spark cluster
+$SPARK_HOME/bin/spark-submit \
+  --class org.apache.xtable.spark.XTableSparkSync \
+  --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
+  xtable-spark-runtime_2.12-<version>.jar \
+  --datasetconfig index_config.yaml
+```
+
+The Spark runtime jar needs the Hudi Spark bundle and the Iceberg libraries on the classpath, as
+described in [Setting up Spark](#setting-up-spark). Use it for large tables, because the index
+build reads every data file of the table and the utilities jar runs it on one machine.
 
 The first sync builds the index from the current snapshot of the table, and each later sync adds
 the changes of the new snapshots.
