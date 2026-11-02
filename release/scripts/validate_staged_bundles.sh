@@ -26,7 +26,7 @@ declare -a extensions=("-javadoc.jar" "-javadoc.jar.asc" "-javadoc.jar.md5" "-ja
 "-sources.jar.asc" "-sources.jar.md5" "-sources.jar.sha1" ".jar" ".jar.asc" ".jar.md5" ".jar.sha1" ".pom" ".pom.asc"
 ".pom.md5" ".pom.sha1")
 
-declare -a bundles=("xtable-api" "xtable-core_2.12" "xtable-hudi-support-extensions_2.12" "xtable-hudi-support-utils")
+declare -a bundles=("xtable-api" "xtable-core_2.12" "xtable-hudi-support-extensions_2.12" "xtable-hudi-support-utils" "xtable-spark-runtime_2.12")
 
 NOW=$(date +%s)
 TMP_DIR_FOR_BUNDLES=/tmp/${NOW}
@@ -41,7 +41,7 @@ do
          echo "Artifact exists: $url"
        else
          echo "Artifact missing: $url"
-         e.xit 1
+         exit 1
        fi
    done
 done

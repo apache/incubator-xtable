@@ -23,7 +23,7 @@ pom chain declares none. Anything not Apache-2.0 must have
 META-INF/licenses/LICENSE-<artifactId>, and a text with no dependency behind it
 is reported too.
 
-Flow, for each */target/*-bundled.jar, plus each module in MAIN_ARTIFACT_BUNDLES:
+Flow, for each shaded module's jar (*-bundled.jar, or the main jar where it is shaded):
 
   main()            find the jars, print each report, exit non-zero on any failure
   check()           everything below, for one jar
@@ -50,15 +50,23 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+
+from generate_shaded_license_metadata import shade_modules
 from functools import lru_cache
 
 M2 = pathlib.Path.home() / ".m2" / "repository"
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TREE = "target/dependency-tree.txt"
 
-# Modules whose shaded jar replaces the main artifact instead of a *-bundled.jar.
-MAIN_ARTIFACT_BUNDLES = ("xtable-spark-runtime/target/xtable-spark-runtime_*.jar",)
 NOT_BUNDLES = ("-sources.jar", "-tests.jar", "-javadoc.jar")
+
+# Texts a dependency ships for code it embeds, kept as LICENSE.*.txt (#701).
+EMBEDDED_TEXTS = {"LICENSE.datanucleus-asm.txt": "org.datanucleus:datanucleus-core"}
+
+# One canonical LICENSE and NOTICE per jar, and META-INF/licenses as the only home for texts (#701).
+CANONICAL = ("META-INF/LICENSE", "META-INF/NOTICE")
+NOT_PACKAGED = ("META-INF/LICENSE-bundled", "META-INF/NOTICE-bundled")
+LICENSE_LIKE = re.compile(r"licen[cs]e|notice", re.IGNORECASE)
 
 # Shade cannot merge module descriptors, so it drops them from every dependency.
 DROPPED_BY_SHADE = {"module-info.class"}
@@ -93,6 +101,25 @@ def shade_includes(pom: pathlib.Path) -> set[str]:
     }
 
 
+def shade_relocations(pom: pathlib.Path) -> list[tuple[str, str]]:
+    """(from, to) class-path prefixes for each <relocation>, so relocated classes still match."""
+    relocations = []
+    for body in re.findall(r"<relocation>(.*?)</relocation>", pom.read_text(), re.DOTALL):
+        # Partial relocations would need shade's own matching; refuse rather than misjudge.
+        if re.search(r"<(includes|excludes|rawString)>", body):
+            raise SystemExit(f"FAIL {pom}: relocations with includes, excludes or rawString are not supported.")
+        pattern, shaded = _tag(body, "pattern"), _tag(body, "shadedPattern")
+        relocations.append((pattern.replace(".", "/") + "/", shaded.replace(".", "/") + "/"))
+    return relocations
+
+
+def relocate(entry: str, relocations: list[tuple[str, str]]) -> str:
+    for prefix, shaded in relocations:
+        if entry.startswith(prefix):
+            return shaded + entry[len(prefix):]
+    return entry
+
+
 def dependency_jar(group: str, artifact: str, version: str, classifier: str) -> pathlib.Path:
     """Where a resolved coordinate lives in the local repository."""
     name = f"{artifact}-{version}-{classifier}.jar" if classifier else f"{artifact}-{version}.jar"
@@ -105,7 +132,10 @@ def class_entries(jar: pathlib.Path) -> set[str]:
         return {
             entry
             for entry in archive.namelist()
-            if entry.endswith(".class") and entry.rsplit("/", 1)[-1] not in DROPPED_BY_SHADE
+            if entry.endswith(".class")
+            and entry.rsplit("/", 1)[-1] not in DROPPED_BY_SHADE
+            # Multi-release copies of base classes; bundles may filter them out.
+            and not entry.startswith("META-INF/versions/")
         }
 
 
@@ -233,6 +263,20 @@ def text_disagrees(declared: str, text: str) -> str | None:
     return None
 
 
+def layout_problems(names: list[str]) -> list[str]:
+    entries = set(names)
+    problems = [f"missing {name}" for name in CANONICAL if name not in entries]
+    problems += [f"{name} should not be packaged" for name in NOT_PACKAGED if name in entries]
+    for name in sorted(entries - set(CANONICAL) - set(NOT_PACKAGED)):
+        if name.endswith((".class", "/")) or name.startswith("META-INF/licenses/"):
+            continue
+        parts = name.split("/")
+        # Whole directory names, so License.class and the like do not match.
+        if any(part.lower() in ("license", "licenses") for part in parts[:-1]) or LICENSE_LIKE.search(parts[-1]):
+            problems.append(f"license file outside META-INF/licenses/: {name}")
+    return problems
+
+
 def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
     """Every way one bundled jar's license texts can be wrong, keyed by kind."""
     tree = module / TREE
@@ -241,11 +285,22 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
 
     with zipfile.ZipFile(jar_path) as jar:
         names = jar.namelist()
+        # Only the texts this project curates; a dependency may ship its own
+        # META-INF/licenses/ directory, which is attribution to keep.
+        texts = {
+            entry.split("/")[-1]: jar.read(entry).decode("utf-8", "replace")
+            for entry in names
+            if entry.startswith("META-INF/licenses/LICENSE-")
+        }
     bundled_classes = {entry for entry in names if entry.endswith(".class")}
-    # Only the texts this project curates; a dependency may ship its own
-    # META-INF/licenses/ directory, which is attribution to keep.
-    texts = {entry.split("/")[-1] for entry in names if entry.startswith("META-INF/licenses/LICENSE-")}
     includes = shade_includes(module / "pom.xml")
+    relocations = shade_relocations(module / "pom.xml")
+    coords = tree_coords(tree)
+    # Either being empty would skip every dependency and report success.
+    if not includes:
+        raise SystemExit(f"FAIL {module.name}: no <artifactSet><includes> found in its pom.xml.")
+    if not coords:
+        raise SystemExit(f"FAIL {module.name}: {TREE} lists no dependencies.")
 
     result: dict[str, list] = {
         "missing": [],
@@ -253,9 +308,10 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         "unresolved": [],
         "partial": [],
         "stale_includes": [],
+        "layout": layout_problems(names),
     }
     bundled = []
-    for group, artifact, version, classifier in tree_coords(tree):
+    for group, artifact, version, classifier in coords:
         if group == "org.apache.xtable" or f"{group}:{artifact}" not in includes:
             continue
         coord = f"{group}:{artifact}:{version}"
@@ -266,11 +322,9 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         # A dependency in both the tree and <includes> is bundled. Classes are
         # how that gets verified; native-binary and aggregator jars have none,
         # so they are taken at their word rather than skipped.
-        declared_classes = class_entries(jar)
+        declared_classes = {relocate(entry, relocations) for entry in class_entries(jar)}
         if declared_classes:
             present = declared_classes & bundled_classes
-            if not present:
-                continue
             if present != declared_classes:
                 result["partial"].append(f"{coord}  ({len(present)}/{len(declared_classes)} classes)")
                 continue
@@ -285,15 +339,13 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
         if f"LICENSE-{artifact}" not in texts:
             result["missing"].append(f"{coord}  ({licenses[0]})")
             continue
-        with zipfile.ZipFile(jar_path) as shaded:
-            committed = shaded.read(f"META-INF/licenses/LICENSE-{artifact}").decode("utf-8", "replace")
-        reason = text_disagrees(licenses[0], committed)
+        reason = text_disagrees(licenses[0], texts[f"LICENSE-{artifact}"])
         if reason and artifact not in KNOWN_TEXT_MISMATCHES:
             result["mismatched"].append(f"{coord}  ({reason})")
 
     # Reverse check: every shade <include> must still exist in the runtime tree.
     # This catches stale includes that silently shrink the bundle.
-    tree_artifacts = {f"{g}:{a}" for g, a, v, c in tree_coords(tree)}
+    tree_artifacts = {f"{g}:{a}" for g, a, v, c in coords}
     stale = sorted(includes - tree_artifacts)
     if stale:
         result["stale_includes"] = [
@@ -301,7 +353,9 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
             for inc in stale
         ]
 
-    result["orphaned"] = sorted(texts - {f"LICENSE-{artifact}" for artifact in bundled})
+    embedded = {name.split("/")[-1] for name in names if name.startswith("META-INF/licenses/LICENSE.")}
+    result["orphaned"] = sorted(set(texts) - {f"LICENSE-{artifact}" for artifact in bundled})
+    result["orphaned"] += sorted(text for text in embedded if EMBEDDED_TEXTS.get(text) not in includes)
     result["count"] = len(bundled)
     return result
 
@@ -313,20 +367,34 @@ REPORTS = [
     ("partial", "dependencies only partly present, so they cannot be classified"),
     ("unresolved", "dependencies that could not be resolved or have no license"),
     ("stale_includes", "shade <include> entries that no longer exist in the runtime dependency tree"),
+    ("layout", "license files outside one canonical LICENSE, NOTICE and META-INF/licenses/"),
 ]
 
+# Published shaded modules; xtable-utilities is not published yet (see AGENTS.md).
+# Keep in sync with SKIPPED_SHADE_MODULES in validate_shaded_license_coverage.sh.
+SKIPPED_SHADE_MODULES = {"xtable-utilities"}
 
-def default_jars() -> list[pathlib.Path]:
-    """Every */target/*-bundled.jar, plus the main jar of each MAIN_ARTIFACT_BUNDLES module."""
-    jars = set(ROOT.glob("**/target/*-bundled.jar"))
-    for pattern in MAIN_ARTIFACT_BUNDLES:
-        jars.update(jar for jar in ROOT.glob(pattern) if not jar.name.endswith(NOT_BUNDLES))
-    return sorted(jars)
+
+def module_jars(module: pathlib.Path) -> list[pathlib.Path]:
+    """A module's *-bundled.jar, or its main jar where its pom has shade replace it."""
+    target = module / "target"
+    if "<shadedArtifactAttached>false</shadedArtifactAttached>" not in (module / "pom.xml").read_text():
+        return sorted(target.glob("*-bundled.jar"))
+    return sorted(jar for jar in target.glob(f"{module.name}*.jar") if not jar.name.endswith(NOT_BUNDLES))
 
 
 def main() -> None:
     """Check every bundled jar, or only those named on the command line."""
-    jars = [pathlib.Path(a) for a in sys.argv[1:]] or default_jars()
+    jars = [pathlib.Path(a) for a in sys.argv[1:]]
+    unbuilt = []
+    if not jars:
+        for module in shade_modules():
+            if module.name in SKIPPED_SHADE_MODULES:
+                continue
+            found = module_jars(module)
+            jars += found
+            if not found:
+                unbuilt.append(module.relative_to(ROOT))
     if not jars:
         raise SystemExit(
             "FAIL: no */target/*-bundled.jar found; nothing was validated.\n"
@@ -334,6 +402,11 @@ def main() -> None:
         )
 
     status = 0
+    if unbuilt:
+        status = 1
+        print("FAIL shaded modules with no bundled jar, so nothing of theirs was checked:")
+        for module in unbuilt:
+            print(f"  - {module}")
     for jar_path in jars:
         result = check(jar_path.parent.parent, jar_path)
         failed = False

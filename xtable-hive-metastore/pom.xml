@@ -29,7 +29,7 @@
     <name>XTable HMS</name>
     <properties>
         <!--
-          This module produces a large bundled jar (~125 MB). Keep it out of the
+          This module produces a large bundled jar (~90 MB). Keep it out of the
           maven-build-cache entirely: the property disables both restore and save
           for this project, so the artifact never enters the cache directory that
           CI persists between runs. Shading is cheap relative to the test suites
@@ -367,6 +367,8 @@
                                         <resource>LICENSE</resource>
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
+                                        <!-- Loose texts that duplicate one in META-INF/licenses (#701). -->
+                                        <resource>LICENSE.txt</resource>
                                     </resources>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
@@ -380,7 +382,6 @@
                             </transformers>
                             <artifactSet>
                                 <includes>
-                                    <include>aopalliance:aopalliance</include>
                                     <include>com.fasterxml.jackson.core:jackson-annotations</include>
                                     <include>com.fasterxml.jackson.core:jackson-core</include>
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
@@ -392,47 +393,17 @@
                                     <include>com.google.guava:failureaccess</include>
                                     <include>com.google.guava:guava</include>
                                     <include>com.google.guava:listenablefuture</include>
-                                    <include>com.google.inject.extensions:guice-servlet</include>
-                                    <include>com.google.inject:guice</include>
                                     <include>com.google.j2objc:j2objc-annotations</include>
-                                    <include>com.google.protobuf:protobuf-java</include>
                                     <include>com.jolbox:bonecp</include>
-                                    <include>com.sun.jersey.contribs:jersey-guice</include>
-                                    <include>com.sun.jersey:jersey-client</include>
                                     <include>com.sun.jersey:jersey-json</include>
                                     <include>com.tdunning:json</include>
                                     <include>com.thoughtworks.paranamer:paranamer</include>
                                     <include>commons-dbcp:commons-dbcp</include>
                                     <include>commons-lang:commons-lang</include>
                                     <include>commons-pool:commons-pool</include>
-                                    <include>io.airlift:aircompressor</include>
                                     <include>io.dropwizard.metrics:metrics-json</include>
                                     <include>io.dropwizard.metrics:metrics-jvm</include>
-                                    <include>io.netty:netty-all</include>
-                                    <include>io.netty:netty-codec-dns</include>
-                                    <include>io.netty:netty-codec-haproxy</include>
-                                    <include>io.netty:netty-codec-http</include>
-                                    <include>io.netty:netty-codec-http2</include>
-                                    <include>io.netty:netty-codec-memcache</include>
-                                    <include>io.netty:netty-codec-mqtt</include>
-                                    <include>io.netty:netty-codec-redis</include>
-                                    <include>io.netty:netty-codec-smtp</include>
-                                    <include>io.netty:netty-codec-socks</include>
-                                    <include>io.netty:netty-codec-stomp</include>
-                                    <include>io.netty:netty-codec-xml</include>
-                                    <include>io.netty:netty-handler-proxy</include>
-                                    <include>io.netty:netty-handler-ssl-ocsp</include>
-                                    <include>io.netty:netty-resolver-dns</include>
-                                    <include>io.netty:netty-resolver-dns-classes-macos</include>
-                                    <include>io.netty:netty-resolver-dns-native-macos</include>
-                                    <include>io.netty:netty-transport-classes-kqueue</include>
-                                    <include>io.netty:netty-transport-native-epoll</include>
-                                    <include>io.netty:netty-transport-native-kqueue</include>
-                                    <include>io.netty:netty-transport-rxtx</include>
-                                    <include>io.netty:netty-transport-sctp</include>
-                                    <include>io.netty:netty-transport-udt</include>
                                     <include>javax.annotation:javax.annotation-api</include>
-                                    <include>javax.inject:javax.inject</include>
                                     <include>javax.transaction:transaction-api</include>
                                     <include>javolution:javolution</include>
                                     <include>jline:jline</include>
@@ -441,11 +412,9 @@
                                     <include>org.antlr:antlr-runtime</include>
                                     <include>org.apache.ant:ant</include>
                                     <include>org.apache.avro:avro</include>
+                                    <include>org.apache.calcite:calcite-core</include>
                                     <include>org.apache.curator:curator-framework</include>
                                     <include>org.apache.derby:derby</include>
-                                    <include>org.apache.hadoop:hadoop-mapreduce-client-core</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-api</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-common</include>
                                     <include>org.apache.hadoop:hadoop-yarn-registry</include>
                                     <include>org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice</include>
                                     <include>org.apache.hadoop:hadoop-yarn-server-common</include>
@@ -463,8 +432,8 @@
                                     <include>org.apache.hive:hive-serde</include>
                                     <include>org.apache.hive:hive-service-rpc</include>
                                     <include>org.apache.hive:hive-shims</include>
+                                    <include>org.apache.hive:hive-standalone-metastore</include>
                                     <include>org.apache.hive:hive-storage-api</include>
-                                    <include>org.apache.httpcomponents:httpcore</include>
                                     <include>org.apache.ivy:ivy</include>
                                     <include>org.apache.logging.log4j:log4j-1.2-api</include>
                                     <include>org.apache.logging.log4j:log4j-api</include>

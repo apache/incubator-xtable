@@ -335,9 +335,6 @@
                             <include>ant:ant</include>
                             <include>aopalliance:aopalliance</include>
                             <include>ch.qos.reload4j:reload4j</include>
-                            <include>co.cask.tephra:tephra-api</include>
-                            <include>co.cask.tephra:tephra-core</include>
-                            <include>co.cask.tephra:tephra-hbase-compat-1.0</include>
                             <include>com.beust:jcommander</include>
                             <include>com.chuusai:shapeless_${scala.binary.version}</include>
                             <include>com.clearspring.analytics:stream</include>
@@ -404,7 +401,6 @@
                             <include>com.google.http-client:google-http-client-gson</include>
                             <include>com.google.http-client:google-http-client-jackson2</include>
                             <include>com.google.inject:guice</include>
-                            <include>com.google.inject.extensions:guice-assistedinject</include>
                             <include>com.google.inject.extensions:guice-servlet</include>
                             <include>com.google.j2objc:j2objc-annotations</include>
                             <include>com.google.oauth-client:google-oauth-client</include>
@@ -430,12 +426,10 @@
                             <include>com.twitter:chill-java</include>
                             <include>com.twitter:chill_${scala.binary.version}</include>
                             <include>com.univocity:univocity-parsers</include>
-                            <include>com.zaxxer:HikariCP</include>
                             <include>commons-beanutils:commons-beanutils</include>
                             <include>commons-cli:commons-cli</include>
                             <include>commons-codec:commons-codec</include>
                             <include>commons-collections:commons-collections</include>
-                            <include>commons-daemon:commons-daemon</include>
                             <include>commons-dbcp:commons-dbcp</include>
                             <include>commons-el:commons-el</include>
                             <include>commons-httpclient:commons-httpclient</include>
@@ -477,7 +471,6 @@
                             <!-- google-c2p delegates to xds on Google Cloud. -->
                             <include>io.grpc:grpc-xds</include>
                             <include>io.javalin:javalin</include>
-                            <include>io.netty:netty</include>
                             <include>io.netty:netty-all</include>
                             <include>io.netty:netty-buffer</include>
                             <include>io.netty:netty-codec</include>
@@ -512,7 +505,6 @@
                             <include>io.prometheus:simpleclient_dropwizard</include>
                             <include>io.prometheus:simpleclient_httpserver</include>
                             <include>io.prometheus:simpleclient_pushgateway</include>
-                            <include>it.unimi.dsi:fastutil</include>
                             <include>jakarta.activation:jakarta.activation-api</include>
                             <include>jakarta.annotation:jakarta.annotation-api</include>
                             <include>jakarta.servlet:jakarta.servlet-api</include>
@@ -522,15 +514,11 @@
                             <include>javax.activation:javax.activation-api</include>
                             <include>javax.annotation:javax.annotation-api</include>
                             <include>javax.inject:javax.inject</include>
-                            <include>javax.jdo:jdo-api</include>
                             <include>javax.servlet:javax.servlet-api</include>
                             <include>javax.servlet:jsp-api</include>
                             <include>javax.servlet:servlet-api</include>
-                            <include>javax.servlet.jsp:javax.servlet.jsp-api</include>
                             <include>javax.servlet.jsp:jsp-api</include>
-                            <include>javax.transaction:jta</include>
                             <include>javax.transaction:transaction-api</include>
-                            <include>javax.ws.rs:javax.ws.rs-api</include>
                             <include>javax.ws.rs:jsr311-api</include>
                             <include>javax.xml.bind:jaxb-api</include>
                             <include>javolution:javolution</include>
@@ -538,14 +526,11 @@
                             <include>joda-time:joda-time</include>
                             <include>net.hydromatic:eigenbase-properties</include>
                             <include>net.razorvine:pickle</include>
-                            <include>net.sf.jpam:jpam</include>
-                            <include>net.sf.opencsv:opencsv</include>
                             <include>net.sf.py4j:py4j</include>
                             <include>org.antlr:ST4</include>
                             <include>org.antlr:antlr-runtime</include>
                             <include>org.antlr:antlr4-runtime</include>
                             <include>org.apache.ant:ant</include>
-                            <include>org.apache.ant:ant-launcher</include>
                             <include>org.apache.arrow:arrow-format</include>
                             <include>org.apache.arrow:arrow-memory-core</include>
                             <include>org.apache.arrow:arrow-memory-netty</include>
@@ -570,16 +555,9 @@
                             <include>org.apache.hadoop:hadoop-auth</include>
                             <include>org.apache.hadoop:hadoop-aws</include>
                             <include>org.apache.hadoop:hadoop-azure</include>
-                            <include>org.apache.hadoop:hadoop-client</include>
                             <include>org.apache.hadoop:hadoop-client-api</include>
                             <include>org.apache.hadoop:hadoop-client-runtime</include>
                             <include>org.apache.hadoop:hadoop-common</include>
-                            <include>org.apache.hadoop:hadoop-hdfs</include>
-                            <include>org.apache.hadoop:hadoop-mapreduce-client-app</include>
-                            <include>org.apache.hadoop:hadoop-mapreduce-client-common</include>
-                            <include>org.apache.hadoop:hadoop-mapreduce-client-core</include>
-                            <include>org.apache.hadoop:hadoop-mapreduce-client-jobclient</include>
-                            <include>org.apache.hadoop:hadoop-mapreduce-client-shuffle</include>
                             <include>org.apache.hadoop:hadoop-yarn-api</include>
                             <include>org.apache.hadoop:hadoop-yarn-common</include>
                             <include>org.apache.hadoop:hadoop-yarn-registry</include>
@@ -587,46 +565,19 @@
                             <include>org.apache.hadoop:hadoop-yarn-server-common</include>
                             <include>org.apache.hadoop:hadoop-yarn-server-resourcemanager</include>
                             <include>org.apache.hadoop:hadoop-yarn-server-web-proxy</include>
-                            <include>org.apache.hbase.thirdparty:hbase-shaded-gson</include>
-                            <include>org.apache.hbase.thirdparty:hbase-shaded-jersey</include>
-                            <include>org.apache.hbase.thirdparty:hbase-shaded-jetty</include>
-                            <include>org.apache.hbase.thirdparty:hbase-shaded-miscellaneous</include>
-                            <include>org.apache.hbase.thirdparty:hbase-shaded-netty</include>
-                            <include>org.apache.hbase.thirdparty:hbase-shaded-protobuf</include>
-                            <include>org.apache.hbase:hbase-asyncfs</include>
-                            <include>org.apache.hbase:hbase-client</include>
-                            <include>org.apache.hbase:hbase-common</include>
-                            <include>org.apache.hbase:hbase-hadoop-compat</include>
-                            <include>org.apache.hbase:hbase-hadoop2-compat</include>
-                            <include>org.apache.hbase:hbase-http</include>
-                            <include>org.apache.hbase:hbase-logging</include>
-                            <include>org.apache.hbase:hbase-metrics</include>
-                            <include>org.apache.hbase:hbase-metrics-api</include>
-                            <include>org.apache.hbase:hbase-procedure</include>
-                            <include>org.apache.hbase:hbase-protocol</include>
-                            <include>org.apache.hbase:hbase-protocol-shaded</include>
-                            <include>org.apache.hbase:hbase-replication</include>
-                            <include>org.apache.hbase:hbase-server</include>
-                            <include>org.apache.hbase:hbase-zookeeper</include>
                             <include>org.apache.hive.shims:hive-shims-0.23</include>
                             <include>org.apache.hive.shims:hive-shims-common</include>
                             <include>org.apache.hive.shims:hive-shims-scheduler</include>
                             <include>org.apache.hive:hive-common</include>
                             <include>org.apache.hive:hive-exec</include>
-                            <include>org.apache.hive:hive-jdbc</include>
                             <include>org.apache.hive:hive-llap-client</include>
                             <include>org.apache.hive:hive-llap-common</include>
-                            <include>org.apache.hive:hive-llap-server</include>
                             <include>org.apache.hive:hive-llap-tez</include>
                             <include>org.apache.hive:hive-metastore</include>
                             <include>org.apache.hive:hive-serde</include>
-                            <include>org.apache.hive:hive-service</include>
                             <include>org.apache.hive:hive-service-rpc</include>
                             <include>org.apache.hive:hive-shims</include>
                             <include>org.apache.hive:hive-storage-api</include>
-                            <include>org.apache.hive:hive-vector-code-gen</include>
-                            <include>org.apache.htrace:htrace-core</include>
-                            <include>org.apache.htrace:htrace-core4</include>
                             <include>org.apache.httpcomponents:httpclient</include>
                             <include>org.apache.httpcomponents:httpcore</include>
                             <include>org.apache.httpcomponents:fluent-hc</include>
@@ -682,12 +633,6 @@
                             <include>org.apache.spark:spark-unsafe_${scala.binary.version}</include>
                             <include>org.apache.thrift:libfb303</include>
                             <include>org.apache.thrift:libthrift</include>
-                            <include>org.apache.twill:twill-api</include>
-                            <include>org.apache.twill:twill-common</include>
-                            <include>org.apache.twill:twill-core</include>
-                            <include>org.apache.twill:twill-discovery-api</include>
-                            <include>org.apache.twill:twill-discovery-core</include>
-                            <include>org.apache.twill:twill-zookeeper</include>
                             <include>org.apache.velocity:velocity</include>
                             <include>org.apache.xbean:xbean-asm9-shaded</include>
                             <include>org.apache.xtable:xtable-api</include>
@@ -695,7 +640,6 @@
                             <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
                             <include>org.apache.xtable:xtable-hive-metastore</include>
                             <include>org.apache.xtable:xtable-hudi-support-utils</include>
-                            <include>org.apache.yetus:audience-annotations</include>
                             <include>org.apache.zookeeper:zookeeper</include>
                             <include>org.bouncycastle:bcprov-jdk18on</include>
                             <include>org.checkerframework:checker-compat-qual</include>
@@ -730,7 +674,6 @@
                             <include>org.eclipse.jetty.websocket:websocket-server</include>
                             <include>org.eclipse.jetty.websocket:websocket-servlet</include>
                             <include>org.fusesource.leveldbjni:leveldbjni-all</include>
-                            <include>org.glassfish:javax.el</include>
                             <include>org.glassfish.hk2.external:aopalliance-repackaged</include>
                             <include>org.glassfish.hk2.external:jakarta.inject</include>
                             <include>org.glassfish.hk2:hk2-api</include>
@@ -743,16 +686,12 @@
                             <include>org.glassfish.jersey.core:jersey-common</include>
                             <include>org.glassfish.jersey.core:jersey-server</include>
                             <include>org.glassfish.jersey.inject:jersey-hk2</include>
-                            <include>org.glassfish.web:javax.servlet.jsp</include>
-                            <include>org.jamon:jamon-runtime</include>
                             <include>org.javassist:javassist</include>
                             <include>org.jetbrains:annotations</include>
                             <include>org.jetbrains.kotlin:kotlin-stdlib</include>
                             <include>org.jetbrains.kotlin:kotlin-stdlib-common</include>
                             <include>org.jetbrains.kotlin:kotlin-stdlib-jdk7</include>
                             <include>org.jetbrains.kotlin:kotlin-stdlib-jdk8</include>
-                            <include>org.jruby.jcodings:jcodings</include>
-                            <include>org.jruby.joni:joni</include>
                             <include>org.json4s:json4s-ast_${scala.binary.version}</include>
                             <include>org.json4s:json4s-core_${scala.binary.version}</include>
                             <include>org.json4s:json4s-jackson_${scala.binary.version}</include>
@@ -817,9 +756,6 @@
                             <include>stax:stax-api</include>
                             <include>tomcat:jasper-compiler</include>
                             <include>tomcat:jasper-runtime</include>
-                            <include>xerces:xercesImpl</include>
-                            <include>xml-apis:xml-apis</include>
-                            <include>xmlenc:xmlenc</include>
                         </includes>
                     </artifactSet>
                 </configuration>

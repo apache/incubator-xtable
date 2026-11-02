@@ -212,6 +212,15 @@ public class ITConversionController {
     return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
   }
 
+  private ConversionSourceProvider<?> getDeltaConversionSourceProvider(boolean useKernelSource) {
+    if (!useKernelSource) {
+      return getConversionSourceProvider(DELTA);
+    }
+    ConversionSourceProvider<Long> provider = new DeltaKernelConversionSourceProvider();
+    provider.init(jsc.hadoopConfiguration());
+    return provider;
+  }
+
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
     switch (sourceTableFormat.toUpperCase()) {
       case HUDI:
@@ -1112,12 +1121,15 @@ public class ITConversionController {
     }
   }
 
-  @Test
-  public void testColumnMappingEnabledDeltaToIceberg() {
+  @ParameterizedTest(name = "useKernelSource={0}")
+  @ValueSource(booleans = {false, true})
+  public void testColumnMappingEnabledDeltaToIceberg(boolean useKernelSource) {
     String tableName = getTableName();
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(DELTA);
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getDeltaConversionSourceProvider(useKernelSource);
     try (TestSparkDeltaTable table =
-        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, null)) {
+        // Partitioned so partition values keyed by physical name are validated.
+        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, "level")) {
       table.insertRows(20);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
@@ -1151,6 +1163,44 @@ public class ITConversionController {
       table.insertRows(10);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 70);
+    }
+  }
+
+  // Column mapping enabled after data exists, then the partition column is renamed and another
+  // column takes its old name, so logical and physical names cross.
+  @ParameterizedTest(name = "useKernelSource={0}")
+  @ValueSource(booleans = {false, true})
+  public void testLateColumnMappingRenameDeltaToIceberg(boolean useKernelSource) {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getDeltaConversionSourceProvider(useKernelSource);
+    try (TestSparkDeltaTable table =
+        TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
+            tableName, tempDir, sparkSession, "level")) {
+      table.insertRows(20);
+      sparkSession.sql(
+          String.format(
+              "ALTER TABLE delta.`%s` SET TBLPROPERTIES "
+                  + "('delta.minReaderVersion'='2','delta.minWriterVersion'='5',"
+                  + "'delta.columnMapping.mode'='name')",
+              table.getBasePath()));
+      // tmp now has physical name "level"; level has physical name "street".
+      table.renameColumn("level", "tmp");
+      table.renameColumn("street", "level");
+      table.insertRows(10);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              DELTA,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Collections.singletonList(ICEBERG),
+              null,
+              null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 30);
     }
   }
 
