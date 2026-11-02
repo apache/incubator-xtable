@@ -33,6 +33,13 @@
     <properties>
         <!-- Spark version of the Hudi bundle that ITXTableSparkRuntimeBundle passes to spark-submit -->
         <engine.spark.version.prefix>${spark.version.prefix}</engine.spark.version.prefix>
+        <!--
+          Delta jars for the spark-submit engine classpath only.
+          Spark 3.4: delta-core 2.x. Spark 3.5+: delta-spark 3.x + delta-storage.
+          The IT JVM stays on the module's provided delta-core 2.4 for writing source tables.
+        -->
+        <engine.delta.artifactId>delta-core_${scala.binary.version}</engine.delta.artifactId>
+        <engine.delta.version>${delta.version}</engine.delta.version>
     </properties>
 
     <dependencies>
@@ -233,12 +240,12 @@
                             <includeScope>provided</includeScope>
                             <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j,org.scala-lang,com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.module</excludeGroupIds>
                             <!-- The Hudi bundle must match the Spark of spark-submit; see engine-hudi-bundle -->
-                            <excludeArtifactIds>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</excludeArtifactIds>
+                            <excludeArtifactIds>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version},delta-core_${scala.binary.version}</excludeArtifactIds>
                             <outputFile>${project.build.directory}/engine-classpath.txt</outputFile>
                         </configuration>
                     </execution>
                     <execution>
-                        <id>engine-hudi-bundle</id>
+                        <id>engine-versioned-jars</id>
                         <phase>pre-integration-test</phase>
                         <goals>
                             <goal>copy</goal>
@@ -251,6 +258,18 @@
                                     <version>${hudi.version}</version>
                                     <!-- one name, so a build for another Spark version replaces the jar -->
                                     <destFileName>hudi-spark-bundle.jar</destFileName>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>io.delta</groupId>
+                                    <artifactId>${engine.delta.artifactId}</artifactId>
+                                    <version>${engine.delta.version}</version>
+                                    <destFileName>delta-engine.jar</destFileName>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>io.delta</groupId>
+                                    <artifactId>delta-storage</artifactId>
+                                    <version>${engine.delta.version}</version>
+                                    <destFileName>delta-storage.jar</destFileName>
                                 </artifactItem>
                             </artifactItems>
                             <outputDirectory>${project.build.directory}/engine-jars</outputDirectory>
