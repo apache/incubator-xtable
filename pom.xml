@@ -700,6 +700,19 @@
                         </excludes>
                     </configuration>
                 </plugin>
+                <!-- Sources jars package src/main/resources too; same excludes. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven-source-plugin.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>META-INF/LICENSE-bundled</exclude>
+                            <exclude>META-INF/NOTICE-bundled</exclude>
+                            <exclude>META-INF/licenses/**</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>net.alchim31.maven</groupId>
                     <artifactId>scala-maven-plugin</artifactId>
@@ -1200,14 +1213,6 @@
                                 </goals>
                             </execution>
                         </executions>
-                        <!-- Mirrors maven-jar-plugin's excludes (#701). -->
-                        <configuration>
-                            <excludes>
-                                <exclude>META-INF/LICENSE-bundled</exclude>
-                                <exclude>META-INF/NOTICE-bundled</exclude>
-                                <exclude>META-INF/licenses/**</exclude>
-                            </excludes>
-                        </configuration>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
