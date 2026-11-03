@@ -364,7 +364,7 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
     embedded = {name.split("/")[-1] for name in names if name.startswith("META-INF/licenses/LICENSE.")}
     result["orphaned"] = sorted(set(texts) - {f"LICENSE-{artifact}" for artifact in bundled})
     result["orphaned"] += sorted(text for text in embedded if EMBEDDED_TEXTS.get(text) not in includes)
-    # Texts a bundled dependency ships for code it embeds; LICENSE must name that code too.
+    # A dependency's own texts must be curated so LICENSE-bundled covers them.
     result["uncurated"] = sorted(
         entry
         for entry in names

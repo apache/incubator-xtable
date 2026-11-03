@@ -176,7 +176,7 @@
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-classification</artifactId>
                 </exclusion>
-                <!-- YARN server and registry code serves Hive's mini-clusters, scheduler and LLAP; an HMS client never loads it. -->
+                <!-- Only Hive's mini-clusters, scheduler shim and LLAP use these. -->
                 <exclusion>
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
@@ -252,7 +252,6 @@
                     <groupId>org.eclipse.jetty</groupId>
                     <artifactId>jetty-xml</artifactId>
                 </exclusion>
-                <!-- YARN server and registry code serves Hive's mini-clusters, scheduler and LLAP; an HMS client never loads it. -->
                 <exclusion>
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
@@ -325,7 +324,7 @@
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-classification</artifactId>
                 </exclusion>
-                <!-- Only Hive's COMPILE command and ivy:// ADD JAR use these; an HMS client never does. -->
+                <!-- Only Hive's COMPILE command and ivy:// ADD JAR use these. -->
                 <exclusion>
                     <groupId>org.codehaus.groovy</groupId>
                     <artifactId>groovy-all</artifactId>
@@ -334,7 +333,6 @@
                     <groupId>org.apache.ivy</groupId>
                     <artifactId>ivy</artifactId>
                 </exclusion>
-                <!-- YARN server and registry code serves Hive's mini-clusters, scheduler and LLAP; an HMS client never loads it. -->
                 <exclusion>
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
