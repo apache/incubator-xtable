@@ -15,14 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-### Checking for DISCLAIMER-WIP
-echo "Checking for DISCLAIMER-WIP"
-disclaimerFile="./DISCLAIMER-WIP"
+### Checking for DISCLAIMER
+# The jars ship the standard DISCLAIMER via apache-incubator-disclaimer-resource-bundle; keep the source in line.
+echo "Checking for DISCLAIMER"
+disclaimerFile="./DISCLAIMER"
 if [ ! -f "$disclaimerFile" ]; then
-  echo "DISCLAIMER-WIP file not be present [ERROR]"
+  echo "DISCLAIMER file not be present [ERROR]"
   exit 1
 fi
-echo -e "\t\tDISCLAIMER-WIP file exists ? [OK]\n"
+if [ -f "./DISCLAIMER-WIP" ]; then
+  echo "DISCLAIMER-WIP present alongside DISCLAIMER [ERROR]"
+  exit 1
+fi
+echo -e "\t\tDISCLAIMER file exists ? [OK]\n"
 
 ### Checking for LICENSE and NOTICE
 echo "Checking for LICENSE and NOTICE"
