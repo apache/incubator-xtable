@@ -468,7 +468,7 @@ ASF_BOILERPLATE = re.compile(
 
 
 def is_asf_boilerplate(text: str) -> bool:
-    """True when a NOTICE says nothing beyond what this project's own NOTICE header already does."""
+    """True when a NOTICE adds nothing to our own NOTICE header."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     for i, line in enumerate(lines):
         if ASF_BOILERPLATE.fullmatch(line):
@@ -505,7 +505,7 @@ def render_notice(module: pathlib.Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-# Not published yet (see AGENTS.md); its bundle includes jol-core, which has no family here.
+# Unpublished; see AGENTS.md.
 SKIPPED_SHADE_MODULES = {"xtable-utilities"}
 
 
