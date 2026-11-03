@@ -260,6 +260,11 @@ This product includes software developed at
 The Apache Software Foundation (https://www.apache.org/).
 """
 
+ASF_NOTICES_HEADER = """--------------------------------------------------------------------------------
+
+This binary artifact bundles the following Apache Software Foundation projects:
+"""
+
 BUNDLED_NOTICES_HEADER = """--------------------------------------------------------------------------------
 
 This binary artifact bundles the following projects with NOTICE:
@@ -456,9 +461,10 @@ def notice_text_for(group: str, artifact: str, version: str) -> str | None:
     return None
 
 
+ASF_COPYRIGHT = re.compile(r"copyright\b.*\bthe apache software foundation\.?", re.IGNORECASE)
+# Lines that need not be duplicated (licensing-howto, "Bundling other ASF products").
 ASF_BOILERPLATE = re.compile(
-    r"copyright\b.*\bthe apache software foundation\.?"
-    r"|this product includes software developed (at|by)"
+    r"this product includes software developed (at|by)"
     r"|the apache software foundation \(https?://www\.apache\.org/?\)\.?"
     r"|-+"
     r"|this product includes code from apache [\w ]+, which includes the following in"
@@ -467,28 +473,41 @@ ASF_BOILERPLATE = re.compile(
 )
 
 
-def is_asf_boilerplate(text: str) -> bool:
-    """True when a NOTICE adds nothing to our own NOTICE header."""
+def asf_attributions(text: str) -> list[str] | None:
+    """Each project name with its ASF copyright line, or None when the NOTICE says more than that."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
+    blocks: list[list[str]] = []
     for i, line in enumerate(lines):
-        if ASF_BOILERPLATE.fullmatch(line):
+        if ASF_COPYRIGHT.fullmatch(line):
+            if blocks and len(blocks[-1]) == 1 and not ASF_COPYRIGHT.fullmatch(blocks[-1][0]):
+                blocks[-1].append(line)
+            else:
+                blocks.append([line])
+        elif ASF_BOILERPLATE.fullmatch(line):
             continue
-        # A project title is only boilerplate when an ASF copyright line follows it.
-        following = lines[i + 1] if i + 1 < len(lines) else ""
-        if not re.fullmatch(r"copyright\b.*\bthe apache software foundation\.?", following, re.IGNORECASE):
-            return False
-    return True
+        elif i + 1 < len(lines) and ASF_COPYRIGHT.fullmatch(lines[i + 1]):
+            blocks.append([line])
+        else:
+            return None
+    return ["\n".join(block) for block in blocks]
 
 
 def render_notice(module: pathlib.Path) -> str:
+    asf: set[str] = set()
     grouped_notices: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
     for coord in third_party_coords(module):
         notice_text = notice_text_for(*coord)
-        if notice_text is None or is_asf_boilerplate(notice_text):
+        if notice_text is None:
+            continue
+        attributions = asf_attributions(notice_text)
+        if attributions is not None:
+            asf.update(attributions)
             continue
         grouped_notices[notice_text].append(coord)
 
     lines = [NOTICE_TEMPLATE]
+    if asf:
+        lines += [ASF_NOTICES_HEADER, "\n\n".join(sorted(asf)), ""]
     if grouped_notices:
         lines += [BUNDLED_NOTICES_HEADER, "--------------------------------------------------------------------------------", ""]
     for notice_text in sorted(grouped_notices):
@@ -505,7 +524,7 @@ def render_notice(module: pathlib.Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-# Unpublished; see AGENTS.md.
+# Unpublished; see AGENTS.md. Keep in sync with validate_shaded_license_coverage.sh.
 SKIPPED_SHADE_MODULES = {"xtable-utilities"}
 
 

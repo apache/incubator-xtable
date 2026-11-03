@@ -51,7 +51,6 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 
-# Keep SKIPPED_SHADE_MODULES in sync with validate_shaded_license_coverage.sh.
 from generate_shaded_license_metadata import SKIPPED_SHADE_MODULES, shade_modules
 from functools import lru_cache
 
