@@ -54,7 +54,7 @@ add the `-Dmaven.build.cache.enabled=false` parameter. For example, `./mvnw clea
 **Note:** The `xtable-utilities` bundled jar and the Docker image built from it are local convenience builds, not release
 artifacts, and lack complete license metadata for what they bundle. The jar includes `jol-core` (GPL-2.0 with Classpath Exception).
 
-1. Get a pre-built bundled jar or create the jar with `./mvnw install -DskipTests`
+1. Build the jar with `./mvnw install -DskipTests`
 2. Create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI
