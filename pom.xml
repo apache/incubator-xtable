@@ -1200,6 +1200,14 @@
                                 </goals>
                             </execution>
                         </executions>
+                        <!-- Same as maven-jar-plugin: bundle licensing belongs only in the bundle (#701). -->
+                        <configuration>
+                            <excludes>
+                                <exclude>META-INF/LICENSE-bundled</exclude>
+                                <exclude>META-INF/NOTICE-bundled</exclude>
+                                <exclude>META-INF/licenses/**</exclude>
+                            </excludes>
+                        </configuration>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
