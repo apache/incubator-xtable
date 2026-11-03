@@ -51,7 +51,8 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 
-from generate_shaded_license_metadata import shade_modules
+# Keep SKIPPED_SHADE_MODULES in sync with validate_shaded_license_coverage.sh.
+from generate_shaded_license_metadata import SKIPPED_SHADE_MODULES, shade_modules
 from functools import lru_cache
 
 M2 = pathlib.Path.home() / ".m2" / "repository"
@@ -378,10 +379,6 @@ REPORTS = [
     ("layout", "license files outside one canonical LICENSE, NOTICE and META-INF/licenses/"),
     ("not_shaded", "curated license texts with no IncludeResourceTransformer in the module's pom"),
 ]
-
-# Published shaded modules; xtable-utilities is not published yet (see AGENTS.md).
-# Keep in sync with SKIPPED_SHADE_MODULES in validate_shaded_license_coverage.sh.
-SKIPPED_SHADE_MODULES = {"xtable-utilities"}
 
 
 def module_jars(module: pathlib.Path) -> list[pathlib.Path]:

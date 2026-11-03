@@ -157,6 +157,7 @@ Notes:
 - Category B licenses can be present in convenience binaries, but the validator will warn so they stay visible.
 - Missing bundled metadata is treated as a failure.
 - Texts under `src/main/resources/META-INF/licenses/` are kept out of the thin jar, so each new one also needs an `IncludeResourceTransformer` in the module's shade config; the validator fails if one is missing.
+- NOTICE-bundled omits dependency NOTICEs that are pure ASF boilerplate; any NOTICE with third-party content is copied verbatim.
 
 ## GitHub Actions
 

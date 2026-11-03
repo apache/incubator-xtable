@@ -258,8 +258,9 @@ Copyright 2024-2026 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (https://www.apache.org/).
+"""
 
---------------------------------------------------------------------------------
+BUNDLED_NOTICES_HEADER = """--------------------------------------------------------------------------------
 
 This binary artifact bundles the following projects with NOTICE:
 """
@@ -455,15 +456,41 @@ def notice_text_for(group: str, artifact: str, version: str) -> str | None:
     return None
 
 
+ASF_BOILERPLATE = re.compile(
+    r"copyright\b.*\bthe apache software foundation\.?"
+    r"|this product includes software developed (at|by)"
+    r"|the apache software foundation \(https?://www\.apache\.org/?\)\.?"
+    r"|-+"
+    r"|this product includes code from apache [\w ]+, which includes the following in"
+    r"|its notice file:",
+    re.IGNORECASE,
+)
+
+
+def is_asf_boilerplate(text: str) -> bool:
+    """True when a NOTICE says nothing beyond what this project's own NOTICE header already does."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for i, line in enumerate(lines):
+        if ASF_BOILERPLATE.fullmatch(line):
+            continue
+        # A project title is only boilerplate when an ASF copyright line follows it.
+        following = lines[i + 1] if i + 1 < len(lines) else ""
+        if not re.fullmatch(r"copyright\b.*\bthe apache software foundation\.?", following, re.IGNORECASE):
+            return False
+    return True
+
+
 def render_notice(module: pathlib.Path) -> str:
     grouped_notices: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
     for coord in third_party_coords(module):
         notice_text = notice_text_for(*coord)
-        if notice_text is None:
+        if notice_text is None or is_asf_boilerplate(notice_text):
             continue
         grouped_notices[notice_text].append(coord)
 
-    lines = [NOTICE_TEMPLATE, "--------------------------------------------------------------------------------", ""]
+    lines = [NOTICE_TEMPLATE]
+    if grouped_notices:
+        lines += [BUNDLED_NOTICES_HEADER, "--------------------------------------------------------------------------------", ""]
     for notice_text in sorted(grouped_notices):
         for group, artifact, version in grouped_notices[notice_text]:
             lines.append(f"Group: {group} Name: {artifact} Version: {version}")
@@ -478,8 +505,14 @@ def render_notice(module: pathlib.Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+# Not published yet (see AGENTS.md); its bundle includes jol-core, which has no family here.
+SKIPPED_SHADE_MODULES = {"xtable-utilities"}
+
+
 def main() -> None:
     for module in shade_modules():
+        if module.name in SKIPPED_SHADE_MODULES:
+            continue
         groups: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
         for coord in third_party_coords(module):
             family = normalize_family(*coord)
