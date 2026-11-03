@@ -1200,7 +1200,7 @@
                                 </goals>
                             </execution>
                         </executions>
-                        <!-- Same as maven-jar-plugin: bundle licensing belongs only in the bundle (#701). -->
+                        <!-- Mirrors maven-jar-plugin's excludes (#701). -->
                         <configuration>
                             <excludes>
                                 <exclude>META-INF/LICENSE-bundled</exclude>
