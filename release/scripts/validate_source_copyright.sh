@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 ### Checking for DISCLAIMER
-# Must match the DISCLAIMER the jars get from apache-incubator-disclaimer-resource-bundle.
+# Keep in line with the DISCLAIMER the jars get from apache-incubator-disclaimer-resource-bundle.
 echo "Checking for DISCLAIMER"
 disclaimerFile="./DISCLAIMER"
 if [ ! -f "$disclaimerFile" ]; then
