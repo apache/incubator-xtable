@@ -188,7 +188,7 @@ Set up a few environment variables to simplify Maven commands that follow. This 
         3. git clone git@github.com:apache/incubator-xtable.git incubator-xtable-tmp-clone && cd incubator-xtable-tmp-clone && git checkout ${RELEASE_BRANCH} && cd ..
         4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
         5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
-        6. Ensure the diff contains assets, demo, website, rfc, xtable-service/examples and non-binary files only in incubator-xtable-tmp-clone.
+        6. Ensure the diff contains only .git, .github, .gitignore, assets, demo, website, rfc, style/IDE.png and xtable-service/examples, all of them only in incubator-xtable-tmp-clone.
         7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
         8. If they pass, delete the repository we got from the tar-ball
           - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
