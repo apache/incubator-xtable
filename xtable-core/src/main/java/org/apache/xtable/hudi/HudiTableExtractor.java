@@ -132,6 +132,22 @@ public class HudiTableExtractor {
 
   private InternalSchema getCanonicalSchemaFromCommitMetadata(
       HoodieTableMetaClient metaClient, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
+    // Prefer Hudi InternalSchema when available
+    try {
+      TableSchemaResolver resolver = new TableSchemaResolver(metaClient);
+      Option<org.apache.hudi.internal.schema.InternalSchema> hudiInternalSchema =
+          resolver.getTableInternalSchemaFromCommitMetadata();
+      if (hudiInternalSchema.isPresent() && !hudiInternalSchema.get().isEmptySchema()) {
+        InternalSchema converted = HudiInternalSchemaConverter.convert(hudiInternalSchema.get());
+        if (converted != null) {
+          return converted;
+        }
+      }
+    } catch (Exception ignored) {
+      // fall through to Avro path
+    }
+
+    // Original Avro path
     String writerSchemaJson = commitMetadata.getExtraMetadata().get(SCHEMA_KEY);
     if (writerSchemaJson == null) {
       throw new SchemaExtractorException(
@@ -167,18 +183,26 @@ public class HudiTableExtractor {
   private InternalSchema getCanonicalSchemaFromTimeline(
       HoodieTableMetaClient metaClient, HoodieInstant commit) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
-    InternalSchema canonicalSchema;
-    Schema avroSchema;
     try {
-      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
-      canonicalSchema = schemaExtractor.schema(avroSchema);
+      // Prefer Hudi InternalSchema when schema-on-read is enabled (preserves field IDs on rename)
+      Option<org.apache.hudi.internal.schema.InternalSchema> hudiInternalSchema =
+          tableSchemaResolver.getTableInternalSchemaFromCommitMetadata();
+      if (hudiInternalSchema.isPresent() && !hudiInternalSchema.get().isEmptySchema()) {
+        InternalSchema converted = HudiInternalSchemaConverter.convert(hudiInternalSchema.get());
+        if (converted != null) {
+          return converted;
+        }
+      }
+
+      // Fallback to Avro schema (original behaviour)
+      Schema avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
+      return schemaExtractor.schema(avroSchema);
     } catch (Exception e) {
       throw new SchemaExtractorException(
           String.format(
               "Failed to convert table %s schema", metaClient.getTableConfig().getTableName()),
           e);
     }
-    return canonicalSchema;
   }
 
   private List<InternalField> getRecordKeyFields(
