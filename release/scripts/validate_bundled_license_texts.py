@@ -406,6 +406,8 @@ def main() -> None:
             # The unshaded jar published beside the bundle; none where shade replaces it.
             thin += [jar for jar in (module / "target").glob(f"{module.name}*.jar")
                      if not jar.name.endswith(NOT_BUNDLES) and jar not in found]
+            # Sources jars package src/main/resources too (#701).
+            thin += sorted((module / "target").glob(f"{module.name}*-sources.jar"))
             if not found:
                 unbuilt.append(module.relative_to(ROOT))
     if not jars:
