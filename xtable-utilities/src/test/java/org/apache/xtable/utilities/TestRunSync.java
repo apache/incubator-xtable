@@ -22,6 +22,7 @@ import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 import static org.apache.xtable.model.storage.TableFormat.PAIMON;
+import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 
 import java.io.IOException;
 import java.net.URL;
@@ -40,6 +41,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.hudi.HudiSourceConfig;
+import org.apache.xtable.parquet.ParquetSourceConfig;
 import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
@@ -216,5 +219,20 @@ class TestRunSync {
     Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());
     Assertions.assertEquals("value1", catalogConfig.getCatalogOptions().get("option1"));
     Assertions.assertEquals("value2", catalogConfig.getCatalogOptions().get("option2"));
+  }
+
+  @Test
+  public void testPartitionSpecUsesSourceFormatKey() {
+    Properties parquet = RunSync.sourceProperties(PARQUET, "region:VALUE");
+    Assertions.assertEquals(
+        "region:VALUE", parquet.getProperty(ParquetSourceConfig.PARTITION_FIELD_SPEC_CONFIG));
+    Assertions.assertNull(parquet.getProperty(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG));
+
+    Properties hudi = RunSync.sourceProperties(HUDI, "region:VALUE");
+    Assertions.assertEquals(
+        "region:VALUE", hudi.getProperty(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG));
+    Assertions.assertNull(hudi.getProperty(ParquetSourceConfig.PARTITION_FIELD_SPEC_CONFIG));
+
+    Assertions.assertTrue(RunSync.sourceProperties(PARQUET, null).isEmpty());
   }
 }
