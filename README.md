@@ -51,7 +51,10 @@ add the `-Dmaven.build.cache.enabled=false` parameter. For example, `./mvnw clea
    Code style check is tied to compile phase by default, so code style violations will lead to build failures.
 
 # Running the bundled jar
-1. Get a pre-built bundled jar or create the jar with `./mvnw install -DskipTests`
+**Note:** The `xtable-utilities` bundled jar and the Docker image built from it are local convenience builds, not release
+artifacts, and carry no LICENSE or NOTICE for what they bundle. The jar includes `jol-core` (GPL-2.0 with Classpath Exception).
+
+1. Build the jar with `./mvnw install -DskipTests`
 2. Create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI

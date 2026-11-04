@@ -176,6 +176,15 @@
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-classification</artifactId>
                 </exclusion>
+                <!-- Only Hive's mini-clusters, scheduler shim and LLAP use these. -->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-registry</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -243,6 +252,14 @@
                     <groupId>org.eclipse.jetty</groupId>
                     <artifactId>jetty-xml</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-registry</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -306,6 +323,24 @@
                 <exclusion>
                     <groupId>org.apache.hive</groupId>
                     <artifactId>hive-classification</artifactId>
+                </exclusion>
+                <!-- Only Hive's mini-clusters, scheduler shim and LLAP use these. -->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-registry</artifactId>
+                </exclusion>
+                <!-- Only Hive's COMPILE command and ivy:// ADD JAR use these. -->
+                <exclusion>
+                    <groupId>org.codehaus.groovy</groupId>
+                    <artifactId>groovy-all</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.ivy</groupId>
+                    <artifactId>ivy</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -400,16 +435,8 @@
                                     <file>target/classes/META-INF/licenses/LICENSE-javolution</file>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/licenses/LICENSE-jersey-json</resource>
-                                    <file>target/classes/META-INF/licenses/LICENSE-jersey-json</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/licenses/LICENSE-jline</resource>
                                     <file>target/classes/META-INF/licenses/LICENSE-jline</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/licenses/LICENSE-leveldbjni-all</resource>
-                                    <file>target/classes/META-INF/licenses/LICENSE-leveldbjni-all</file>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/licenses/LICENSE-paranamer</resource>
@@ -443,7 +470,6 @@
                                     <include>com.google.guava:listenablefuture</include>
                                     <include>com.google.j2objc:j2objc-annotations</include>
                                     <include>com.jolbox:bonecp</include>
-                                    <include>com.sun.jersey:jersey-json</include>
                                     <include>com.tdunning:json</include>
                                     <include>com.thoughtworks.paranamer:paranamer</include>
                                     <include>commons-dbcp:commons-dbcp</include>
@@ -463,11 +489,6 @@
                                     <include>org.apache.calcite:calcite-core</include>
                                     <include>org.apache.curator:curator-framework</include>
                                     <include>org.apache.derby:derby</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-registry</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-server-common</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-server-resourcemanager</include>
-                                    <include>org.apache.hadoop:hadoop-yarn-server-web-proxy</include>
                                     <include>org.apache.hive.shims:hive-shims-0.23</include>
                                     <include>org.apache.hive.shims:hive-shims-common</include>
                                     <include>org.apache.hive.shims:hive-shims-scheduler</include>
@@ -482,7 +503,6 @@
                                     <include>org.apache.hive:hive-shims</include>
                                     <include>org.apache.hive:hive-standalone-metastore</include>
                                     <include>org.apache.hive:hive-storage-api</include>
-                                    <include>org.apache.ivy:ivy</include>
                                     <include>org.apache.logging.log4j:log4j-1.2-api</include>
                                     <include>org.apache.logging.log4j:log4j-api</include>
                                     <include>org.apache.orc:orc-core</include>
@@ -500,14 +520,10 @@
                                     <include>org.apache.xtable:xtable-hudi-support-utils</include>
                                     <include>org.apache.zookeeper:zookeeper</include>
                                     <include>org.checkerframework:checker-qual</include>
-                                    <include>org.codehaus.groovy:groovy-all</include>
-                                    <include>org.codehaus.jackson:jackson-core-asl</include>
-                                    <include>org.codehaus.jackson:jackson-mapper-asl</include>
                                     <include>org.datanucleus:datanucleus-api-jdo</include>
                                     <include>org.datanucleus:datanucleus-core</include>
                                     <include>org.datanucleus:datanucleus-rdbms</include>
                                     <include>org.datanucleus:javax.jdo</include>
-                                    <include>org.fusesource.leveldbjni:leveldbjni-all</include>
                                     <include>org.scala-lang:scala-library</include>
                                     <include>stax:stax-api</include>
                                 </includes>

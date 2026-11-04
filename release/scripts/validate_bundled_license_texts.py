@@ -364,6 +364,15 @@ def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
     embedded = {name.split("/")[-1] for name in names if name.startswith("META-INF/licenses/LICENSE.")}
     result["orphaned"] = sorted(set(texts) - {f"LICENSE-{artifact}" for artifact in bundled})
     result["orphaned"] += sorted(text for text in embedded if EMBEDDED_TEXTS.get(text) not in includes)
+    # A dependency's own texts must be curated so LICENSE-bundled covers them.
+    result["uncurated"] = sorted(
+        entry
+        for entry in names
+        if entry.startswith("META-INF/licenses/")
+        and not entry.endswith("/")
+        and not entry.startswith("META-INF/licenses/LICENSE-")
+        and entry.split("/")[-1] not in EMBEDDED_TEXTS
+    )
     result["count"] = len(bundled)
     return result
 
@@ -372,6 +381,7 @@ REPORTS = [
     ("missing", "bundled non-Apache-2.0 dependencies with no license text"),
     ("mismatched", "license texts that do not match the declared license"),
     ("orphaned", "license texts with no bundled non-Apache-2.0 dependency"),
+    ("uncurated", "license texts a dependency brought in; add them to EMBEDDED_TEXTS and LICENSE-bundled"),
     ("partial", "dependencies only partly present, so they cannot be classified"),
     ("unresolved", "dependencies that could not be resolved or have no license"),
     ("stale_includes", "shade <include> entries that no longer exist in the runtime dependency tree"),
@@ -402,6 +412,8 @@ def main() -> None:
             # The unshaded jar published beside the bundle; none where shade replaces it.
             thin += [jar for jar in (module / "target").glob(f"{module.name}*.jar")
                      if not jar.name.endswith(NOT_BUNDLES) and jar not in found]
+            # Sources jars package src/main/resources too (#701).
+            thin += sorted((module / "target").glob(f"{module.name}*-sources.jar"))
             if not found:
                 unbuilt.append(module.relative_to(ROOT))
     if not jars:

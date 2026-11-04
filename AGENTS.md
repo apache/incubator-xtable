@@ -158,6 +158,7 @@ Notes:
 - NOTICE-bundled reduces a dependency NOTICE that is pure ASF boilerplate to its project and copyright lines; any NOTICE with third-party content is copied verbatim.
 - Missing bundled metadata is treated as a failure.
 - Texts under `src/main/resources/META-INF/licenses/` are kept out of the thin jar, so each new one also needs an `IncludeResourceTransformer` in the module's shade config; the validator fails if one is missing.
+- A license text a bundled dependency ships for code it embeds fails validation until it is listed in `EMBEDDED_TEXTS` and that code is named in LICENSE-bundled.
 
 ## GitHub Actions
 
