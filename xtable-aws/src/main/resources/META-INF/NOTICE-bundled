@@ -6,6 +6,28 @@ The Apache Software Foundation (https://www.apache.org/).
 
 --------------------------------------------------------------------------------
 
+This binary artifact bundles the following Apache Software Foundation projects:
+
+Apache Avro
+Copyright 2009-2024 The Apache Software Foundation
+
+Apache Avro
+Copyright 2010-2015 The Apache Software Foundation
+
+Apache Commons Pool
+Copyright 2001-2012 The Apache Software Foundation
+
+Apache Log4j 1.x Compatibility API
+Copyright 1999-2023 The Apache Software Foundation
+
+Apache Log4j API
+Copyright 1999-2023 The Apache Software Foundation
+
+Apache Parquet Avro
+Copyright 2014-2024 The Apache Software Foundation
+
+--------------------------------------------------------------------------------
+
 This binary artifact bundles the following projects with NOTICE:
 
 --------------------------------------------------------------------------------
@@ -153,75 +175,6 @@ NOTICE:
 |
 |   This product includes software developed at
 |   The Apache Software Foundation (https://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.avro Name: avro Version: 1.12.0
-
-NOTICE:
-| Apache Avro
-| Copyright 2009-2024 The Apache Software Foundation
-|
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: commons-pool Name: commons-pool Version: 1.6
-
-NOTICE:
-| Apache Commons Pool
-| Copyright 2001-2012 The Apache Software Foundation
-|
-| This product includes software developed by
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.logging.log4j Name: log4j-1.2-api Version: 2.22.0
-
-NOTICE:
-| Apache Log4j 1.x Compatibility API
-| Copyright 1999-2023 The Apache Software Foundation
-|
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.logging.log4j Name: log4j-api Version: 2.22.0
-
-NOTICE:
-| Apache Log4j API
-| Copyright 1999-2023 The Apache Software Foundation
-|
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.parquet Name: parquet-avro Version: 1.15.2
-
-NOTICE:
-| Apache Parquet Avro
-| Copyright 2014-2024 The Apache Software Foundation
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-|
-| --------------------------------------------------------------------------------
-|
-| This product includes code from Apache Avro, which includes the following in
-| its NOTICE file:
-|
-|   Apache Avro
-|   Copyright 2010-2015 The Apache Software Foundation
-|
-|   This product includes software developed at
-|   The Apache Software Foundation (http://www.apache.org/).
 
 --------------------------------------------------------------------------------
 

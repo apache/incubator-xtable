@@ -258,8 +258,14 @@ Copyright 2024-2026 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (https://www.apache.org/).
+"""
 
---------------------------------------------------------------------------------
+ASF_NOTICES_HEADER = """--------------------------------------------------------------------------------
+
+This binary artifact bundles the following Apache Software Foundation projects:
+"""
+
+BUNDLED_NOTICES_HEADER = """--------------------------------------------------------------------------------
 
 This binary artifact bundles the following projects with NOTICE:
 """
@@ -455,15 +461,55 @@ def notice_text_for(group: str, artifact: str, version: str) -> str | None:
     return None
 
 
+ASF_COPYRIGHT = re.compile(r"copyright\b.*\bthe apache software foundation\.?", re.IGNORECASE)
+# Lines that need not be duplicated (licensing-howto, "Bundling other ASF products").
+ASF_BOILERPLATE = re.compile(
+    r"this product includes software developed (at|by)"
+    r"|the apache software foundation \(https?://www\.apache\.org/?\)\.?"
+    r"|-+"
+    r"|this product includes code from apache [\w ]+, which includes the following in"
+    r"|its notice file:",
+    re.IGNORECASE,
+)
+
+
+def asf_attributions(text: str) -> list[str] | None:
+    """Each project name with its ASF copyright line, or None when the NOTICE says more than that."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    blocks: list[list[str]] = []
+    for i, line in enumerate(lines):
+        if ASF_COPYRIGHT.fullmatch(line):
+            if blocks and len(blocks[-1]) == 1 and not ASF_COPYRIGHT.fullmatch(blocks[-1][0]):
+                blocks[-1].append(line)
+            else:
+                blocks.append([line])
+        elif ASF_BOILERPLATE.fullmatch(line):
+            continue
+        elif i + 1 < len(lines) and ASF_COPYRIGHT.fullmatch(lines[i + 1]):
+            blocks.append([line])
+        else:
+            return None
+    return ["\n".join(block) for block in blocks]
+
+
 def render_notice(module: pathlib.Path) -> str:
+    asf: set[str] = set()
     grouped_notices: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
     for coord in third_party_coords(module):
         notice_text = notice_text_for(*coord)
         if notice_text is None:
             continue
+        attributions = asf_attributions(notice_text)
+        if attributions is not None:
+            asf.update(attributions)
+            continue
         grouped_notices[notice_text].append(coord)
 
-    lines = [NOTICE_TEMPLATE, "--------------------------------------------------------------------------------", ""]
+    lines = [NOTICE_TEMPLATE]
+    if asf:
+        lines += [ASF_NOTICES_HEADER, "\n\n".join(sorted(asf)), ""]
+    if grouped_notices:
+        lines += [BUNDLED_NOTICES_HEADER, "--------------------------------------------------------------------------------", ""]
     for notice_text in sorted(grouped_notices):
         for group, artifact, version in grouped_notices[notice_text]:
             lines.append(f"Group: {group} Name: {artifact} Version: {version}")
@@ -478,8 +524,14 @@ def render_notice(module: pathlib.Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+# Unpublished; see AGENTS.md. Keep in sync with validate_shaded_license_coverage.sh.
+SKIPPED_SHADE_MODULES = {"xtable-utilities"}
+
+
 def main() -> None:
     for module in shade_modules():
+        if module.name in SKIPPED_SHADE_MODULES:
+            continue
         groups: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
         for coord in third_party_coords(module):
             family = normalize_family(*coord)
