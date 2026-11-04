@@ -123,7 +123,8 @@ public class PaimonStatsExtractor {
     }
   }
 
-  private Object getValue(BinaryRow row, int index, InternalType type, InternalSchema fieldSchema) {
+  /** Reads the value at {@code index} in the representation XTable expects for {@code type}. */
+  Object getValue(BinaryRow row, int index, InternalType type, InternalSchema fieldSchema) {
     if (row.isNullAt(index)) {
       return null;
     }

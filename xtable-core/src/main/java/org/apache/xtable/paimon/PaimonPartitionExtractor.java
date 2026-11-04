@@ -21,7 +21,6 @@ package org.apache.xtable.paimon;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -45,6 +44,7 @@ import org.apache.xtable.model.stat.Range;
 public class PaimonPartitionExtractor {
 
   private static final PaimonPartitionExtractor INSTANCE = new PaimonPartitionExtractor();
+  private static final PaimonStatsExtractor statsExtractor = PaimonStatsExtractor.getInstance();
 
   public static PaimonPartitionExtractor getInstance() {
     return INSTANCE;
@@ -62,21 +62,26 @@ public class PaimonPartitionExtractor {
 
   public List<PartitionValue> toPartitionValues(
       FileStoreTable table, BinaryRow partition, InternalSchema internalSchema) {
-    InternalRowPartitionComputer partitionComputer = newPartitionComputer(table);
-    Map<String, String> partValues = partitionComputer.generatePartValues(partition);
-
-    if (partValues.isEmpty()) {
-      return Collections.emptyList();
-    }
-
-    List<PartitionValue> partitionValues = new ArrayList<>(partValues.size());
-    for (Map.Entry<String, String> entry : partValues.entrySet()) {
-      PartitionValue partitionValue =
+    List<String> partitionKeys = table.partitionKeys();
+    List<PartitionValue> partitionValues = new ArrayList<>(partitionKeys.size());
+    for (int i = 0; i < partitionKeys.size(); i++) {
+      InternalPartitionField partitionField =
+          toPartitionField(partitionKeys.get(i), internalSchema);
+      InternalSchema fieldSchema = partitionField.getSourceField().getSchema();
+      // read the typed value from the partition row, the string form from
+      // InternalRowPartitionComputer is only meant for paths
+      Object value = statsExtractor.getValue(partition, i, fieldSchema.getDataType(), fieldSchema);
+      if (value == null && !partition.isNullAt(i)) {
+        throw new ReadException(
+            String.format(
+                "Unsupported partition type %s for partition key %s",
+                fieldSchema.getDataType(), partitionKeys.get(i)));
+      }
+      partitionValues.add(
           PartitionValue.builder()
-              .partitionField(toPartitionField(entry.getKey(), internalSchema))
-              .range(Range.scalar(entry.getValue()))
-              .build();
-      partitionValues.add(partitionValue);
+              .partitionField(partitionField)
+              .range(Range.scalar(value))
+              .build());
     }
     return partitionValues;
   }
