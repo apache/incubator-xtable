@@ -22,28 +22,46 @@ VERSION=$2
 
 STAGING_REPO="https://repository.apache.org/content/repositories/${REPO}/org/apache/xtable"
 
-declare -a extensions=("-javadoc.jar" "-javadoc.jar.asc" "-javadoc.jar.md5" "-javadoc.jar.sha1" "-sources.jar"
-"-sources.jar.asc" "-sources.jar.md5" "-sources.jar.sha1" ".jar" ".jar.asc" ".jar.md5" ".jar.sha1" ".pom" ".pom.asc"
-".pom.md5" ".pom.sha1")
+# Every artifact is checked along with its .asc, .md5 and .sha1
+declare -a checksums=("" ".asc" ".md5" ".sha1")
+declare -a jar_suffixes=(".pom" ".jar" "-sources.jar" "-javadoc.jar")
 
-declare -a bundles=("xtable-api" "xtable-core_2.12" "xtable-hudi-support-extensions_2.12" "xtable-hudi-support-utils" "xtable-spark-runtime_2.12")
+# xtable-utilities and xtable-spark-extensions are not deployed
+declare -a poms=("xtable" "xtable-hudi-support")
+declare -a jars=("xtable-api" "xtable-core_2.12" "xtable-hudi-support-utils" "xtable-hudi-support-extensions_2.12"
+"xtable-iceberg-pluggable-tf_2.12" "xtable-aws" "xtable-hive-metastore" "xtable-service" "xtable-spark-runtime_2.12")
+declare -a extras=("xtable-core_2.12:-tests.jar" "xtable-aws:-bundled.jar" "xtable-hive-metastore:-bundled.jar"
+"xtable-hudi-support-extensions_2.12:-bundled.jar")
 
-NOW=$(date +%s)
-TMP_DIR_FOR_BUNDLES=/tmp/${NOW}
-mkdir "$TMP_DIR_FOR_BUNDLES"
-
-for bundle in "${bundles[@]}"
-do
-   for extension in "${extensions[@]}"
-   do
-       url=${STAGING_REPO}/$bundle/${VERSION}/$bundle-${VERSION}$extension
-       if curl --output "$TMP_DIR_FOR_BUNDLES/$bundle-${VERSION}$extension" --head --fail "$url"; then
-         echo "Artifact exists: $url"
-       else
-         echo "Artifact missing: $url"
-         exit 1
-       fi
-   done
+declare -a files=()
+for artifact in "${poms[@]}"; do
+  files+=("$artifact/$artifact-${VERSION}.pom")
+done
+for artifact in "${jars[@]}"; do
+  for suffix in "${jar_suffixes[@]}"; do
+    files+=("$artifact/$artifact-${VERSION}$suffix")
+  done
+done
+for extra in "${extras[@]}"; do
+  artifact=${extra%%:*}
+  files+=("$artifact/$artifact-${VERSION}${extra#*:}")
 done
 
+missing=0
+for file in "${files[@]}"; do
+  for checksum in "${checksums[@]}"; do
+    url=${STAGING_REPO}/${file%%/*}/${VERSION}/${file#*/}$checksum
+    if curl --silent --head --fail --output /dev/null "$url"; then
+      echo "Artifact exists: $url"
+    else
+      echo "Artifact missing: $url"
+      missing=1
+    fi
+  done
+done
+
+if [ "$missing" -ne 0 ]; then
+  echo "Validation failed: artifacts are missing."
+  exit 1
+fi
 echo "All artifacts exist. Validation succeeds."

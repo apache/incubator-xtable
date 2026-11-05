@@ -60,7 +60,6 @@
 
     <properties>
         <delta.kernel.version>4.0.0</delta.kernel.version>
-        <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2026-07-21T19:16:22Z</project.build.outputTimestamp>
         <javaVersion>8</javaVersion>

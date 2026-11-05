@@ -111,7 +111,8 @@ git commit -am "[MINOR] Moving to ${NEXT_VERSION_IN_BASE_BRANCH}-SNAPSHOT on mai
 ## git push --set-upstream origin ${NEXT_VERSION_BRANCH}
 
 echo "==============================================================="
-echo "!!Please open a PR based on ${NEXT_VERSION_BRANCH} branch for approval!! [Press ENTER to continue]"
+echo "!!Push ${NEXT_VERSION_BRANCH} from ~/${LOCAL_CLONE_DIR}/${XTABLE_REPO_DIR} to your fork and open a PR now;"
+echo "the clean-up at the end can delete this clone!! [Press ENTER to continue]"
 read confirmation
 
 # Checkout and update release branch
