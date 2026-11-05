@@ -66,41 +66,33 @@ associated with your Apache account, please follow the instructions below.
 
 ### Create GPG public key with apache email
 
-- Install gpg (`brew install gnupg pinentry-mac` on macOS).
-- Create an RSA 4096 key with your apache email: `gpg --full-generate-key`.
-- Export its fingerprint into an environment variable `SIGNING_KEY`. The release scripts sign with this key, and fall back to
-  gpg's default key when it is unset.
+- Install gpg using [https://gpgtools.org/](https://gpgtools.org/).
+- Create gpg key with your apache emailId. 
+- Export the KeyId into an environment variable KEY_ID
 
 ```shell
-export SIGNING_KEY=<40-character fingerprint from gpg --list-keys you@apache.org>
+LOCAL_SVN_DIR=local_svn_dir
+mkdir -p ~/$LOCAL_SVN_DIR && cd $LOCAL_SVN_DIR
+svn checkout https://dist.apache.org/repos/dist/dev/incubator/xtable && cd xtable
+email=yourapacheemailusername@apache.org
+(gpg --list-sigs ${email} && gpg --armor --export ${name}) >> KEYS
+svn --username=${apache_username} --password=${passowrd} commit -m "Add xtable directory and keys"
 ```
 
-Append the key to the KEYS file in both dist/dev and dist/release. Committing to dist/release needs PPMC membership; ask a
-PPMC member if you are not one.
+### Submit your GPG public key into MIT PGP Public Key Server
+
+In order to make yourself have the right permission to stage java artifacts in Apache Nexus staging repository, please
+submit your GPG public key into [MIT PGP Public Key Server](http://pgp.mit.edu:11371/).
+
+Also send public key to ubuntu server via
 
 ```shell
-for area in dev release; do
-  svn checkout --depth=files https://dist.apache.org/repos/dist/${area}/incubator/xtable xtable-${area}
-  (gpg --list-sigs ${SIGNING_KEY} && gpg --armor --export ${SIGNING_KEY}) >> xtable-${area}/KEYS
-  svn commit xtable-${area}/KEYS -m "Add ${SIGNING_KEY} to KEYS"
-done
+gpg --keyserver hkp://keyserver.ubuntu.com --send-keys ${KEY_ID} # send public key to ubuntu server
+gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys ${KEY_ID} # verify
 ```
 
-Also add the fingerprint to your profile at [id.apache.org](https://id.apache.org/), so the key is published at
-`https://people.apache.org/keys/committer/<apache_id>.asc`.
-
-### Publish your public key to a keyserver
-
-Nexus checks for your public key on keyserver.ubuntu.com and keys.openpgp.org when it closes a staging repository.
-pgp.mit.edu is no longer reliable.
-
-```shell
-gpg --keyserver hkps://keyserver.ubuntu.com --send-keys ${SIGNING_KEY}
-gpg --keyserver hkps://keys.openpgp.org --send-keys ${SIGNING_KEY} # then confirm the emailed link
-```
-
-If `--send-keys` fails with a network error, upload the armored key through the web forms at
-[keyserver.ubuntu.com](https://keyserver.ubuntu.com/) and [keys.openpgp.org](https://keys.openpgp.org/upload).
+would also refer
+to [stackoverflow](https://stackoverflow.com/questions/19462617/no-public-key-key-with-id-xxxxx-was-not-able-to-be-located-oss-sonatype-org)
 
 ### Access to Apache Nexus repository
 
@@ -148,7 +140,7 @@ Export Some Environment variables in the terminal where you are running the rele
 
 Use cut_release_branch.sh to cut a release branch
 
-- Script: [cut_release_branch.sh](https://github.com/apache/incubator-xtable/blob/main/release/scripts/cut_release_branch.sh)
+- Script: [cut_release_branch.sh](https://github.com/apache/incubator-xtable/blob/master/scripts/release/cut_release_branch.sh)
 
 Usage
 
@@ -179,8 +171,17 @@ Set up a few environment variables to simplify Maven commands that follow. This 
 1. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory
     1. git checkout ${RELEASE_BRANCH}
     2. cd release && ./scripts/create_source_release.sh
-       > The tarball is signed with `SIGNING_KEY` (see One-time Setup), or with gpg's default key if it is unset.
-       > The script needs `RC_NUM` exported and checks out the `release-${RELEASE_VERSION}-rc${RC_NUM}` tag.
+       > If you have multiple gpg keys(gpg --list-keys), then the signing command will take in the first key most likely.
+       > You will release this when it asks for a passphrase in a pop up.
+       > When asked for passphrase, ensure the intended key is the one asked for.
+       >
+       > Command used in script:
+       >
+       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
+       >
+       > To use a specific key: update as follows: // replace FINGERPRINT
+       >
+       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
     3. Verify Source release is signed and buildable
         1. cd ../src_release
         2. gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz
@@ -231,18 +232,19 @@ Set up a few environment variables to simplify Maven commands that follow. This 
     6. Verify that files are [present](https://dist.apache.org/repos/dist/dev/incubator/xtable)
     7. Run Verification Script to ensure the source release is sane
         1. For RC: cd release/scripts && ./validate_staged_release.sh --release=${RELEASE_VERSION} --rc_num=${RC_NUM} --verbose
-        2. For finalized release in dev: cd release/scripts && ./validate_staged_release.sh --release=${RELEASE_VERSION} --verbose
+        2. For finalized release in dev: cd scripts && ./scripts/validate_staged_release.sh --release=${RELEASE_VERSION}  --verbose
 
 4. Deploy maven artifacts and verify
     1. This will deploy jar artifacts to the Apache Nexus Repository, which is the staging area for deploying jars to Maven Central.
     2. Review all staged artifacts (https://repository.apache.org/). They should contain all relevant parts for each module, including pom.xml, jar, test jar, source, test source, javadoc, etc. Carefully review any new artifacts.
     3. git checkout ${RELEASE_BRANCH} && export GPG_TTY=$(tty)
-    4. ./release/scripts/deploy_staging_jars.sh
-        1. The script signs with `SIGNING_KEY`, the same key as the source release, and disables the Maven build cache, which otherwise fails the deploy with "duplicated artifacts attached".
+    4. ./mvnw deploy -Prelease -DskipTests -DdeployArtifacts=true -Dmaven.build.cache.enabled=false
+        1. when prompted for the passphrase, if you have multiple gpg keys in your keyring, make sure that you enter the right passphase corresponding to the same key (FINGERPRINT) as used while generating source release in step f.ii.
+           > If the prompt is not for the same key (by default the maven-gpg-plugin will pick up the first key in your keyring so that could be different), then add the following option to your ~/.gnupg/gpg.conf file
         2. make sure your IP is not changing while uploading, otherwise it creates a different staging repo
         3. Use a VPN if you can't prevent your IP from switching
     5. Review all staged artifacts by logging into Apache Nexus and clicking on "Staging Repositories" link on left pane. Then find a "open" entry for apachextable
-    6. Once you have ensured everything is good and the validation in step 3.7 succeeds, you can close the staging repo. Until you close, you can re-run deploying to staging multiple times. But once closed, it will create a new staging repo. So ensure you close this, so that the next RC (if need be) is on a new repo. So, once everything is good, close the staging repository on Apache Nexus. When prompted for a description, enter
+    6. Once you have ensured everything is good and validation of step 7 succeeds, you can close the staging repo. Until you close, you can re-run deploying to staging multiple times. But once closed, it will create a new staging repo. So ensure you close this, so that the next RC (if need be) is on a new repo. So, once everything is good, close the staging repository on Apache Nexus. When prompted for a description, enter
        > Apache incubator-xtable, version `${RELEASE_VERSION}`, release candidate `${RC_NUM}`.
     7. After closing, run the script to validate the staged bundles again:
        ```shell
@@ -256,109 +258,103 @@ Set up a few environment variables to simplify Maven commands that follow. This 
 
 # Vote on the release candidate
 
-As an incubating project, a release needs two votes: first the XTable PPMC on dev@, then the Incubator PMC (IPMC) on
-general@incubator.apache.org. Only IPMC votes are binding for the release. See the
-[Incubator release management guide](https://incubator.apache.org/guides/releasemanagement.html#releasing-podling-releases).
+Once you have built and individually reviewed the release candidate, please share it for the community-wide(dev@incubator-xtable ) review. Please review foundation-wide voting guidelines for more information.
 
-## Vote on dev@
-
-Once you have built and individually reviewed the release candidate, start the vote thread on dev@. The release manager
-votes too, and every +1 should list what the voter checked. Here's an email template; please adjust as you see fit.
+Start the review-and-vote thread on the dev@ mailing list. Here’s an email template; please adjust as you see fit.
 
 ```
-To: dev@xtable.apache.org
+From: Release Manager
 
-Subject: [VOTE] Release Apache XTable (incubating) ${RELEASE_VERSION}, release candidate #${RC_NUM}
+To: dev@incubator-xtable.apache.org 
+
+Subject: [VOTE] Release 1.2.3, release candidate #3
+
+ 
 
 Hi everyone,
 
-Please review and vote on release candidate #${RC_NUM} for Apache XTable (incubating) ${RELEASE_VERSION}.
+Please review and vote on the release candidate #3 for the version 1.2.3, as follows:
 
 [ ] +1, Approve the release
+
 [ ] -1, Do not approve the release (please provide specific comments)
 
-The release candidate includes:
+ 
 
-* GitHub release notes [1]
-* the source release to be deployed to dist.apache.org [2] (svn revision NNNNN), signed with the key with
-  fingerprint ${SIGNING_KEY} [3]
-* the sha512 of apache-xtable-${RELEASE_VERSION}.src.tgz: <sha512>
-* all convenience binaries to be deployed to the Maven Central Repository [4]
-* the source code tag release-${RELEASE_VERSION}-rc${RC_NUM} [5], at commit <commit sha>
+The complete staging area is available for your review, which includes:
 
-The source release builds with Java 11: ./mvnw clean package -DskipTests
+* GH release notes [1],
 
-The xtable-utilities bundled jar is a local convenience build and is not part of this release. It includes jol-core
-(GPL-2.0 with Classpath Exception) and is not deployed to Maven Central.
+* the official Apache source release and binary convenience releases to be deployed to dist.apache.org [2], which are signed with the key with fingerprint FFFFFFFF [3],
 
-The vote will be open for at least 72 hours. It is adopted by majority approval, with at least 3 PPMC affirmative votes.
-If it passes, the release goes to a vote on general@incubator.apache.org.
+* all artifacts to be deployed to the Maven Central Repository [4],
+
+* source code tag "1.2.3-rc3" [5],
+
+ 
+
+The vote will be open for at least 72 hours. It is adopted by majority approval, with at least 3 PMC affirmative votes.
+
+ 
 
 Thanks,
+
 Release Manager
 
-[1] https://github.com/apache/incubator-xtable/releases/tag/release-${RELEASE_VERSION}-rc${RC_NUM}
-[2] https://dist.apache.org/repos/dist/dev/incubator/xtable/${RELEASE_VERSION}-rc${RC_NUM}/
+ 
+
+[1] link
+
+[2] link
+
 [3] https://dist.apache.org/repos/dist/release/incubator/xtable/KEYS
-[4] https://repository.apache.org/content/repositories/orgapachextable-NNNN/
-[5] https://github.com/apache/incubator-xtable/tree/release-${RELEASE_VERSION}-rc${RC_NUM}
+
+[4] link
+
+[5] link
+
+[6] link
 ```
 
-If there are any issues found in the release candidate, cancel the vote in a separate `[CANCEL] [VOTE] ...` email; there's
-no need to wait 72 hours. Proceed to the Fix Issues step below and address the problem. However, some issues don't require
-cancellation. For example, if an issue is found in the website, just correct it on the spot and the vote can continue as-is.
+If there are any issues found in the release candidate, reply on the vote thread to cancel the vote, and there’s no need to wait 72 hours if any issues found. Proceed to the Fix Issues step below and address the problem. However, some issues don’t require cancellation. For example, if an issue is found in the website, just correct it on the spot and the vote can continue as-is.
 
-If there are no issues, reply on the vote thread to close the voting. Then, tally the votes in a separate email. Here's an
-email template; please adjust as you see fit.
+If there are no issues, reply on the vote thread to close the voting. Then, tally the votes in a separate email. Here’s an email template; please adjust as you see fit.
 
 ```
+From: Release Manager
+
 To: dev@xtable.apache.org
 
-Subject: [RESULT] [VOTE] Release Apache XTable (incubating) ${RELEASE_VERSION}, release candidate #${RC_NUM}
+Subject: [RESULT] [VOTE] Release 1.2.3, release candidate #3
 
-The vote has passed with XXX +1 votes, XXX of which are binding (PPMC):
+ 
 
-* approver 1 (binding)
-* approver 2 (binding)
-* approver 3 (binding)
+I'm happy to announce that we have unanimously approved this release.
 
-There are no 0 or -1 votes.
+ 
 
-Vote thread: <lists.apache.org link>
+There are XXX approving votes, XXX of which are binding:
 
-The release will now be put to a vote on general@incubator.apache.org. Thanks everyone!
+* approver 1
+
+* approver 2
+
+* approver 3
+
+* approver 4
+
+ 
+
+There are no disapproving votes.
+
+ 
+
+Thanks everyone!
 ```
-
-## Vote on general@incubator
-
-Start a vote with the same content on general@incubator.apache.org, adding a link to the dev@ vote and result threads.
-Votes from mentors on dev@ are IPMC votes and can be carried over; say so in the email.
-
-```
-To: general@incubator.apache.org
-
-Subject: [VOTE] Release Apache XTable (incubating) ${RELEASE_VERSION}, release candidate #${RC_NUM}
-
-Hello Incubator PMC,
-
-The Apache XTable community has voted and approved release candidate #${RC_NUM} of Apache XTable (incubating)
-${RELEASE_VERSION}. We now kindly request that the IPMC vote on this release.
-
-The XTable community vote thread: <link>
-The vote result: <link>
-Carried-over binding IPMC votes from the dev@ vote: <names>
-
-<the release candidate details from the dev@ email>
-
-The vote will be open for at least 72 hours. It needs at least 3 binding IPMC +1 votes and more +1 than -1 votes.
-```
-
-Close it with a `[RESULT] [VOTE]` email to general@ in the same format as the dev@ one, listing binding IPMC votes.
 
 ## Checklist to proceed to the finalization step
 
-1. The dev@ vote passed with at least three approving PPMC votes.
-2. The general@ vote passed with at least three binding IPMC votes.
+Community votes to release the proposed candidate, with at least three approving PMC votes
 
 # Fix any issues
 
@@ -377,8 +373,6 @@ Issues identified during vote have been resolved, with fixes committed to the re
 Once the release candidate has been reviewed and approved by the community, the release should be finalized. This involves the final deployment of the release candidate to the release repositories, merging of the website changes, etc.
 
 ## Current follow the below steps to finalize the release.
-
-Do not start until both the dev@ and the general@ votes have passed.
 
 1. Drop all RC orgapachextable-XXX in [Apache Nexus Staging Repositories](https://repository.apache.org/#stagingRepositories) that haven't been approved.
 2. Checkout to the release branch for the approved rc and move it to one without the rc suffix. Eg: `release-0.1.0-incubating-rc4 to release-0.1.0-incubating`
@@ -401,14 +395,7 @@ Do not start until both the dev@ and the general@ votes have passed.
        svn add ${RELEASE_VERSION}
        svn commit
        ```
-    5. Verify that files are [present](https://dist.apache.org/repos/dist/release/incubator/xtable)
-    6. Remove the previous release from dist/release; it stays available on [archive.apache.org](https://archive.apache.org/dist/incubator/xtable/).
-       Point its download links in `website/releases/downloads.mdx` at the archive.
-       ```shell
-       svn rm xtable/<PREVIOUS_VERSION>
-       svn commit -m "Remove xtable <PREVIOUS_VERSION>, now in the archive"
-       ```
-    7. Delete the RC directories from https://dist.apache.org/repos/dist/dev/incubator/xtable.
+    5. Verify that files are [present](https://dist.apache.org/repos/dist/release/xtable)
 4. Use the Apache Nexus repository to release the staged binary artifacts to the Maven Central repository. In the Staging Repositories section, find the relevant release candidate orgapachextable-XXX entry and click `Release`.
    > Note: make sure and check you click `Release` repo, it cannot be withdrawn.
 5. Drop all other release candidates that are not being released. It can take up to 24 hours for the new release to show up in [Maven Central repository](https://search.maven.org/search?q=g:org.apache.xtable).
@@ -440,12 +427,21 @@ From: Release Manager
 
 To: announce@apache.org
 
-Subject: [ANNOUNCE] Apache XTable (incubating) <VERSION> released
+Subject: [ANNOUNCE] Apache incubator-xtable <VERSION> released
 
-The Apache XTable (incubating) team is pleased to announce the release of Apache XTable (incubating) <VERSION>.
+ 
 
-Apache XTable (incubating) is a cross-table converter for table formats such as Apache Hudi, Apache Iceberg and
-Delta Lake, which lets you write data in one format and read it in another.
+The Apache incubator-xtable team is pleased to announce the release of Apache
+
+incubator-xtable <VERSION>.
+
+
+
+Apache incubator-xtable manages storage of large analytical
+
+datasets on DFS (Cloud stores, HDFS or any Hadoop FileSystem compatible storage)
+
+and provides the ability to query them.
 
 
 
@@ -458,7 +454,7 @@ For details on how to use incubator-xtable, please look at the quick start page 
 
 If you'd like to download the source release, you can find it here:
 
-https://xtable.apache.org/releases/downloads
+https://github.com/apache/incubator-xtable/releases/tag/<VERSION>
 
 You can read more about the release (including release notes) here:
 
@@ -470,13 +466,6 @@ https://xtable.apache.org/
 Thanks to everyone involved!
 
 XXX
-
-----
-Apache XTable (incubating) is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the
-Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that
-the infrastructure, communications, and decision making process have stabilized in a manner consistent with
-other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or
-stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
 ```
 
 ## Recordkeeping

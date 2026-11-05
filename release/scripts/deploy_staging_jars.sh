@@ -23,8 +23,8 @@ set -o errexit
 set -o nounset
 
 CURR_DIR=$(pwd)
-if [ ! -d "$CURR_DIR/release/scripts" ] ; then
-  echo "You have to call the script from the repository root dir"
+if [ ! -d "$CURR_DIR/packaging" ] ; then
+  echo "You have to call the script from the repository root dir that contains 'packaging/'"
   exit 1
 fi
 
@@ -49,8 +49,6 @@ fi
 # cached source:jar-no-fork execution and then re-attaches the sources jar, which fails the
 # release build with "duplicated artifacts attached". Disable it for release deploys.
 COMMON_OPTIONS="-DdeployArtifacts=true -DskipTests -DretryFailedDeploymentCount=10 -Dmaven.build.cache.enabled=false"
-# Signs with gpg's default key unless SIGNING_KEY (a fingerprint) is set
-COMMON_OPTIONS="$COMMON_OPTIONS ${SIGNING_KEY:+-Dgpg.keyname=$SIGNING_KEY}"
 echo "Cleaning everything before any deployment"
 $MVN clean $COMMON_OPTIONS
 echo "Building with options"

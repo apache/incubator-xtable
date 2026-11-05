@@ -31,8 +31,6 @@ if [[ `basename $CURR_DIR` != "release" ]] ; then
   exit 1
 fi
 
-: "${RC_NUM:?export RC_NUM before running this script}"
-
 RELEASE_VERSION=`grep -A 5 "<artifactId>xtable</artifactId>" ../pom.xml  | grep '<version>' | sed -e 's/<version>//' -e 's/<\/version>//' -e 's/ //g'`
 
 if [ -z "${RELEASE_VERSION}" ]; then
@@ -69,8 +67,7 @@ rsync -a \
   --exclude "xtable-service/examples" . apache-xtable-$RELEASE_VERSION
 
 tar czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
-# Signs with gpg's default key unless SIGNING_KEY (a fingerprint) is set
-gpg --armor ${SIGNING_KEY:+--local-user "$SIGNING_KEY"} --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
+gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 cd ${RELEASE_DIR}
 shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > apache-xtable-${RELEASE_VERSION}.src.tgz.sha512
 
