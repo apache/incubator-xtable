@@ -238,7 +238,7 @@ Set up a few environment variables to simplify Maven commands that follow. This 
     1. This will deploy jar artifacts to the Apache Nexus Repository, which is the staging area for deploying jars to Maven Central.
     2. Review all staged artifacts (https://repository.apache.org/). They should contain all relevant parts for each module, including pom.xml, jar, test jar, source, test source, javadoc, etc. Carefully review any new artifacts.
     3. git checkout ${RELEASE_BRANCH} && export GPG_TTY=$(tty)
-    4. ./mvnw deploy -Prelease -DskipTests  -DdeployArtifacts=true
+    4. ./mvnw deploy -Prelease -DskipTests -DdeployArtifacts=true -Dmaven.build.cache.enabled=false
         1. when prompted for the passphrase, if you have multiple gpg keys in your keyring, make sure that you enter the right passphase corresponding to the same key (FINGERPRINT) as used while generating source release in step f.ii.
            > If the prompt is not for the same key (by default the maven-gpg-plugin will pick up the first key in your keyring so that could be different), then add the following option to your ~/.gnupg/gpg.conf file
         2. make sure your IP is not changing while uploading, otherwise it creates a different staging repo
