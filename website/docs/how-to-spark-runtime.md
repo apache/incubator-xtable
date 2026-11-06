@@ -230,6 +230,10 @@ Delta Standalone doesn't run on Spark 3.5, so on 3.5 and newer a Delta source or
 through Delta Kernel with no flag needed. If you want Kernel on Spark 3.4 as well, pass
 `--usedeltakernel`, or set `.useDeltaKernel(true)` on the `TableSyncSpec`.
 
+Delta Kernel is not part of the Delta Spark jars. When the sync uses Kernel, add
+`io.delta:delta-kernel-api:4.0.0` and `io.delta:delta-kernel-defaults:4.0.0` to the classpath, or
+the sync fails with `NoClassDefFoundError: io/delta/kernel/engine/Engine`.
+
 ## Running on AWS Glue
 
 From 0.5.0, the jar is built against Hudi 1.2.x, and a sync job with a Hudi source or target uses
