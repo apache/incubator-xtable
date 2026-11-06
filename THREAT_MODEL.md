@@ -20,7 +20,7 @@
 # Apache XTable (Incubating) Threat Model
 
 Status: v1 draft, pending PPMC review.
-Applies to: `main` (0.5.0-SNAPSHOT) and all released versions.
+Applies to: `main` (0.6.0-SNAPSHOT) and all released versions.
 
 This document states what the Apache XTable (Incubating) project treats as a security
 vulnerability, and what it does not. It exists so that reporters, users and the PPMC
