@@ -67,7 +67,7 @@ rsync -a \
   --exclude "xtable-service/examples" . apache-xtable-$RELEASE_VERSION
 
 tar czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
-gpg --armor --local-user E391B3E8179C4FD9BB8BF72002AB8E945EFD1E91 --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
+gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 cd ${RELEASE_DIR}
 shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > apache-xtable-${RELEASE_VERSION}.src.tgz.sha512
 
