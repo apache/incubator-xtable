@@ -189,6 +189,20 @@ A table entry can also set `targetProperties`, keyed by target format, for examp
 | `--usedeltakernel` | Force Delta Kernel for a Delta source or target. |
 | `--help` | Print the usage text. |
 
+## Hudi targets
+
+A sync to a Hudi target writes the Hudi commit with Hudi's Java client by default, and the Hudi
+Spark bundle doesn't include it. When the sync has a Hudi target, do one of these:
+
+- Add `org.apache.hudi:hudi-java-client:1.2.1` to the classpath, next to the Hudi Spark bundle.
+- Use Hudi's Spark client, which the bundle includes, by setting
+  `xtable.hudi.target.execution.engine: spark` in the `targetProperties` of each table in
+  `--datasetconfig`, or in the `targetProperties` of the `TableSyncSpec`.
+
+Without either, the sync fails with
+`NoClassDefFoundError: org/apache/hudi/client/common/HoodieJavaEngineContext`. See
+[Hudi](/docs/features-and-limitations#hudi) for the other Hudi target properties.
+
 ## Supported formats
 
 Paimon and Parquet are read-only sources; XTable does not write either format as a target.
@@ -215,6 +229,31 @@ and the jar chooses the right one automatically:
 Delta Standalone doesn't run on Spark 3.5, so on 3.5 and newer a Delta source or target is routed
 through Delta Kernel with no flag needed. If you want Kernel on Spark 3.4 as well, pass
 `--usedeltakernel`, or set `.useDeltaKernel(true)` on the `TableSyncSpec`.
+
+Delta Kernel is not part of the Delta Spark jars. When the sync uses Kernel, add
+`io.delta:delta-kernel-api:4.0.0` and `io.delta:delta-kernel-defaults:4.0.0` to the classpath, or
+the sync fails with `NoClassDefFoundError: io/delta/kernel/engine/Engine`.
+
+## Running on AWS Glue
+
+From 0.5.0, the jar is built against Hudi 1.2.x, and a sync job with a Hudi source or target uses
+Hudi 1.2.x. AWS Glue 5.1 includes Hudi 1.0.2, and Glue documents how to
+[use a different Hudi version](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-hudi.html)
+in a job. For the sync job:
+
+- Pass the XTable jar and `hudi-spark3.5-bundle_2.12` 1.2.x with `--extra-jars`.
+- Set `--user-jars-first` to `true`.
+- Leave `hudi` out of `--datalake-formats`, so that Glue does not add its own Hudi jars.
+
+```text md title="Glue job parameters"
+--extra-jars       s3://<bucket>/jars/xtable-spark-runtime_2.12-<version>.jar,s3://<bucket>/jars/hudi-spark3.5-bundle_2.12-1.2.1.jar
+--user-jars-first  true
+--conf             spark.serializer=org.apache.spark.serializer.KryoSerializer
+```
+
+The sync also needs the Iceberg or Delta libraries for its targets, as it does on any other Spark
+cluster, and a sync to a Hudi target needs the setup in [Hudi targets](#hudi-targets). Your other Glue jobs can keep writing the table with the Hudi version they already use,
+because Hudi 1.2.x reads tables written by Hudi 0.15.x and 1.0.x without upgrading them.
 
 ## Next steps
 
