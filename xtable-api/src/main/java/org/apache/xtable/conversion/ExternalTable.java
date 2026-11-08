@@ -19,6 +19,7 @@
 package org.apache.xtable.conversion;
 
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -32,6 +33,8 @@ import com.google.common.base.Preconditions;
 @Getter
 @EqualsAndHashCode
 class ExternalTable {
+  private static final Pattern WINDOWS_ABSOLUTE_PATH = Pattern.compile("^[A-Za-z]:/.*");
+
   /** The name of the table. */
   protected final @NonNull String name;
 
@@ -66,6 +69,11 @@ class ExternalTable {
   }
 
   protected String sanitizeBasePath(String tableBasePath) {
+    String pathWithForwardSlashes = tableBasePath.replace('\\', '/');
+    if (WINDOWS_ABSOLUTE_PATH.matcher(pathWithForwardSlashes).matches()) {
+      return new Path("file:///" + pathWithForwardSlashes).toUri().toString();
+    }
+
     Path path = new Path(tableBasePath);
     Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
     if (path.isAbsoluteAndSchemeAuthorityNull()) {

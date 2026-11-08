@@ -295,8 +295,7 @@ public class TestDeltaKernelSync {
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2, dataFile3)));
 
     // Verify partition columns are set
-    Table deltaTable =
-        Table.forPath(engine, DeltaKernelUtils.normalizeTablePath(basePath.toString()));
+    Table deltaTable = Table.forPath(engine, getTableBasePath(basePath));
     Snapshot snapshot = deltaTable.getLatestSnapshot(engine);
     SnapshotImpl snapshotImpl = (SnapshotImpl) snapshot;
     Set<String> partitionColumns = snapshotImpl.getMetadata().getPartitionColNames();
@@ -378,8 +377,7 @@ public class TestDeltaKernelSync {
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2, dataFile3)));
 
     // Verify partition columns
-    Table deltaTable =
-        Table.forPath(engine, DeltaKernelUtils.normalizeTablePath(basePath.toString()));
+    Table deltaTable = Table.forPath(engine, getTableBasePath(basePath));
     Snapshot snapshot = deltaTable.getLatestSnapshot(engine);
     SnapshotImpl snapshotImpl = (SnapshotImpl) snapshot;
     Set<String> partitionColumns = snapshotImpl.getMetadata().getPartitionColNames();
@@ -473,7 +471,7 @@ public class TestDeltaKernelSync {
 
   private void validateDeltaTable(Path basePath, Set<InternalDataFile> expectedFiles)
       throws IOException {
-    Table table = Table.forPath(engine, DeltaKernelUtils.normalizeTablePath(basePath.toString()));
+    Table table = Table.forPath(engine, getTableBasePath(basePath));
     assertNotNull(table);
 
     Snapshot snapshot = table.getLatestSnapshot(engine);
@@ -510,6 +508,15 @@ public class TestDeltaKernelSync {
 
     assertEquals(
         expectedFiles.size(), count, "Number of files from Delta scan don't match expectation");
+  }
+
+  private String getTableBasePath(Path path) {
+    return TargetTable.builder()
+        .name(tableName)
+        .basePath(path.toString())
+        .formatName(TableFormat.DELTA)
+        .build()
+        .getBasePath();
   }
 
   private InternalSnapshot buildSnapshot(

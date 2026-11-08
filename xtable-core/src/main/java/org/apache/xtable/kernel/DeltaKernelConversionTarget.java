@@ -165,14 +165,14 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
    */
   public DeltaKernelConversionTarget(TargetTable targetTable, Engine engine) {
     this(
-        DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath()),
+        targetTable.getBasePath(),
         targetTable.getMetadataRetention().toHours(),
         engine,
         DeltaKernelSchemaExtractor.getInstance(),
         DeltaKernelPartitionExtractor.getInstance(),
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
-            .basePath(DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath()))
+            .basePath(targetTable.getBasePath())
             // Column statistics are not needed for conversion operations
             .includeColumnStats(false)
             .build());
@@ -205,7 +205,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       DeltaKernelSchemaExtractor schemaExtractor,
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelDataFileUpdatesExtractor dataKernelFileUpdatesExtractor) {
-    this.basePath = DeltaKernelUtils.normalizeTablePath(tableDataPath);
+    this.basePath = tableDataPath;
     this.schemaExtractor = schemaExtractor;
     this.partitionExtractor = partitionExtractor;
     this.dataKernelFileUpdatesExtractor = dataKernelFileUpdatesExtractor;
@@ -220,19 +220,17 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
           "init() called on an already initialized instance. "
               + "Do not call init() after using the parameterized constructor.");
     }
-
     Engine engine = DefaultEngine.create(configuration);
-    String normalizedBasePath = DeltaKernelUtils.normalizeTablePath(targetTable.getBasePath());
 
     initInternal(
-        normalizedBasePath,
+        targetTable.getBasePath(),
         targetTable.getMetadataRetention().toHours(),
         engine,
         DeltaKernelSchemaExtractor.getInstance(),
         DeltaKernelPartitionExtractor.getInstance(),
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
-            .basePath(normalizedBasePath)
+            .basePath(targetTable.getBasePath())
             .includeColumnStats(true)
             .build());
   }
