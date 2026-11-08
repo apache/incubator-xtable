@@ -98,8 +98,6 @@ public class TestExternalTable {
 
     assertThrows(
         IllegalArgumentException.class,
-        () ->
-            new ExternalTable(
-                "name", "hudi", "relative/table/path", null, null, null));
+        () -> new ExternalTable("name", "hudi", "relative/table/path", null, null, null));
   }
 }
