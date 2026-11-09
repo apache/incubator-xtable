@@ -66,7 +66,9 @@ rsync -a \
   --exclude "assets" --exclude "demo" --exclude "website" --exclude "style/IDE.png" \
   --exclude "xtable-service/examples" . apache-xtable-$RELEASE_VERSION
 
-tar czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
+# macOS tar otherwise adds a ._* AppleDouble entry per file to carry extended attributes
+COPYFILE_DISABLE=1 tar --no-xattrs -czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
+${XTABLE_DIR}/release/scripts/validate_source_tarball_entries.sh ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 cd ${RELEASE_DIR}
 shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > apache-xtable-${RELEASE_VERSION}.src.tgz.sha512

@@ -115,6 +115,8 @@ curl https://dist.apache.org/repos/dist/dev/incubator/xtable/KEYS > ../KEYS
 echo "Checking Signature"
 (bash -c "gpg --import ../KEYS $REDIRECT" && bash -c "gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz $REDIRECT" && echo -e "\t\tSignature Check - [OK]\n") || (echo -e "\t\tSignature Check - [ERROR]\n\t\t Run with --verbose to get details\n" && exit 1)
 
+$CURR_DIR/validate_source_tarball_entries.sh apache-xtable-${RELEASE_VERSION}.src.tgz
+
 # Untar
 (bash -c "tar -zxf apache-xtable-${RELEASE_VERSION}.src.tgz $REDIRECT") || (echo -e "\t\t Unable to untar apache-xtable-${RELEASE_VERSION}.src.tgz - [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
 cd apache-xtable-${RELEASE_VERSION}
