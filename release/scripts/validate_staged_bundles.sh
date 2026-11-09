@@ -46,4 +46,15 @@ do
    done
 done
 
+for extension in "-source-release.tar.gz" "-source-release.tar.gz.asc" "-source-release.tar.gz.sha512" "-source-release.zip" "-source-release.zip.asc" "-source-release.zip.sha512"
+do
+   url=${STAGING_REPO}/xtable/${VERSION}/xtable-${VERSION}$extension
+   if curl --output "$TMP_DIR_FOR_BUNDLES/xtable-${VERSION}$extension" --head --fail "$url"; then
+     echo "Artifact exists: $url"
+   else
+     echo "Artifact missing: $url"
+     exit 1
+   fi
+done
+
 echo "All artifacts exist. Validation succeeds."

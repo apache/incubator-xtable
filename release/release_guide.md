@@ -154,102 +154,114 @@ Usage
 ./incubator-xtable/release/scripts/cut_release_branch.sh -h
 ```
 
-## Verify that a Release Build Works
+## Verify that a release build works
 
-Run "./mvnw -Prelease clean install" to ensure that the build processes are in good shape. // You need to execute this command once you have the release branch in apache/incubator-xtable
+On the release branch, run the release profile without signing to check that the build, the javadoc and the source release work:
 
 ```shell
-./mvnw -Prelease clean install
+./mvnw clean install -Papache-release -DskipTests -Dgpg.skip -Dmaven.build.cache.enabled=false
 ```
+
+The build writes `target/xtable-${RELEASE_VERSION}-source-release.tar.gz` and `.zip`, each with a `.sha512`.
 
 # Build a release candidate
 
 The core of the release process is the build-vote-fix cycle. Each cycle produces one release candidate. The Release Manager repeats this cycle until the community approves one release candidate, which is then finalized.
 
-Set up a few environment variables to simplify Maven commands that follow. This identifies the release candidate being built. Start with RC_NUM equal to 1 and increment it for each candidate.
+The source release, the official subject of the vote, is a Maven build output. The `apache-release` profile, inherited from the ASF parent POM `org.apache:apache` and extended in the root `pom.xml`, does the following in one build:
 
-1. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory
-    1. git checkout ${RELEASE_BRANCH}
-    2. cd release && ./scripts/create_source_release.sh
-       > If you have multiple gpg keys(gpg --list-keys), then the signing command will take in the first key most likely.
-       > You will release this when it asks for a passphrase in a pop up.
-       > When asked for passphrase, ensure the intended key is the one asked for.
-       >
-       > Command used in script:
-       >
-       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
-       >
-       > To use a specific key: update as follows: // replace FINGERPRINT
-       >
-       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
-    3. Verify Source release is signed and buildable
-        1. cd ../src_release
-        2. gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz
-        3. git clone git@github.com:apache/incubator-xtable.git incubator-xtable-tmp-clone && cd incubator-xtable-tmp-clone && git checkout ${RELEASE_BRANCH} && cd ..
-        4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
-        5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
-        6. Ensure the diff contains only .git, .github, .gitignore, assets, demo, website, rfc, style/IDE.png and xtable-service/examples, all of them only in incubator-xtable-tmp-clone.
-        7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
-        8. If they pass, delete the repository we got from the tar-ball
-          - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
+- Packs the source tree into `xtable-${RELEASE_VERSION}-source-release.tar.gz` and `.zip`, using [release/assembly/source-release.xml](assembly/source-release.xml). Entries carry the timestamp of `project.build.outputTimestamp` and no owner or extended attributes, so the archive doesn't depend on the machine that builds it.
+- Writes a `.sha512` for each archive, in the `<hash>  <file>` format that `sha512sum -c` and `shasum -a 512 -c` read.
+- Builds the jars, sources jars and javadoc jars.
+- Signs every artifact with `maven-gpg-plugin`.
+- Deploys all of it, the source release included, to the Nexus staging repository.
 
-2. Create tag
-    1. git tag -s release-${RELEASE_VERSION}-rc${RC_NUM} -m "${RELEASE_VERSION}".
-       > If you run into some issues, and if want to re-run the same candidate again from start, ensure you delete existing tags before retrying again.
-       >
-       > // to remove local
-       >
-       > git tag -d release-${RELEASE_VERSION}-rc${RC_NUM}
-       >
-       > // to remove remote
-       >
-       > git push --delete origin release-${RELEASE_VERSION}-rc${RC_NUM}
-    2. if apache repo is origin.
-       > git push origin release-${RELEASE_VERSION}-rc${RC_NUM}
-       >
-       > If a branch with the same name already exists in origin, this command might fail as below.
-       >
-       > error: src refspec release-0.5.3 matches more than one
-       >
-       > error: failed to push some refs to 'https://github.com/apache/incubator-xtable.git'
-       >
-       > In such a case, try below command
-       >
-       > git push origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
+The archive contains the working directory of the build, minus the excludes in the descriptor, so always build from a fresh clone of the release tag.
 
-3. [Stage source releases](https://www.apache.org/legal/release-policy.html#stage) on [dist.apache.org](http://dist.apache.org/)
-    1. If you have not already, check out the xtable section of the dev repository on [dist.apache.org](http://dist.apache.org/) via Subversion. In a fresh directory
-    2. if you would not checkout, please try svn checkout [https://dist.apache.org/repos/dist/dev/incubator/xtable](https://dist.apache.org/repos/dist/dev/incubator/xtable) again.
-        1. svn checkout [https://dist.apache.org/repos/dist/dev/incubator/xtable](https://dist.apache.org/repos/dist/dev/incubator/xtable) --depth=immediates
-    3. Make a directory for the new release:
-        1. mkdir xtable/${RELEASE_VERSION}-rc${RC_NUM}
-    4. Copy incubator-xtable source distributions, hashes, and GPG signature:
-        1. mv <incubator-xtable-dir>/src_release/* xtable/${RELEASE_VERSION}-rc${RC_NUM}
-    5. Add and commit all the files.
-        1. cd xtable
-        2. svn add ${RELEASE_VERSION}-rc${RC_NUM}
-        3. svn --username=${apache_username} --password=${passowrd} commit -m "Add xtable-${RELEASE_VERSION}-rc${RC_NUM}"
-    6. Verify that files are [present](https://dist.apache.org/repos/dist/dev/incubator/xtable)
-    7. Run Verification Script to ensure the source release is sane
-        1. For RC: cd release/scripts && ./validate_staged_release.sh --release=${RELEASE_VERSION} --rc_num=${RC_NUM} --verbose
-        2. For finalized release in dev: cd scripts && ./scripts/validate_staged_release.sh --release=${RELEASE_VERSION}  --verbose
+Set up the environment variables for this candidate. Start with `RC_NUM` equal to 1 and increment it for each candidate.
 
-4. Deploy maven artifacts and verify
-    1. This will deploy jar artifacts to the Apache Nexus Repository, which is the staging area for deploying jars to Maven Central.
-    2. Review all staged artifacts (https://repository.apache.org/). They should contain all relevant parts for each module, including pom.xml, jar, test jar, source, test source, javadoc, etc. Carefully review any new artifacts.
-    3. git checkout ${RELEASE_BRANCH} && export GPG_TTY=$(tty)
-    4. ./mvnw deploy -Prelease -DskipTests -DdeployArtifacts=true -Dmaven.build.cache.enabled=false
-        1. when prompted for the passphrase, if you have multiple gpg keys in your keyring, make sure that you enter the right passphase corresponding to the same key (FINGERPRINT) as used while generating source release in step f.ii.
-           > If the prompt is not for the same key (by default the maven-gpg-plugin will pick up the first key in your keyring so that could be different), then add the following option to your ~/.gnupg/gpg.conf file
-        2. make sure your IP is not changing while uploading, otherwise it creates a different staging repo
-        3. Use a VPN if you can't prevent your IP from switching
-    5. Review all staged artifacts by logging into Apache Nexus and clicking on "Staging Repositories" link on left pane. Then find a "open" entry for apachextable
-    6. Once you have ensured everything is good and validation of step 7 succeeds, you can close the staging repo. Until you close, you can re-run deploying to staging multiple times. But once closed, it will create a new staging repo. So ensure you close this, so that the next RC (if need be) is on a new repo. So, once everything is good, close the staging repository on Apache Nexus. When prompted for a description, enter
-       > Apache incubator-xtable, version `${RELEASE_VERSION}`, release candidate `${RC_NUM}`.
-    7. After closing, run the script to validate the staged bundles again:
+```shell
+export RELEASE_VERSION=<RELEASE_VERSION_TO_BE_PUBLISHED>-incubating   # for example 0.5.0-incubating
+export RC_NUM=<RC_NUM>
+export RELEASE_BRANCH=release-${RELEASE_VERSION}-rc${RC_NUM}
+export RELEASE_TAG=release-${RELEASE_VERSION}-rc${RC_NUM}
+export KEY_ID=<FINGERPRINT_OF_YOUR_APACHE_KEY>
+```
+
+1. Create and push the tag.
+
+   ```shell
+   git checkout ${RELEASE_BRANCH}
+   git tag -s ${RELEASE_TAG} -u ${KEY_ID} -m "${RELEASE_VERSION} rc${RC_NUM}"
+   git push origin refs/tags/${RELEASE_TAG}
+   ```
+
+   The release branch and the tag share a name, so push the tag by its full ref. To redo a candidate whose staging repository you have dropped, delete the tag first with `git tag -d ${RELEASE_TAG}` and `git push --delete origin refs/tags/${RELEASE_TAG}`.
+
+2. Build and deploy from a fresh clone of the tag. Use JDK 11.
+
+   ```shell
+   git clone https://github.com/apache/incubator-xtable.git xtable-${RELEASE_TAG}
+   cd xtable-${RELEASE_TAG}
+   git checkout --detach refs/tags/${RELEASE_TAG}
+   export GPG_TTY=$(tty)
+   ./release/scripts/deploy_staging_jars.sh -Dgpg.keyname=${KEY_ID}
+   ```
+
+   The script refuses to run unless `HEAD` is a tag and the checkout has no modified, untracked or ignored files. It then runs:
+
+   ```shell
+   ./mvnw clean deploy -Papache-release -DskipTests -DretryFailedDeploymentCount=10 -Dmaven.build.cache.enabled=false -Dgpg.keyname=${KEY_ID}
+   ```
+
+   `-Dmaven.build.cache.enabled=false` is required: the build cache re-attaches the sources jar and the deploy fails with "duplicated artifacts attached". `gpg-agent` asks for the passphrase; to pass it non-interactively, export `MAVEN_GPG_PASSPHRASE`. Keep your IP address stable during the upload, otherwise Nexus opens a second staging repository.
+
+3. Validate the source release that the build left in `target/`. The script checks the checksums and signatures, rejects macOS metadata (`._*`, `__MACOSX`, `.DS_Store`), extended-attribute headers and files outside the top-level directory, then unpacks the tarball and runs the binary file, license and RAT checks.
+
+   ```shell
+   cd release/scripts
+   ./validate_staged_release.sh --release=${RELEASE_VERSION} --rc_num=${RC_NUM} --local_dir=../../target --verbose
+   cd ../..
+   ```
+
+   Also build and test the unpacked source with `./mvnw clean package` before you close the staging repository.
+
+4. Review and close the staging repository.
+    1. Log in to [Apache Nexus](https://repository.apache.org/), open **Staging Repositories** and find the open `orgapachextable-NNNN` entry. It contains every module's pom, jar, sources and javadoc jar, and under `org/apache/xtable/xtable/${RELEASE_VERSION}/` the files `xtable-${RELEASE_VERSION}-source-release.tar.gz` and `.zip` with their `.asc` and `.sha512`.
+    2. Until you close it, a failed deploy can be repeated into the same repository. Once everything is in place, close it with the description:
+       > Apache XTable (incubating), version `${RELEASE_VERSION}`, release candidate `${RC_NUM}`.
+    3. Check the staged bundles:
        ```shell
-       ./release/scripts/validate_staged_bundles.sh orgapachextable-<stage_repo_number> ${RELEASE_VERSION}-rc${RC_NUM} 2>&1 | tee -a /tmp/validate_staged_bundles_output.txt
+       ./release/scripts/validate_staged_bundles.sh orgapachextable-NNNN ${RELEASE_VERSION} 2>&1 | tee -a /tmp/validate_staged_bundles_output.txt
        ```
+
+5. Stage the source release on [dist.apache.org](https://dist.apache.org/repos/dist/dev/incubator/xtable). Copy it from the closed staging repository, so the voted files are the ones in Nexus.
+
+   ```shell
+   STAGING_URL=https://repository.apache.org/content/repositories/orgapachextable-NNNN/org/apache/xtable/xtable/${RELEASE_VERSION}
+   svn checkout https://dist.apache.org/repos/dist/dev/incubator/xtable --depth=immediates
+   mkdir xtable/${RELEASE_VERSION}-rc${RC_NUM}
+   cd xtable/${RELEASE_VERSION}-rc${RC_NUM}
+   for ext in tar.gz tar.gz.asc tar.gz.sha512 zip zip.asc zip.sha512; do
+     curl -fsSLO ${STAGING_URL}/xtable-${RELEASE_VERSION}-source-release.${ext}
+   done
+   shasum -a 512 -c *.sha512
+   for f in *.tar.gz *.zip; do gpg --verify ${f}.asc ${f}; done
+   # the same bytes as the local build
+   for f in *.tar.gz *.zip; do cmp ${f} <PATH_TO_CLONE>/target/${f}; done
+   cd ..
+   svn add ${RELEASE_VERSION}-rc${RC_NUM}
+   svn commit -m "Add Apache XTable ${RELEASE_VERSION} rc${RC_NUM}"
+   ```
+
+   Replace `NNNN` with the number of the staging repository and `<PATH_TO_CLONE>` with the clone from step 2.
+
+6. Validate the files on dist.apache.org:
+
+   ```shell
+   cd release/scripts
+   ./validate_staged_release.sh --release=${RELEASE_VERSION} --rc_num=${RC_NUM} --verbose
+   ```
 
 ## Checklist to proceed to the next step
 
