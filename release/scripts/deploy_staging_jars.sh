@@ -15,44 +15,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-## Variables with defaults (if not overwritten by environment)
+## Builds and deploys a release candidate to the Apache Nexus staging repository: the jars,
+# sources and javadoc, plus the source release (tar.gz and zip), all signed, with the SHA-512
+# of the source release. Run it from the root of a fresh clone of the release tag; extra
+# arguments are passed to Maven, for example -Dgpg.keyname=<FINGERPRINT>.
 ##
 MVN=${MVN:-./mvnw}
-# fail immediately
+
 set -o errexit
 set -o nounset
 
-CURR_DIR=$(pwd)
-if [ ! -d "$CURR_DIR/packaging" ] ; then
-  echo "You have to call the script from the repository root dir that contains 'packaging/'"
-  exit 1
-fi
-
-if [ "$#" -gt "1" ]; then
-  echo "Only accept 0 or 1 argument. Use -h to see examples."
-  exit 1
-fi
-
-
-if [ "${1:-}" == "-h" ]; then
-  echo "
-Usage: $(basename "$0") [OPTIONS]
-
-Options:
--h, --help
-"
+if [ "${1:-}" == "-h" ] || [ "${1:-}" == "--help" ]; then
+  echo "Usage: $(basename "$0") [MAVEN_OPTIONS]"
+  echo "Run from the root of a fresh clone of the release tag, for example"
+  echo "  git clone --branch release-\${RELEASE_VERSION}-rc\${RC_NUM} https://github.com/apache/incubator-xtable.git"
   exit 0
 fi
 
+if [ ! -f pom.xml ] || [ ! -x mvnw ] || [ ! -d release/assembly ]; then
+  echo "You have to call the script from the root of the incubator-xtable checkout" >&2
+  exit 1
+fi
 
-# -Dmaven.build.cache.enabled=false: the build cache (.mvn/extensions.xml) restores the
-# cached source:jar-no-fork execution and then re-attaches the sources jar, which fails the
-# release build with "duplicated artifacts attached". Disable it for release deploys.
-COMMON_OPTIONS="-DdeployArtifacts=true -DskipTests -DretryFailedDeploymentCount=10 -Dmaven.build.cache.enabled=false"
-echo "Cleaning everything before any deployment"
-$MVN clean $COMMON_OPTIONS
-echo "Building with options"
-$MVN install $COMMON_OPTIONS
+# The source release packs the working directory, so it must hold exactly the tag.
+if ! TAG=$(git describe --exact-match --tags HEAD 2>/dev/null); then
+  echo "HEAD is not at a tag; check out release-<version>-rc<N> first" >&2
+  exit 1
+fi
+if [ -n "$(git status --porcelain --ignored --untracked-files=all)" ]; then
+  echo "The checkout has modified, untracked or ignored files; use a fresh clone of ${TAG}:" >&2
+  git status --short --ignored --untracked-files=all | head -20 >&2
+  exit 1
+fi
 
-echo "Deploying to repository.apache.org with version options"
-$MVN deploy $COMMON_OPTIONS
+echo "Deploying ${TAG} to repository.apache.org"
+$MVN clean deploy -Papache-release -DskipTests -DretryFailedDeploymentCount=10 -Dmaven.build.cache.enabled=false "$@"

@@ -19,11 +19,11 @@ set -o errexit
 set -o nounset
 
 echo "Checking for binary files in the source files"
-numBinaryFiles=`find . -iname '*' | xargs -I {} file -I {} | grep -va directory | grep -v "release/" | grep -v "/src/test/" | grep -va 'application/json' | grep -va 'text/' | grep -va 'application/xml' | grep -va 'application/json' | wc -l | sed -e s'/ //g'`
+numBinaryFiles=`find . -iname '*' | xargs -I {} file --mime {} | grep -va directory | grep -v "release/" | grep -v "/src/test/" | grep -va 'application/json' | grep -va 'text/' | grep -va 'application/xml' | grep -va 'application/json' | wc -l | sed -e s'/ //g'`
 
 if [ "$numBinaryFiles" -gt "0" ]; then
   echo -e "There were non-text files in source release. [ERROR]\n Please check below\n"
-  find . -iname '*' | xargs -I {} file -I {} | grep -va directory | grep -v "release/release_guide" | grep -v "/src/test/" | grep -va 'application/json' | grep -va 'text/' |  grep -va 'application/xml'
+  find . -iname '*' | xargs -I {} file --mime {} | grep -va directory | grep -v "release/release_guide" | grep -v "/src/test/" | grep -va 'application/json' | grep -va 'text/' |  grep -va 'application/xml'
   exit 1
 fi
 echo -e "\t\tNo Binary Files in the source files? - [OK]\n"
