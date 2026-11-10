@@ -57,6 +57,3 @@ demo/notebook/derby.log
 
 # Written by maven-shade-plugin in xtable-spark-runtime
 dependency-reduced-pom.xml
-
-# Source release built by release/scripts/create_source_release.sh
-src_release/

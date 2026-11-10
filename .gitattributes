@@ -15,8 +15,7 @@
 # limitations under the License.
 #
 
-# Left out of the source release built by release/scripts/create_source_release.sh:
-# not needed to build or test it, and partly binary (images, demo tables) or web assets.
+# Left out of the source release built by release/scripts/create_source_release.sh
 /.asf.yaml                  export-ignore
 /.gitattributes             export-ignore
 /.gitignore                 export-ignore

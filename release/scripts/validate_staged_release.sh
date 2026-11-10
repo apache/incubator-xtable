@@ -33,7 +33,6 @@ if [[ $# -lt 1 ]]; then
     echo "--release=\${CURRENT_RELEASE_VERSION}"
     echo "--rc_num=\${RC_NUM}"
     echo "--release_type=release"
-    echo "--local_dir=\${PATH_TO_SRC_RELEASE} validates local files instead of dist, e.g. ../../src_release"
     exit
 else
     for param in "$@"
@@ -47,9 +46,6 @@ else
         if [[ $param =~ --release_type\="release" ]]; then
                 RELEASE_TYPE="release"
         fi
-	if [[ $param =~ --local_dir\=(.+) ]]; then
-		LOCAL_DIR=$(cd "${BASH_REMATCH[1]}" && pwd)
-	fi
 	if [[ $param =~ --verbose ]]; then
                REDIRECT=""
         fi
@@ -100,21 +96,16 @@ echo "Current directory: `pwd`"
 
 FULL_SVN_URL=${ROOT_SVN_URL}/${REPO_TYPE}/${XTABLE_REPO}/${ARTIFACT_SUFFIX}
 
-if [ -n "${LOCAL_DIR:-}" ]; then
-  echo "Copying from $LOCAL_DIR"
-  mkdir ${ARTIFACT_SUFFIX} && cp "$LOCAL_DIR"/apache-xtable-${RELEASE_VERSION}-src.tar.gz* ${ARTIFACT_SUFFIX}/
-else
-  echo "Downloading from svn co $FULL_SVN_URL"
-  (bash -c "svn co $FULL_SVN_URL $REDIRECT") || (echo -e "\t\t Unable to checkout  $FULL_SVN_URL to $REDIRECT. Please run with --verbose to get details\n" && exit -1)
-fi
+echo "Downloading from svn co $FULL_SVN_URL"
+
+(bash -c "svn co $FULL_SVN_URL $REDIRECT") || (echo -e "\t\t Unable to checkout  $FULL_SVN_URL to $REDIRECT. Please run with --verbose to get details\n" && exit -1)
 
 echo "Validating apache-xtable-${RELEASE_VERSION} with release type \"${REPO_TYPE}\""
 cd ${ARTIFACT_SUFFIX}
-ARCHIVE=apache-xtable-${RELEASE_VERSION}-src.tar.gz
-shasum -a 512 ${ARCHIVE} > got.sha512
+shasum -a 512 apache-xtable-${RELEASE_VERSION}-src.tar.gz > got.sha512
 
 echo "Checking Checksum of Source Release"
-diff -u ${ARCHIVE}.sha512 got.sha512
+diff -u apache-xtable-${RELEASE_VERSION}-src.tar.gz.sha512 got.sha512
 echo -e "\t\tChecksum Check of Source Release - [OK]\n"
 
 # Download KEYS file
@@ -122,11 +113,11 @@ curl https://dist.apache.org/repos/dist/dev/incubator/xtable/KEYS > ../KEYS
 
 # GPG Check
 echo "Checking Signature"
-(bash -c "gpg --import ../KEYS $REDIRECT" && bash -c "gpg --verify ${ARCHIVE}.asc ${ARCHIVE} $REDIRECT" && echo -e "\t\tSignature Check - [OK]\n") || (echo -e "\t\tSignature Check - [ERROR]\n\t\t Run with --verbose to get details\n" && exit 1)
+(bash -c "gpg --import ../KEYS $REDIRECT" && bash -c "gpg --verify apache-xtable-${RELEASE_VERSION}-src.tar.gz.asc apache-xtable-${RELEASE_VERSION}-src.tar.gz $REDIRECT" && echo -e "\t\tSignature Check - [OK]\n") || (echo -e "\t\tSignature Check - [ERROR]\n\t\t Run with --verbose to get details\n" && exit 1)
 
 # Reads the archive directly: macOS tar hides ._* entries when listing or extracting
-echo "Checking the entries of ${ARCHIVE}"
-python3 -I - ${ARCHIVE} apache-xtable-${RELEASE_VERSION} <<'PY'
+echo "Checking the entries of apache-xtable-${RELEASE_VERSION}-src.tar.gz"
+python3 -I - apache-xtable-${RELEASE_VERSION}-src.tar.gz apache-xtable-${RELEASE_VERSION} <<'PY'
 import sys, tarfile
 archive, top = sys.argv[1], sys.argv[2]
 # git archive writes the commit id as a global "comment" header; tars that copy
@@ -149,7 +140,7 @@ PY
 echo -e "\t\tArchive entries clean? - [OK]\n"
 
 # Untar
-(bash -c "tar -zxf ${ARCHIVE} $REDIRECT") || (echo -e "\t\t Unable to untar ${ARCHIVE} - [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
+(bash -c "tar -zxf apache-xtable-${RELEASE_VERSION}-src.tar.gz $REDIRECT") || (echo -e "\t\t Unable to untar apache-xtable-${RELEASE_VERSION}-src.tar.gz - [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
 cd apache-xtable-${RELEASE_VERSION}
 
 ### BEGIN: Binary Files Check
