@@ -102,10 +102,10 @@ echo "Downloading from svn co $FULL_SVN_URL"
 
 echo "Validating apache-xtable-${RELEASE_VERSION} with release type \"${REPO_TYPE}\""
 cd ${ARTIFACT_SUFFIX}
-shasum -a 512 apache-xtable-${RELEASE_VERSION}-src.tar.gz > got.sha512
+shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > got.sha512
 
 echo "Checking Checksum of Source Release"
-diff -u apache-xtable-${RELEASE_VERSION}-src.tar.gz.sha512 got.sha512
+diff -u apache-xtable-${RELEASE_VERSION}.src.tgz.sha512 got.sha512
 echo -e "\t\tChecksum Check of Source Release - [OK]\n"
 
 # Download KEYS file
@@ -113,11 +113,11 @@ curl https://dist.apache.org/repos/dist/dev/incubator/xtable/KEYS > ../KEYS
 
 # GPG Check
 echo "Checking Signature"
-(bash -c "gpg --import ../KEYS $REDIRECT" && bash -c "gpg --verify apache-xtable-${RELEASE_VERSION}-src.tar.gz.asc apache-xtable-${RELEASE_VERSION}-src.tar.gz $REDIRECT" && echo -e "\t\tSignature Check - [OK]\n") || (echo -e "\t\tSignature Check - [ERROR]\n\t\t Run with --verbose to get details\n" && exit 1)
+(bash -c "gpg --import ../KEYS $REDIRECT" && bash -c "gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz $REDIRECT" && echo -e "\t\tSignature Check - [OK]\n") || (echo -e "\t\tSignature Check - [ERROR]\n\t\t Run with --verbose to get details\n" && exit 1)
 
 # Reads the archive directly: macOS tar hides ._* entries when listing or extracting
-echo "Checking the entries of apache-xtable-${RELEASE_VERSION}-src.tar.gz"
-python3 -I - apache-xtable-${RELEASE_VERSION}-src.tar.gz apache-xtable-${RELEASE_VERSION} <<'PY'
+echo "Checking the entries of apache-xtable-${RELEASE_VERSION}.src.tgz"
+python3 -I - apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-${RELEASE_VERSION} <<'PY'
 import sys, tarfile
 archive, top = sys.argv[1], sys.argv[2]
 # git archive writes the commit id as a global "comment" header; tars that copy
@@ -140,7 +140,7 @@ PY
 echo -e "\t\tArchive entries clean? - [OK]\n"
 
 # Untar
-(bash -c "tar -zxf apache-xtable-${RELEASE_VERSION}-src.tar.gz $REDIRECT") || (echo -e "\t\t Unable to untar apache-xtable-${RELEASE_VERSION}-src.tar.gz - [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
+(bash -c "tar -zxf apache-xtable-${RELEASE_VERSION}.src.tgz $REDIRECT") || (echo -e "\t\t Unable to untar apache-xtable-${RELEASE_VERSION}.src.tgz - [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
 cd apache-xtable-${RELEASE_VERSION}
 
 ### BEGIN: Binary Files Check

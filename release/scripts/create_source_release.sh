@@ -60,9 +60,9 @@ git fetch ${GITHUB_REPO_URL} tag ${RELEASE_TAG}
 # Only committed files minus export-ignore paths in .gitattributes, owned by 0/0 with
 # the commit's mtime, so the archive does not depend on the machine that builds it
 git -c tar.umask=0022 archive --format=tar --prefix=apache-xtable-${RELEASE_VERSION}/ ${RELEASE_TAG} \
-  | gzip -9 --no-name > ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}-src.tar.gz
-gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}-src.tar.gz
+  | gzip -9 --no-name > ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
+gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 cd ${RELEASE_DIR}
-shasum -a 512 apache-xtable-${RELEASE_VERSION}-src.tar.gz > apache-xtable-${RELEASE_VERSION}-src.tar.gz.sha512
+shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > apache-xtable-${RELEASE_VERSION}.src.tgz.sha512
 
 cd ${CURR_DIR}

@@ -177,16 +177,16 @@ Set up a few environment variables to simplify Maven commands that follow. This 
        >
        > Command used in script:
        >
-       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}-src.tar.gz
+       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
        >
        > To use a specific key: update as follows: // replace FINGERPRINT
        >
-       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}-src.tar.gz
+       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
     3. Verify Source release is signed and buildable
         1. cd ../src_release
-        2. gpg --verify apache-xtable-${RELEASE_VERSION}-src.tar.gz.asc apache-xtable-${RELEASE_VERSION}-src.tar.gz
+        2. gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz
         3. git clone git@github.com:apache/incubator-xtable.git incubator-xtable-tmp-clone && cd incubator-xtable-tmp-clone && git checkout ${RELEASE_BRANCH} && cd ..
-        4. tar -zxvf apache-xtable-${RELEASE_VERSION}-src.tar.gz 
+        4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
         5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
         6. Ensure the diff contains only .git and the export-ignore paths in .gitattributes, all of them only in incubator-xtable-tmp-clone.
         7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
