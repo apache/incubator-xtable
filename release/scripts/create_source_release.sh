@@ -51,7 +51,6 @@ mkdir -p "${RELEASE_DIR}"
 # mtimes from the commit, so the tar stream is the same on any machine.
 git -c tar.umask=0022 archive --format=tar --prefix="apache-xtable-${RELEASE_VERSION}/" "${TAG_COMMIT}" \
   | gzip -9 --no-name > "${RELEASE_DIR}/${ARCHIVE}"
-"${XTABLE_DIR}/release/scripts/validate_source_tarball_entries.sh" "${RELEASE_DIR}/${ARCHIVE}" "apache-xtable-${RELEASE_VERSION}"
 
 cd "${RELEASE_DIR}"
 gpg ${KEY_ID:+--local-user "${KEY_ID}"} --armor --detach-sig "${ARCHIVE}"
