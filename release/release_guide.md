@@ -166,80 +166,48 @@ Run "./mvnw -Prelease clean install" to ensure that the build processes are in g
 
 The core of the release process is the build-vote-fix cycle. Each cycle produces one release candidate. The Release Manager repeats this cycle until the community approves one release candidate, which is then finalized.
 
-Set up a few environment variables to simplify Maven commands that follow. This identifies the release candidate being built. Start with RC_NUM equal to 1 and increment it for each candidate.
+Use the environment variables from [Create a release branch](#create-a-release-branch-in-apacheincubator-xtable-repository), plus `KEY_ID` from [Create GPG public key with apache email](#create-gpg-public-key-with-apache-email). Start with RC_NUM equal to 1 and increment it for each candidate.
 
-1. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory
+1. Create and push the tag
     1. git checkout ${RELEASE_BRANCH}
-    2. cd release && ./scripts/create_source_release.sh
-       > If you have multiple gpg keys(gpg --list-keys), then the signing command will take in the first key most likely.
-       > You will release this when it asks for a passphrase in a pop up.
-       > When asked for passphrase, ensure the intended key is the one asked for.
+    2. git tag -s release-${RELEASE_VERSION}-rc${RC_NUM} -u ${KEY_ID} -m "${RELEASE_VERSION} rc${RC_NUM}"
+    3. git push origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
+       > The release branch and the tag share a name, so push the tag by its full ref.
        >
-       > Command used in script:
-       >
-       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
-       >
-       > To use a specific key: update as follows: // replace FINGERPRINT
-       >
-       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
-    3. Verify Source release is signed and buildable
-        1. cd ../src_release
-        2. gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz
-        3. git clone git@github.com:apache/incubator-xtable.git incubator-xtable-tmp-clone && cd incubator-xtable-tmp-clone && git checkout ${RELEASE_BRANCH} && cd ..
-        4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
-        5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
-        6. Ensure the diff contains only .git, .github, .gitignore, assets, demo, website, rfc, style/IDE.png and xtable-service/examples, all of them only in incubator-xtable-tmp-clone.
-        7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
-        8. If they pass, delete the repository we got from the tar-ball
-          - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
-
-2. Create tag
-    1. git tag -s release-${RELEASE_VERSION}-rc${RC_NUM} -m "${RELEASE_VERSION}".
-       > If you run into some issues, and if want to re-run the same candidate again from start, ensure you delete existing tags before retrying again.
-       >
-       > // to remove local
+       > To redo a candidate before it is staged, delete the tag locally and remotely first:
        >
        > git tag -d release-${RELEASE_VERSION}-rc${RC_NUM}
        >
-       > // to remove remote
+       > git push --delete origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
+
+2. Generate the source release
+    1. ./release/scripts/create_source_release.sh
+       > The script runs `git archive` on the pushed tag, so only committed files go in, minus the `export-ignore` paths in [.gitattributes](../.gitattributes). Entries are owned by 0/0 and carry the commit's timestamp, so the archive does not depend on the machine that builds it.
        >
-       > git push --delete origin release-${RELEASE_VERSION}-rc${RC_NUM}
-    2. if apache repo is origin.
-       > git push origin release-${RELEASE_VERSION}-rc${RC_NUM}
-       >
-       > If a branch with the same name already exists in origin, this command might fail as below.
-       >
-       > error: src refspec release-0.5.3 matches more than one
-       >
-       > error: failed to push some refs to 'https://github.com/apache/incubator-xtable.git'
-       >
-       > In such a case, try below command
-       >
-       > git push origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
+       > It refuses to run unless the tag on GitHub points at the same commit as your local tag. It writes `apache-xtable-${RELEASE_VERSION}-src.tar.gz` with its `.asc` (signed with `KEY_ID`) and `.sha512` to `src_release/`.
+    2. Validate it before staging:
+       ```shell
+       cd release/scripts && ./validate_staged_release.sh --release=${RELEASE_VERSION} --rc_num=${RC_NUM} --local_dir=../../src_release --verbose && cd ../..
+       ```
+       > This checks the checksum and signature; rejects macOS metadata (`._*`, `.DS_Store`), extended-attribute headers, owners other than 0/0 and entries outside `apache-xtable-${RELEASE_VERSION}/`; and runs the binary file, DISCLAIMER/LICENSE/NOTICE and RAT checks.
+    3. Check that the unpacked source builds: `tar -xzf src_release/apache-xtable-${RELEASE_VERSION}-src.tar.gz -C /tmp && (cd /tmp/apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests)`
 
 3. [Stage source releases](https://www.apache.org/legal/release-policy.html#stage) on [dist.apache.org](http://dist.apache.org/)
-    1. If you have not already, check out the xtable section of the dev repository on [dist.apache.org](http://dist.apache.org/) via Subversion. In a fresh directory
-    2. if you would not checkout, please try svn checkout [https://dist.apache.org/repos/dist/dev/incubator/xtable](https://dist.apache.org/repos/dist/dev/incubator/xtable) again.
-        1. svn checkout [https://dist.apache.org/repos/dist/dev/incubator/xtable](https://dist.apache.org/repos/dist/dev/incubator/xtable) --depth=immediates
-    3. Make a directory for the new release:
-        1. mkdir xtable/${RELEASE_VERSION}-rc${RC_NUM}
-    4. Copy incubator-xtable source distributions, hashes, and GPG signature:
-        1. mv <incubator-xtable-dir>/src_release/* xtable/${RELEASE_VERSION}-rc${RC_NUM}
-    5. Add and commit all the files.
-        1. cd xtable
-        2. svn add ${RELEASE_VERSION}-rc${RC_NUM}
-        3. svn --username=${apache_username} --password=${passowrd} commit -m "Add xtable-${RELEASE_VERSION}-rc${RC_NUM}"
-    6. Verify that files are [present](https://dist.apache.org/repos/dist/dev/incubator/xtable)
-    7. Run Verification Script to ensure the source release is sane
+    1. svn checkout [https://dist.apache.org/repos/dist/dev/incubator/xtable](https://dist.apache.org/repos/dist/dev/incubator/xtable) --depth=immediates
+    2. mkdir xtable/${RELEASE_VERSION}-rc${RC_NUM}
+    3. cp <incubator-xtable-dir>/src_release/* xtable/${RELEASE_VERSION}-rc${RC_NUM}
+    4. cd xtable && svn add ${RELEASE_VERSION}-rc${RC_NUM} && svn commit -m "Add Apache XTable ${RELEASE_VERSION} rc${RC_NUM}"
+    5. Verify that files are [present](https://dist.apache.org/repos/dist/dev/incubator/xtable)
+    6. Validate the staged files:
         1. For RC: cd release/scripts && ./validate_staged_release.sh --release=${RELEASE_VERSION} --rc_num=${RC_NUM} --verbose
-        2. For finalized release in dev: cd scripts && ./scripts/validate_staged_release.sh --release=${RELEASE_VERSION}  --verbose
+        2. For finalized release in dev: cd release/scripts && ./validate_staged_release.sh --release=${RELEASE_VERSION} --verbose
 
 4. Deploy maven artifacts and verify
     1. This will deploy jar artifacts to the Apache Nexus Repository, which is the staging area for deploying jars to Maven Central.
     2. Review all staged artifacts (https://repository.apache.org/). They should contain all relevant parts for each module, including pom.xml, jar, test jar, source, test source, javadoc, etc. Carefully review any new artifacts.
     3. git checkout ${RELEASE_BRANCH} && export GPG_TTY=$(tty)
     4. ./mvnw deploy -Prelease -DskipTests -DdeployArtifacts=true -Dmaven.build.cache.enabled=false
-        1. when prompted for the passphrase, if you have multiple gpg keys in your keyring, make sure that you enter the right passphase corresponding to the same key (FINGERPRINT) as used while generating source release in step f.ii.
+        1. when prompted for the passphrase, if you have multiple gpg keys in your keyring, make sure that you enter the passphrase of the same key (KEY_ID) that signed the source release in step 2.
            > If the prompt is not for the same key (by default the maven-gpg-plugin will pick up the first key in your keyring so that could be different), then add the following option to your ~/.gnupg/gpg.conf file
         2. make sure your IP is not changing while uploading, otherwise it creates a different staging repo
         3. Use a VPN if you can't prevent your IP from switching

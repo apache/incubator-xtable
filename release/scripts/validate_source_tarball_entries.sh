@@ -15,17 +15,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# Usage: validate_source_tarball_entries.sh <archive> <top-level directory>
 set -o errexit
 set -o nounset
 
 # Reads the archive directly: macOS tar hides ._* entries when listing or extracting
-echo "Checking for macOS metadata in $1"
-python3 -I - "$1" <<'PY'
+echo "Checking the entries of $1"
+python3 -I - "$1" "$2" <<'PY'
 import sys, tarfile
-bad = [m.name for m in tarfile.open(sys.argv[1]).getmembers()
-       if m.name.rsplit("/", 1)[-1].startswith("._") or m.name.endswith(".DS_Store")
-       or any(k.startswith(("SCHILY.xattr.", "LIBARCHIVE.xattr.")) for k in m.pax_headers)]
-if bad:
-    sys.exit(f"\t\t{len(bad)} entries carry macOS metadata, e.g. {bad[:3]} [ERROR]")
+archive, top = sys.argv[1], sys.argv[2]
+# git archive writes the commit id as a global "comment" header; tars that copy
+# extended attributes add SCHILY.xattr.* or LIBARCHIVE.xattr.* keys
+allowed_pax = {"comment", "path", "linkpath", "size", "mtime", "uid", "gid", "uname", "gname"}
+problems = []
+for m in tarfile.open(archive).getmembers():
+    base = m.name.rstrip("/").rsplit("/", 1)[-1]
+    if base.startswith("._") or base in (".DS_Store", "__MACOSX"):
+        problems.append(f"{m.name}: macOS metadata")
+    if m.name != top and not m.name.startswith(top + "/") or ".." in m.name.split("/"):
+        problems.append(f"{m.name}: outside {top}/")
+    if (m.uid, m.gid) != (0, 0):
+        problems.append(f"{m.name}: owner {m.uid}/{m.gid}")
+    if set(m.pax_headers) - allowed_pax:
+        problems.append(f"{m.name}: pax headers {sorted(set(m.pax_headers) - allowed_pax)}")
+if problems:
+    sys.exit(f"\t\t{len(problems)} bad entries, e.g. {problems[:3]} [ERROR]")
 PY
-echo -e "\t\tNo macOS metadata in the source tarball? - [OK]\n"
+echo -e "\t\tArchive entries clean? - [OK]\n"

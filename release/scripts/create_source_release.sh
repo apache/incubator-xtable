@@ -15,63 +15,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-## Variables with defaults (if not overwritten by environment)
-##
-MVN=${MVN:-mvn}
+# Builds the source release from the pushed RC tag with git archive, then signs and
+# checksums it into src_release/.
+# Usage: RELEASE_VERSION=<v> RC_NUM=<n> [KEY_ID=<fingerprint>] create_source_release.sh
 
-# fail immediately
 set -o errexit
 set -o nounset
-# print command before executing
+set -o pipefail
 set -o xtrace
 
-CURR_DIR=`pwd`
-if [[ `basename $CURR_DIR` != "release" ]] ; then
-  echo "You have to call the script from the release/ dir"
+GITHUB_REPO_URL=${GITHUB_REPO_URL:-https://github.com/apache/incubator-xtable.git}
+XTABLE_DIR=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+cd "${XTABLE_DIR}"
+
+RELEASE_TAG=release-${RELEASE_VERSION}-rc${RC_NUM}
+TAG_COMMIT=$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")
+
+# Voters check the archive against the tag on GitHub, so it has to be the same commit
+REMOTE_COMMIT=$(git ls-remote "${GITHUB_REPO_URL}" "refs/tags/${RELEASE_TAG}" "refs/tags/${RELEASE_TAG}^{}" | tail -n 1 | cut -f1)
+if [ "${REMOTE_COMMIT}" != "${TAG_COMMIT}" ]; then
+  echo "${RELEASE_TAG} is ${TAG_COMMIT} locally but '${REMOTE_COMMIT}' on ${GITHUB_REPO_URL}; push the tag first"
+  exit 1
+fi
+if [ "$(git show "${TAG_COMMIT}:pom.xml" | sed -n 's:^    <version>\(.*\)</version>$:\1:p' | head -n 1)" != "${RELEASE_VERSION}" ]; then
+  echo "pom.xml version at ${RELEASE_TAG} is not ${RELEASE_VERSION}"
   exit 1
 fi
 
-RELEASE_VERSION=`grep -A 5 "<artifactId>xtable</artifactId>" ../pom.xml  | grep '<version>' | sed -e 's/<version>//' -e 's/<\/version>//' -e 's/ //g'`
-
-if [ -z "${RELEASE_VERSION}" ]; then
-    echo "RELEASE_VERSION was not set."
-    exit 1
-fi
-
-echo "RELEASE_VERSION=${RELEASE_VERSION}"
-
-###########################
-
-cd ..
-
-XTABLE_DIR=`pwd`
 RELEASE_DIR=${XTABLE_DIR}/src_release
-CLONE_DIR=${RELEASE_DIR}/incubator-xtable-tmp-clone
-GITHUB_REPO_URL=git@github.com:apache/incubator-xtable.git
+ARCHIVE=apache-xtable-${RELEASE_VERSION}-src.tar.gz
+rm -rf "${RELEASE_DIR}"
+mkdir -p "${RELEASE_DIR}"
 
-echo "Creating source package"
+# Only committed files, minus export-ignore paths in .gitattributes; owners 0/0 and
+# mtimes from the commit, so the tar stream is the same on any machine.
+git -c tar.umask=0022 archive --format=tar --prefix="apache-xtable-${RELEASE_VERSION}/" "${TAG_COMMIT}" \
+  | gzip -9 --no-name > "${RELEASE_DIR}/${ARCHIVE}"
+"${XTABLE_DIR}/release/scripts/validate_source_tarball_entries.sh" "${RELEASE_DIR}/${ARCHIVE}" "apache-xtable-${RELEASE_VERSION}"
 
-rm -rf ${RELEASE_DIR}
-mkdir -p ${RELEASE_DIR}
-
-# create a temporary git clone to ensure that we have a pristine source release
-git clone ${GITHUB_REPO_URL} ${CLONE_DIR}
-cd ${CLONE_DIR}
-git checkout release-${RELEASE_VERSION}-rc${RC_NUM}
-
-rsync -a \
-  --exclude ".git" --exclude ".gitignore" --exclude ".gitattributes" --exclude ".travis.yml" \
-  --exclude ".github" --exclude "target" --exclude ".idea" --exclude "*.iml" --exclude ".DS_Store" \
-  --exclude "build-target" --exclude ".rubydeps" --exclude "rfc" --exclude "docker/images" \
-  --exclude "assets" --exclude "demo" --exclude "website" --exclude "style/IDE.png" \
-  --exclude "xtable-service/examples" . apache-xtable-$RELEASE_VERSION
-
-# macOS tar otherwise adds a ._* AppleDouble entry per file to carry extended attributes
-COPYFILE_DISABLE=1 tar --no-xattrs -czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
-${XTABLE_DIR}/release/scripts/validate_source_tarball_entries.sh ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
-gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
-cd ${RELEASE_DIR}
-shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > apache-xtable-${RELEASE_VERSION}.src.tgz.sha512
-
-cd ${CURR_DIR}
-rm -rf ${CLONE_DIR}
+cd "${RELEASE_DIR}"
+gpg ${KEY_ID:+--local-user "${KEY_ID}"} --armor --detach-sig "${ARCHIVE}"
+shasum -a 512 "${ARCHIVE}" > "${ARCHIVE}.sha512"
