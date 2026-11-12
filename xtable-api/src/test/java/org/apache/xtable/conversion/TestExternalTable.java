@@ -32,11 +32,54 @@ public class TestExternalTable {
 
     ExternalTable localFilePath =
         new ExternalTable("name", "hudi", "/local/data//path", null, null, null);
-    assertEquals("file:///local/data/path", localFilePath.getBasePath());
+    assertEquals("/local/data/path", localFilePath.getBasePath());
 
     ExternalTable properLocalFilePath =
         new ExternalTable("name", "hudi", "file:///local/data//path", null, null, null);
     assertEquals("file:///local/data/path", properLocalFilePath.getBasePath());
+
+    ExternalTable windowsLocalPath =
+        new ExternalTable("name", "hudi", "C:/local/data//path", null, null, null);
+    assertEquals("file:///C:/local/data/path", windowsLocalPath.getBasePath());
+
+    ExternalTable windowsBackslashPath =
+        new ExternalTable("name", "hudi", "C:\\local\\data\\\\path", null, null, null);
+    assertEquals("file:///C:/local/data/path", windowsBackslashPath.getBasePath());
+  }
+
+  @Test
+  void sourceAndTargetTablesUseSharedPathSanitization() {
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name("source")
+            .formatName("delta")
+            .basePath("/local/source//path")
+            .dataPath("file:///local/source//data")
+            .build();
+    TargetTable targetTable =
+        TargetTable.builder()
+            .name("target")
+            .formatName("delta")
+            .basePath("/local/target//path")
+            .build();
+    SourceTable windowsSourceTable =
+        SourceTable.builder()
+            .name("windows-source")
+            .formatName("delta")
+            .basePath("C:/local/source//path")
+            .build();
+    TargetTable windowsTargetTable =
+        TargetTable.builder()
+            .name("windows-target")
+            .formatName("delta")
+            .basePath("C:\\local\\target\\\\path")
+            .build();
+
+    assertEquals("/local/source/path", sourceTable.getBasePath());
+    assertEquals("file:///local/source/data", sourceTable.getDataPath());
+    assertEquals("/local/target/path", targetTable.getBasePath());
+    assertEquals("file:///C:/local/source/path", windowsSourceTable.getBasePath());
+    assertEquals("file:///C:/local/target/path", windowsTargetTable.getBasePath());
   }
 
   @Test
@@ -52,5 +95,9 @@ public class TestExternalTable {
     assertThrows(
         NullPointerException.class,
         () -> new ExternalTable(null, "hudi", "file://bucket/path", null, null, null));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new ExternalTable("name", "hudi", "relative/table/path", null, null, null));
   }
 }
