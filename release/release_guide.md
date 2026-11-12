@@ -168,7 +168,31 @@ The core of the release process is the build-vote-fix cycle. Each cycle produces
 
 Set up a few environment variables to simplify Maven commands that follow. This identifies the release candidate being built. Start with RC_NUM equal to 1 and increment it for each candidate.
 
-1. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory with `git archive` of the tag, so create and push the tag (step 2) first
+1. Create tag
+    1. git tag -s release-${RELEASE_VERSION}-rc${RC_NUM} -m "${RELEASE_VERSION}".
+       > If you run into some issues, and if want to re-run the same candidate again from start, ensure you delete existing tags before retrying again.
+       >
+       > // to remove local
+       >
+       > git tag -d release-${RELEASE_VERSION}-rc${RC_NUM}
+       >
+       > // to remove remote
+       >
+       > git push --delete origin release-${RELEASE_VERSION}-rc${RC_NUM}
+    2. if apache repo is origin.
+       > git push origin release-${RELEASE_VERSION}-rc${RC_NUM}
+       >
+       > If a branch with the same name already exists in origin, this command might fail as below.
+       >
+       > error: src refspec release-0.5.3 matches more than one
+       >
+       > error: failed to push some refs to 'https://github.com/apache/incubator-xtable.git'
+       >
+       > In such a case, try below command
+       >
+       > git push origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
+
+2. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory
     1. git checkout ${RELEASE_BRANCH}
     2. cd release && ./scripts/create_source_release.sh
        > If you have multiple gpg keys(gpg --list-keys), then the signing command will take in the first key most likely.
@@ -192,30 +216,6 @@ Set up a few environment variables to simplify Maven commands that follow. This 
         7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
         8. If they pass, delete the repository we got from the tar-ball
           - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
-
-2. Create tag
-    1. git tag -s release-${RELEASE_VERSION}-rc${RC_NUM} -m "${RELEASE_VERSION}".
-       > If you run into some issues, and if want to re-run the same candidate again from start, ensure you delete existing tags before retrying again.
-       >
-       > // to remove local
-       >
-       > git tag -d release-${RELEASE_VERSION}-rc${RC_NUM}
-       >
-       > // to remove remote
-       >
-       > git push --delete origin release-${RELEASE_VERSION}-rc${RC_NUM}
-    2. if apache repo is origin.
-       > git push origin release-${RELEASE_VERSION}-rc${RC_NUM}
-       >
-       > If a branch with the same name already exists in origin, this command might fail as below.
-       >
-       > error: src refspec release-0.5.3 matches more than one
-       >
-       > error: failed to push some refs to 'https://github.com/apache/incubator-xtable.git'
-       >
-       > In such a case, try below command
-       >
-       > git push origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
 
 3. [Stage source releases](https://www.apache.org/legal/release-policy.html#stage) on [dist.apache.org](http://dist.apache.org/)
     1. If you have not already, check out the xtable section of the dev repository on [dist.apache.org](http://dist.apache.org/) via Subversion. In a fresh directory
