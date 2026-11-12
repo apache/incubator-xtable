@@ -67,6 +67,8 @@ import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.StorageIdentifier;
@@ -85,6 +87,7 @@ public class RunCatalogSync {
   private static final String CATALOG_SOURCE_AND_TARGET_CONFIG_PATH = "catalogConfig";
   private static final String HADOOP_CONFIG_PATH = "hadoopConfig";
   private static final String CONVERTERS_CONFIG_PATH = "convertersConfig";
+  private static final String FAIL_ON_ERROR_OPTION = "failOnError";
   private static final String HELP_OPTION = "h";
   private static final Map<String, ConversionSourceProvider> CONVERSION_SOURCE_PROVIDERS =
       new HashMap<>();
@@ -108,6 +111,11 @@ public class RunCatalogSync {
               true,
               "The path to a yaml file containing InternalTable converter configurations. "
                   + "These configs will override the default")
+          .addOption(
+              FAIL_ON_ERROR_OPTION,
+              "failOnError",
+              false,
+              "Fail the process if any table or catalog sync fails")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws Exception {
@@ -125,6 +133,8 @@ public class RunCatalogSync {
       formatter.printHelp("RunCatalogSync", OPTIONS);
       return;
     }
+
+    boolean failOnError = cmd.hasOption(FAIL_ON_ERROR_OPTION);
 
     DatasetConfig datasetConfig;
     try (InputStream inputStream =
@@ -190,13 +200,36 @@ public class RunCatalogSync {
               .distinct()
               .collect(Collectors.toList());
       try {
-        conversionController.syncTableAcrossCatalogs(
-            conversionConfig,
-            getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
+        Map<String, SyncResult> syncResults =
+            conversionController.syncTableAcrossCatalogs(
+                conversionConfig,
+                getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
+        if (failOnError && hasSyncFailures(syncResults)) {
+          throw new RuntimeException("Sync completed with failures. See logs for details.");
+        }
       } catch (Exception e) {
         log.error("Error running sync for {}", sourceTable.getBasePath(), e);
+        if (failOnError) {
+          throw e;
+        }
       }
     }
+  }
+
+  private static boolean hasSyncFailures(Map<String, SyncResult> syncResults) {
+    return syncResults.values().stream().anyMatch(RunCatalogSync::syncResultHasFailure);
+  }
+
+  private static boolean syncResultHasFailure(SyncResult syncResult) {
+    if (syncResult == null) {
+      return false;
+    }
+    SyncResult.SyncStatus tableStatus = syncResult.getTableFormatSyncStatus();
+    if (tableStatus != null && tableStatus.getStatusCode() == SyncStatusCode.ERROR) {
+      return true;
+    }
+    return syncResult.getCatalogSyncStatusList().stream()
+        .anyMatch(status -> status.getStatusCode() == SyncStatusCode.ERROR);
   }
 
   static Optional<CatalogConversionSource> getCatalogConversionSource(
