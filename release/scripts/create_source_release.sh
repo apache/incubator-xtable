@@ -46,30 +46,23 @@ cd ..
 
 XTABLE_DIR=`pwd`
 RELEASE_DIR=${XTABLE_DIR}/src_release
-CLONE_DIR=${RELEASE_DIR}/incubator-xtable-tmp-clone
-GITHUB_REPO_URL=git@github.com:apache/incubator-xtable.git
+GITHUB_REPO_URL=https://github.com/apache/incubator-xtable.git
+RELEASE_TAG=release-${RELEASE_VERSION}-rc${RC_NUM}
 
 echo "Creating source package"
 
 rm -rf ${RELEASE_DIR}
 mkdir -p ${RELEASE_DIR}
 
-# create a temporary git clone to ensure that we have a pristine source release
-git clone ${GITHUB_REPO_URL} ${CLONE_DIR}
-cd ${CLONE_DIR}
-git checkout release-${RELEASE_VERSION}-rc${RC_NUM}
+# Fails if the local tag differs from the pushed one, which voters check against
+git fetch ${GITHUB_REPO_URL} tag ${RELEASE_TAG}
 
-rsync -a \
-  --exclude ".git" --exclude ".gitignore" --exclude ".gitattributes" --exclude ".travis.yml" \
-  --exclude ".github" --exclude "target" --exclude ".idea" --exclude "*.iml" --exclude ".DS_Store" \
-  --exclude "build-target" --exclude ".rubydeps" --exclude "rfc" --exclude "docker/images" \
-  --exclude "assets" --exclude "demo" --exclude "website" --exclude "style/IDE.png" \
-  --exclude "xtable-service/examples" . apache-xtable-$RELEASE_VERSION
-
-tar czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
+# Only committed files minus export-ignore paths in .gitattributes, owned by 0/0 with
+# the commit's mtime, so the archive does not depend on the machine that builds it
+git -c tar.umask=0022 archive --format=tar --prefix=apache-xtable-${RELEASE_VERSION}/ ${RELEASE_TAG} \
+  | gzip -9 --no-name > ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 gpg --armor --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
 cd ${RELEASE_DIR}
 shasum -a 512 apache-xtable-${RELEASE_VERSION}.src.tgz > apache-xtable-${RELEASE_VERSION}.src.tgz.sha512
 
 cd ${CURR_DIR}
-rm -rf ${CLONE_DIR}

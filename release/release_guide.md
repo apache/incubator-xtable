@@ -168,32 +168,7 @@ The core of the release process is the build-vote-fix cycle. Each cycle produces
 
 Set up a few environment variables to simplify Maven commands that follow. This identifies the release candidate being built. Start with RC_NUM equal to 1 and increment it for each candidate.
 
-1. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory
-    1. git checkout ${RELEASE_BRANCH}
-    2. cd release && ./scripts/create_source_release.sh
-       > If you have multiple gpg keys(gpg --list-keys), then the signing command will take in the first key most likely.
-       > You will release this when it asks for a passphrase in a pop up.
-       > When asked for passphrase, ensure the intended key is the one asked for.
-       >
-       > Command used in script:
-       >
-       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
-       >
-       > To use a specific key: update as follows: // replace FINGERPRINT
-       >
-       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
-    3. Verify Source release is signed and buildable
-        1. cd ../src_release
-        2. gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz
-        3. git clone git@github.com:apache/incubator-xtable.git incubator-xtable-tmp-clone && cd incubator-xtable-tmp-clone && git checkout ${RELEASE_BRANCH} && cd ..
-        4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
-        5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
-        6. Ensure the diff contains only .git, .github, .gitignore, assets, demo, website, rfc, style/IDE.png and xtable-service/examples, all of them only in incubator-xtable-tmp-clone.
-        7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
-        8. If they pass, delete the repository we got from the tar-ball
-          - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
-
-2. Create tag
+1. Create tag
     1. git tag -s release-${RELEASE_VERSION}-rc${RC_NUM} -m "${RELEASE_VERSION}".
        > If you run into some issues, and if want to re-run the same candidate again from start, ensure you delete existing tags before retrying again.
        >
@@ -216,6 +191,31 @@ Set up a few environment variables to simplify Maven commands that follow. This 
        > In such a case, try below command
        >
        > git push origin refs/tags/release-${RELEASE_VERSION}-rc${RC_NUM}
+
+2. Generate Source Release: This will create the tarball under incubator-xtable/src_release directory
+    1. git checkout ${RELEASE_BRANCH}
+    2. cd release && ./scripts/create_source_release.sh
+       > If you have multiple gpg keys(gpg --list-keys), then the signing command will take in the first key most likely.
+       > You will release this when it asks for a passphrase in a pop up.
+       > When asked for passphrase, ensure the intended key is the one asked for.
+       >
+       > Command used in script:
+       >
+       > gpg --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
+       >
+       > To use a specific key: update as follows: // replace FINGERPRINT
+       >
+       > gpg --local-user [FINGERPRINT] --armor --detach-sig ${RELEASE_DIR}/incubator-xtable-${RELEASE_VERSION}.src.tgz
+    3. Verify Source release is signed and buildable
+        1. cd ../src_release
+        2. gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz
+        3. git clone git@github.com:apache/incubator-xtable.git incubator-xtable-tmp-clone && cd incubator-xtable-tmp-clone && git checkout ${RELEASE_BRANCH} && cd ..
+        4. tar -zxvf apache-xtable-${RELEASE_VERSION}.src.tgz 
+        5. diff -qr apache-xtable-${RELEASE_VERSION} incubator-xtable-tmp-clone
+        6. Ensure the diff contains only .git and the export-ignore paths in .gitattributes, all of them only in incubator-xtable-tmp-clone.
+        7. cd apache-xtable-${RELEASE_VERSION} && ./mvnw clean package -DskipTests
+        8. If they pass, delete the repository we got from the tar-ball
+          - cd ../ && rm -rf apache-xtable-${RELEASE_VERSION} && rm -rf incubator-xtable-tmp-clone
 
 3. [Stage source releases](https://www.apache.org/legal/release-policy.html#stage) on [dist.apache.org](http://dist.apache.org/)
     1. If you have not already, check out the xtable section of the dev repository on [dist.apache.org](http://dist.apache.org/) via Subversion. In a fresh directory
