@@ -75,6 +75,17 @@ public class DeltaKernelDataFileExtractor {
     return new DeltaDataFileIterator(deltaSnapshot, table, engine, schema, true, null);
   }
 
+  /**
+   * Initializes an iterator for active Delta Lake data files.
+   *
+   * @param deltaSnapshot snapshot containing the active data files
+   * @param table Delta table being scanned
+   * @param engine Delta Kernel engine used to read the table
+   * @param schema internal schema used to convert the data files
+   * @param deletionVectorHandler handler invoked with the data file path when a deletion vector is
+   *     found
+   * @return Delta table file iterator
+   */
   public DataFileIterator iterator(
       Snapshot deltaSnapshot,
       Table table,

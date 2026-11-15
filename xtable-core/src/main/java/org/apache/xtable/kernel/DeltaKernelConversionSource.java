@@ -194,13 +194,12 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Table table = Table.forPath(engine, basePath);
-    Snapshot latestSnapshot = table.getLatestSnapshot(engine);
     Snapshot snapshot =
         table.getSnapshotAsOfTimestamp(
             engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
 
     long versionNumberAtLastSyncInstant = snapshot.getVersion();
-    long latestVersion = latestSnapshot.getVersion();
+    long latestVersion = table.getLatestSnapshot(engine).getVersion();
     if (versionNumberAtLastSyncInstant >= latestVersion) {
       log.info(
           "No new delta commits to sync: last sync instant {} corresponds to version {} and the "
