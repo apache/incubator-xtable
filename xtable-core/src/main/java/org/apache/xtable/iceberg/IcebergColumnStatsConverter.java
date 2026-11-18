@@ -93,20 +93,26 @@ public class IcebergColumnStatsConverter {
       Map<Integer, Long> size,
       Map<Integer, ByteBuffer> minValues,
       Map<Integer, ByteBuffer> maxValues) {
-    if (valueCounts == null || valueCounts.isEmpty()) {
+    // Iceberg writers may omit any of these metrics. A field without a null count is skipped, like
+    // one without a value count, since a null count of zero would let targets skip the file for
+    // IS NULL filters. A missing column size is reported as zero.
+    if (valueCounts == null || valueCounts.isEmpty() || nullCounts == null) {
       return Collections.emptyList();
     }
     return fields.stream()
-        .filter(field -> valueCounts.containsKey(field.getFieldId()))
+        .filter(
+            field ->
+                valueCounts.containsKey(field.getFieldId())
+                    && nullCounts.containsKey(field.getFieldId()))
         .map(
             field -> {
               Integer fieldId = field.getFieldId();
               long numValues = valueCounts.get(fieldId);
               long numNulls = nullCounts.get(fieldId);
-              long totalSize = size.get(fieldId);
+              long totalSize = size == null ? 0L : size.getOrDefault(fieldId, 0L);
               Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
-              Object minValue = convertFromIcebergValue(fieldType, minValues.get(fieldId));
-              Object maxValue = convertFromIcebergValue(fieldType, maxValues.get(fieldId));
+              Object minValue = convertFromIcebergValue(fieldType, getOrNull(minValues, fieldId));
+              Object maxValue = convertFromIcebergValue(fieldType, getOrNull(maxValues, fieldId));
               Range range = Range.vector(minValue, maxValue);
               return ColumnStat.builder()
                   .field(field)
@@ -117,6 +123,10 @@ public class IcebergColumnStatsConverter {
                   .build();
             })
         .collect(CustomCollectors.toList(fields.size()));
+  }
+
+  private static <T> T getOrNull(Map<Integer, T> stats, Integer fieldId) {
+    return stats == null ? null : stats.get(fieldId);
   }
 
   private Object convertFromIcebergValue(Type fieldType, ByteBuffer value) {
