@@ -130,7 +130,7 @@ public class TestDeltaValueConverter {
                         InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
                         InternalSchema.MetadataValue.MILLIS))
                 .build(),
-            "2022-10-08 21:08:17"),
+            "2022-10-08T21:08:17.000Z"),
         Arguments.of(
             1665263297000000L,
             InternalSchema.builder()
@@ -141,7 +141,7 @@ public class TestDeltaValueConverter {
                         InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
                         InternalSchema.MetadataValue.MICROS))
                 .build(),
-            "2022-10-08 21:08:17"),
+            "2022-10-08T21:08:17.000Z"),
         Arguments.of(
             1665263297000L,
             InternalSchema.builder()
@@ -152,7 +152,7 @@ public class TestDeltaValueConverter {
                         InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
                         InternalSchema.MetadataValue.MILLIS))
                 .build(),
-            "2022-10-08 21:08:17"),
+            "2022-10-08T21:08:17.000"),
         Arguments.of(
             1665263297000000L,
             InternalSchema.builder()
@@ -163,7 +163,7 @@ public class TestDeltaValueConverter {
                         InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
                         InternalSchema.MetadataValue.MICROS))
                 .build(),
-            "2022-10-08 21:08:17"));
+            "2022-10-08T21:08:17.000"));
   }
 
   private static Stream<Arguments> valuesWithSchemaProviderForPartitions() {
@@ -323,5 +323,78 @@ public class TestDeltaValueConverter {
                 .build(),
             new BigDecimal("1234.56", new MathContext(6, RoundingMode.UNNECESSARY))
                 .setScale(2, RoundingMode.UNNECESSARY)));
+  }
+
+  /**
+   * Delta readers parse timestamp stats as JSON timestamps and add 1 ms to the max before skipping
+   * files. The stats must keep milliseconds and, for TIMESTAMP, carry the UTC offset, the same as
+   * the stats Spark Delta writes. Otherwise the max can be below the true max, or shifted by the
+   * reader's session time zone.
+   */
+  @ParameterizedTest
+  @MethodSource("timestampStatsWithMilliseconds")
+  void timestampStatsKeepMilliseconds(
+      long fieldValue, InternalSchema fieldSchema, String expectedDeltaValue) {
+    assertEquals(
+        expectedDeltaValue,
+        DeltaValueConverter.convertToDeltaColumnStatValue(fieldValue, fieldSchema));
+  }
+
+  private static Stream<Arguments> timestampStatsWithMilliseconds() {
+    return Stream.of(
+        // 2026-11-14T00:39:18.926789Z
+        Arguments.of(
+            1794616758926789L,
+            timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MICROS),
+            "2026-11-14T00:39:18.926Z"),
+        Arguments.of(
+            1794616758926L,
+            timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MILLIS),
+            "2026-11-14T00:39:18.926Z"),
+        Arguments.of(
+            1794616758926789L,
+            timestampSchema(InternalType.TIMESTAMP_NTZ, InternalSchema.MetadataValue.MICROS),
+            "2026-11-14T00:39:18.926"),
+        Arguments.of(
+            1794616758926L,
+            timestampSchema(InternalType.TIMESTAMP_NTZ, InternalSchema.MetadataValue.MILLIS),
+            "2026-11-14T00:39:18.926"),
+        // 1969-12-31T23:59:59.9985Z rounds down, so a min stat is never above the true min
+        Arguments.of(
+            -1500L,
+            timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MICROS),
+            "1969-12-31T23:59:59.998Z"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("timestampStatsToParse")
+  void parseTimestampStats(String deltaValue, InternalSchema fieldSchema, long expectedValue) {
+    assertEquals(
+        expectedValue,
+        DeltaValueConverter.convertFromDeltaColumnStatValue(deltaValue, fieldSchema));
+  }
+
+  private static Stream<Arguments> timestampStatsToParse() {
+    InternalSchema timestampMicros =
+        timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MICROS);
+    InternalSchema timestampNtzMicros =
+        timestampSchema(InternalType.TIMESTAMP_NTZ, InternalSchema.MetadataValue.MICROS);
+    return Stream.of(
+        Arguments.of("2026-11-14T00:39:18.926Z", timestampMicros, 1794616758926000L),
+        Arguments.of("2026-11-14T06:09:18.926+05:30", timestampMicros, 1794616758926000L),
+        Arguments.of("2026-11-14T00:39:18.926", timestampNtzMicros, 1794616758926000L),
+        // written by earlier XTable versions
+        Arguments.of("2022-10-08 21:08:17", timestampMicros, 1665263297000000L),
+        Arguments.of("2022-10-08 21:08:17", timestampNtzMicros, 1665263297000000L));
+  }
+
+  private static InternalSchema timestampSchema(
+      InternalType type, InternalSchema.MetadataValue precision) {
+    return InternalSchema.builder()
+        .name("timestamp")
+        .dataType(type)
+        .metadata(
+            Collections.singletonMap(InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precision))
+        .build();
   }
 }
