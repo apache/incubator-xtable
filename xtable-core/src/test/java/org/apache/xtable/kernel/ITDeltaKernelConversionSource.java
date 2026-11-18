@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -438,6 +439,75 @@ public class ITDeltaKernelConversionSource {
   }
 
   @Test
+  void testNestedColumnStats() {
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` (id INT, nested STRUCT<name: STRING, score: INT>) USING DELTA LOCATION '"
+            + basePath
+            + "'");
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (1, named_struct('name', 'a', 'score', 10)),"
+            + " (2, named_struct('name', 'b', 'score', NULL))");
+    Engine engine = DefaultEngine.create(new Configuration());
+    long timestamp1 =
+        Table.forPath(engine, basePath.toString()).getLatestSnapshot(engine).getTimestamp(engine);
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (3, named_struct('name', 'c', 'score', 30)),"
+            + " (4, named_struct('name', NULL, 'score', 40))");
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaKernelConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    // The snapshot read goes through DeltaKernelDataFileExtractor.
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+    Map<Long, List<ColumnStat>> statsByMinId =
+        snapshot.getPartitionedDataFiles().stream()
+            .flatMap(group -> group.getDataFiles().stream())
+            .map(InternalDataFile::getColumnStats)
+            .collect(
+                Collectors.toMap(
+                    stats -> ((Number) getStat(stats, "id").getRange().getMinValue()).longValue(),
+                    stats -> stats));
+    assertEquals(2, statsByMinId.size());
+    List<ColumnStat> firstFileStats = statsByMinId.get(1L);
+    assertStat(firstFileStats, "id", 1, 2, 0);
+    assertStat(firstFileStats, "nested.name", "a", "b", 0);
+    assertStat(firstFileStats, "nested.score", 10, 10, 1);
+    List<ColumnStat> secondFileStats = statsByMinId.get(3L);
+    assertStat(secondFileStats, "id", 3, 4, 0);
+    assertStat(secondFileStats, "nested.name", "c", "c", 1);
+    assertStat(secondFileStats, "nested.score", 30, 40, 0);
+
+    // The incremental read goes through DeltaKernelConversionSource#getTableChangeForCommit.
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(
+            InstantsForIncrementalSync.builder()
+                .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+                .build());
+    assertEquals(1, commitsBacklog.getCommitsToProcess().size());
+    TableChange tableChange =
+        conversionSource.getTableChangeForCommit(commitsBacklog.getCommitsToProcess().get(0));
+    Set<InternalDataFile> addedFiles = tableChange.getFilesDiff().dataFilesAdded();
+    assertEquals(1, addedFiles.size());
+    List<ColumnStat> addedFileStats = addedFiles.iterator().next().getColumnStats();
+    assertStat(addedFileStats, "id", 3, 4, 0);
+    assertStat(addedFileStats, "nested.name", "c", "c", 1);
+    assertStat(addedFileStats, "nested.score", 30, 40, 0);
+  }
+
+  @Test
   public void testsShowingVacuumHasNoEffectOnIncrementalSync() {
     boolean isPartitioned = true;
     String tableName = GenericTable.getTableName();
@@ -715,6 +785,20 @@ public class ITDeltaKernelConversionSource {
       allTableChanges.add(tableChange);
     }
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  private static ColumnStat getStat(List<ColumnStat> stats, String path) {
+    return stats.stream()
+        .filter(stat -> stat.getField().getPath().equals(path))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("No column stat for " + path + " in " + stats));
+  }
+
+  private static void assertStat(
+      List<ColumnStat> stats, String path, Object min, Object max, long numNulls) {
+    ColumnStat stat = getStat(stats, path);
+    assertEquals(Range.vector(min, max), stat.getRange(), path);
+    assertEquals(numNulls, stat.getNumNulls(), path);
   }
 
   private void validateDeltaPartitioning(InternalSnapshot internalSnapshot) {
