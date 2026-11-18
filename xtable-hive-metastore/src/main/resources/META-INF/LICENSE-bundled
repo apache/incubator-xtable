@@ -263,6 +263,8 @@ org.datanucleus:datanucleus-api-jdo:4.2.4
 org.datanucleus:datanucleus-core:4.1.17
 org.datanucleus:datanucleus-rdbms:4.1.19
 org.datanucleus:javax.jdo:3.2.0-m3
+org.fusesource.hawtjni:hawtjni-runtime:1.8
+org.fusesource.jansi:jansi:1.11
 org.scala-lang:scala-library:2.12.20
 stax:stax-api:1.0.1
 
