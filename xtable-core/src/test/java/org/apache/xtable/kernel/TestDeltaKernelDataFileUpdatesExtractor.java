@@ -18,6 +18,8 @@
  
 package org.apache.xtable.kernel;
 
+import static org.apache.xtable.model.schema.InternalSchema.MetadataValue.MICROS;
+import static org.apache.xtable.model.schema.InternalSchema.MetadataValue.MILLIS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +43,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import scala.collection.JavaConverters;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
@@ -53,11 +59,14 @@ import io.delta.kernel.types.StringType;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 
+import org.apache.xtable.delta.DeltaStatsExtractor;
+import org.apache.xtable.delta.DeltaValueConverter;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -398,6 +407,131 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     assertTrue(hasFile1Remove, "Should have RemoveFile action for file1.parquet");
 
     // Note: file2 should not appear in actions as it's unchanged
+  }
+
+  @Test
+  public void testTimestampStatsUseFieldPrecision() throws IOException {
+    // Range stores TIMESTAMP and TIMESTAMP_NTZ stats as millis or micros, depending on the field's
+    // TIMESTAMP_PRECISION. Sources with millisecond timestamps (Hudi, Paimon, Parquet) send millis.
+    Instant min = Instant.parse("2024-03-15T10:20:30Z");
+    Instant max = Instant.parse("2024-03-16T11:22:33Z");
+    InternalField tsMillis = timestampField("ts_millis", InternalType.TIMESTAMP, MILLIS);
+    InternalField tsMicros = timestampField("ts_micros", InternalType.TIMESTAMP, MICROS);
+    InternalField ntzMillis = timestampField("ntz_millis", InternalType.TIMESTAMP_NTZ, MILLIS);
+    InternalField ntzMicros = timestampField("ntz_micros", InternalType.TIMESTAMP_NTZ, MICROS);
+    InternalSchema schema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(Arrays.asList(tsMillis, tsMicros, ntzMillis, ntzMicros))
+            .build();
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            millisStat(tsMillis, min, max),
+            microsStat(tsMicros, min, max),
+            millisStat(ntzMillis, min, max),
+            microsStat(ntzMicros, min, max));
+
+    Path dataFilePath = tempDir.resolve("ts_data.parquet");
+    Files.createFile(dataFilePath);
+    InternalDataFile dataFile =
+        InternalDataFile.builder()
+            .physicalPath(dataFilePath.toString())
+            .fileSizeBytes(1024L)
+            .lastModified(Instant.now().toEpochMilli())
+            .recordCount(10L)
+            .partitionValues(Collections.emptyList())
+            .columnStats(columnStats)
+            .build();
+    DeltaKernelDataFileUpdatesExtractor statsExtractor =
+        DeltaKernelDataFileUpdatesExtractor.builder()
+            .engine(engine)
+            .basePath(tempDir.toString())
+            .includeColumnStats(true)
+            .build();
+    Table table = Table.forPath(engine, tempDir.resolve("new_table").toString());
+
+    List<RowBackedAction> actions =
+        JavaConverters.seqAsJavaList(
+            statsExtractor.applySnapshot(
+                table,
+                Collections.singletonList(
+                    PartitionFileGroup.builder()
+                        .files(Collections.singletonList(dataFile))
+                        .partitionValues(Collections.emptyList())
+                        .build()),
+                schema,
+                null));
+    assertEquals(1, actions.size());
+    JsonNode kernelStats =
+        new ObjectMapper().readTree(((AddFile) actions.get(0)).getStatsJson().get());
+    JsonNode standaloneStats =
+        new ObjectMapper()
+            .readTree(
+                DeltaStatsExtractor.getInstance()
+                    .convertStatsToDeltaFormat(schema, 10L, columnStats));
+
+    for (InternalField field : schema.getFields()) {
+      for (String bound : Arrays.asList("minValues", "maxValues")) {
+        Instant expected = bound.equals("minValues") ? min : max;
+        String kernelValue = kernelStats.get(bound).get(field.getName()).asText();
+        String standaloneValue = standaloneStats.get(bound).get(field.getName()).asText();
+        assertEquals(
+            expected,
+            readStatAsInstant(kernelValue, field),
+            String.format("Kernel %s.%s was %s", bound, field.getName(), kernelValue));
+        assertEquals(
+            expected,
+            readStatAsInstant(standaloneValue, field),
+            String.format("Standalone %s.%s was %s", bound, field.getName(), standaloneValue));
+      }
+    }
+  }
+
+  private static InternalField timestampField(
+      String name, InternalType type, InternalSchema.MetadataValue precision) {
+    return InternalField.builder()
+        .name(name)
+        .schema(
+            InternalSchema.builder()
+                .name(type == InternalType.TIMESTAMP ? "timestamp" : "timestamp_ntz")
+                .dataType(type)
+                .isNullable(true)
+                .metadata(
+                    Collections.singletonMap(
+                        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precision))
+                .build())
+        .build();
+  }
+
+  private static ColumnStat millisStat(InternalField field, Instant min, Instant max) {
+    return ColumnStat.builder()
+        .field(field)
+        .range(Range.vector(min.toEpochMilli(), max.toEpochMilli()))
+        .numNulls(0)
+        .numValues(10)
+        .build();
+  }
+
+  private static ColumnStat microsStat(InternalField field, Instant min, Instant max) {
+    return ColumnStat.builder()
+        .field(field)
+        .range(Range.vector(min.toEpochMilli() * 1000, max.toEpochMilli() * 1000))
+        .numNulls(0)
+        .numValues(10)
+        .build();
+  }
+
+  /** Reads a Delta timestamp stat back the way the Delta sources do, as micros in UTC. */
+  private static Instant readStatAsInstant(String statValue, InternalField field) {
+    InternalSchema microsSchema =
+        field.getSchema().toBuilder()
+            .metadata(
+                Collections.singletonMap(InternalSchema.MetadataKey.TIMESTAMP_PRECISION, MICROS))
+            .build();
+    long micros =
+        (long) DeltaValueConverter.convertFromDeltaColumnStatValue(statValue, microsSchema);
+    return Instant.EPOCH.plus(micros, ChronoUnit.MICROS);
   }
 
   private Table createSimpleDeltaTable() {

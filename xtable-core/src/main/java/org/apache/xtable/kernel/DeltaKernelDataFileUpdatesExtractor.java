@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import lombok.Builder;
@@ -313,11 +314,9 @@ public class DeltaKernelDataFileUpdatesExtractor {
         // XTable stores dates as days since epoch (int)
         return Literal.ofDate(((Number) value).intValue());
       case TIMESTAMP:
-        // XTable stores timestamps as microseconds since epoch
-        return Literal.ofTimestamp(((Number) value).longValue());
+        return Literal.ofTimestamp(toEpochMicros(value, fieldSchema));
       case TIMESTAMP_NTZ:
-        // XTable stores timestamp_ntz as microseconds since epoch
-        return Literal.ofTimestampNtz(((Number) value).longValue());
+        return Literal.ofTimestampNtz(toEpochMicros(value, fieldSchema));
       case DECIMAL:
         // Extract precision and scale from schema metadata
         Map<InternalSchema.MetadataKey, Object> metadata = fieldSchema.getMetadata();
@@ -340,6 +339,22 @@ public class DeltaKernelDataFileUpdatesExtractor {
         // Unsupported type for stats
         return null;
     }
+  }
+
+  /**
+   * Returns a timestamp stat as micros since epoch, which is what Kernel's timestamp literals take.
+   * XTable stores timestamp stats as millis or micros since epoch, depending on the field's {@link
+   * InternalSchema.MetadataKey#TIMESTAMP_PRECISION}.
+   */
+  private static long toEpochMicros(Object value, InternalSchema fieldSchema) {
+    long timestamp = ((Number) value).longValue();
+    Map<InternalSchema.MetadataKey, Object> metadata = fieldSchema.getMetadata();
+    if (metadata != null
+        && metadata.get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+            == InternalSchema.MetadataValue.MILLIS) {
+      return TimeUnit.MILLISECONDS.toMicros(timestamp);
+    }
+    return timestamp;
   }
 
   private MapValue convertToMapValue(Map<String, String> map) {
