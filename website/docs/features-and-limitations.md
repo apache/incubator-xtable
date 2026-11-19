@@ -27,15 +27,33 @@ In addition to synchronizing table format metadata, Apache XTable™ (Incubating
 This reduces friction by eliminating the manual step of registering tables in multiple catalogs and enhances flexibility by avoiding catalog lock-in.
 HMS and AWS Glue are the two catalogs supported right now, support for other catalogs (Unity, Apache Polaris, Apache Gravitino, DataHub) coming soon. 
 
+### Secondary index for Iceberg tables
+A sync to a Hudi target can build a secondary index on a column of an Iceberg source table and keep it current on each later sync.
+The index is stored as a Hudi metadata table in the data folder of the table, and Spark sessions with the XTable Spark SQL extensions use it to read only the files that hold the values of a point lookup.
+See [Secondary index for Iceberg tables](/docs/how-to-index).
+
+### Writing Hudi tables as Iceberg tables
+The `xtable-iceberg-pluggable-tf` module plugs Iceberg into Hudi's pluggable table format support, so a Hudi writer commits an Iceberg snapshot with each Hudi commit and the table reads as an Iceberg table without a sync job.
+See [Write Hudi tables as Iceberg tables](/docs/how-to-iceberg-table-format).
+
 
 ## Limitations and Compatibility Notes
 ### General
 - Only Copy-on-Write or Read-Optimized views of tables are currently supported. This means that only the underlying parquet files are synced but log files from Hudi and [delete vectors](https://docs.delta.io/latest/delta-deletion-vectors.html#:~:text=Deletion%20vectors%20indicate%20changes%20to,is%20run%20on%20the%20table.) from Delta and Iceberg are not captured by the sync.
 
 ### Hudi
-- Hudi 0.14.0 or later is required when reading a Hudi target table. Users will also need to enable 
+- XTable uses Hudi 1.2.1. As a source, it reads Hudi tables of table version 6 (written by Hudi 0.14.x and 0.15.x), 8 (Hudi 1.0.x) and 9 (Hudi 1.1.x and 1.2.x) without upgrading them.
+- As a target, XTable writes table version 6 by default. Set the target property `xtable.hudi.target.table_version` to `9` to write the Hudi 1.x timeline and the version 2 column statistics index instead. Table versions 6 and 9 are the only supported values.
+- Hudi 0.14.0 or later is required when reading a table version 6 Hudi target table, and Hudi 1.1.0 or later for a table version 9 target. Users will also need to enable 
   - the metadata table (`hoodie.metadata.enable=true`) and 
   - hive style partitioning (`hoodie.datasource.write.hive_style_partitioning=true`) wherever applicable when reading the data.
+- Hudi targets accept these target properties, which are set per table under `targetProperties.HUDI` in the dataset config of `RunSync` and `XTableSparkSync`:
+
+  | Property | Default | Meaning |
+  |---|---|---|
+  | `xtable.hudi.target.table_version` | `6` | Hudi table version to write, `6` or `9` |
+  | `xtable.hudi.target.execution.engine` | `java` | Engine that writes the Hudi commit and the metadata table indexes, `java` or `spark` |
+  | `xtable.hudi.target.secondary.index.column` | | Column to build a [secondary index](/docs/how-to-index) on. Needs table version `9` and the `spark` engine |
 - Be sure to enable `parquet.avro.write-old-list-structure=false` for proper compatibility with lists when syncing from Hudi to Iceberg.
 - When using Hudi as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions [here](https://github.com/apache/incubator-xtable/tree/main/xtable-hudi-support/xtable-hudi-support-extensions).
 
