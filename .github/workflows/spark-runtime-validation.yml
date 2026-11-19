@@ -79,9 +79,27 @@ jobs:
 
       - name: Build reactor (skip tests)
         run: ./mvnw clean install -ntp -B -DskipTests
+      - name: Derive engine Delta coords
+        run: |
+          set -euo pipefail
+          # SPARK_VERSION is e.g. 3.4.3 or 3.5.9 → prefix already passed as ${SPARK_VERSION%.*}
+          PREFIX="${SPARK_VERSION%.*}"
+          if [ "$PREFIX" = "3.5" ]; then
+            # delta-core was renamed to delta-spark starting with Delta 3.0 (Spark 3.5)
+            echo "ENGINE_DELTA_ARTIFACT=delta-spark_2.12" >> "$GITHUB_ENV"
+            # 3.2.1 is a stable Delta release built for Spark 3.5
+            echo "ENGINE_DELTA_VERSION=3.2.1" >> "$GITHUB_ENV"
+          else
+            echo "ENGINE_DELTA_ARTIFACT=delta-core_2.12" >> "$GITHUB_ENV"
+            echo "ENGINE_DELTA_VERSION=2.4.0" >> "$GITHUB_ENV"
+          fi
 
       - name: Run xtable-spark-runtime bundle IT
         env:
           SPARK_LOCAL_IP: "127.0.0.1"
-        # spark-submit gets the Hudi bundle built for its own Spark version, as users pass it
-        run: ./mvnw verify -ntp -B -pl xtable-spark-runtime -Dengine.spark.version.prefix="${SPARK_VERSION%.*}"
+        # spark-submit gets Hudi + Delta jars matching the matrix Spark version
+        run: |
+          ./mvnw verify -ntp -B -pl xtable-spark-runtime \
+            -Dengine.spark.version.prefix="${SPARK_VERSION%.*}" \
+            -Dengine.delta.artifactId="${ENGINE_DELTA_ARTIFACT}" \
+            -Dengine.delta.version="${ENGINE_DELTA_VERSION}"
