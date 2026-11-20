@@ -403,6 +403,42 @@ public class ITConversionController {
     }
   }
 
+  // A Hudi timestamp-millis column has its stats in millis. Delta readers skip files using the
+  // min and max stats in the Delta log, so stats written in the wrong unit drop rows from a read
+  // that filters on the column. Runs against both the Standalone and the Kernel Delta target.
+  @ParameterizedTest(name = "useKernelTarget={0}")
+  @ValueSource(booleans = {false, true})
+  public void testMillisTimestampFilterDeltaTarget(boolean useKernelTarget) {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    List<String> targetTableFormats = Collections.singletonList(DELTA);
+    String filter =
+        String.format(
+            "timestamp_millis_nullable_field >= timestamp_millis(%d)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              targetTableFormats,
+              null,
+              null,
+              useKernelTarget);
+      table.insertRecords(100, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      table.insertRecords(100, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 200);
+      checkDatasetEquivalenceWithFilter(
+          HUDI, table, targetTableFormats, filter, Collections.emptyMap());
+    }
+  }
+
   private void runVariousOperationsTest(
       String sourceTableFormat,
       SyncMode syncMode,
