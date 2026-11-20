@@ -173,6 +173,73 @@ public class TestBaseFileUpdatesExtractor {
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
+  @Test
+  void convertDiffWithUnknownNullCountOrColumnSize() {
+    String tableBasePath = "file://base";
+    String partitionPath = "partition1";
+    InternalField longField =
+        InternalField.builder()
+            .name("long_field")
+            .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
+            .build();
+    InternalField stringField =
+        InternalField.builder()
+            .name("string_field")
+            .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
+            .build();
+    // long_field has bounds but no null count.
+    String fileName1 = "file1.parquet";
+    InternalDataFile fileWithUnknownNullCount =
+        createFile(
+            String.format("%s/%s/%s", tableBasePath, partitionPath, fileName1),
+            Arrays.asList(
+                ColumnStat.builder()
+                    .field(longField)
+                    .numValues(100)
+                    .totalSize(10L)
+                    .range(Range.vector(10L, 20L))
+                    .build(),
+                ColumnStat.builder()
+                    .field(stringField)
+                    .numValues(100)
+                    .numNulls(1L)
+                    .totalSize(20L)
+                    .range(Range.vector("a", "c"))
+                    .build()));
+    // long_field has a null count but no column size.
+    String fileName2 = "file2.parquet";
+    InternalDataFile fileWithUnknownSize =
+        createFile(
+            String.format("%s/%s/%s", tableBasePath, partitionPath, fileName2),
+            Collections.singletonList(
+                ColumnStat.builder()
+                    .field(longField)
+                    .numValues(100)
+                    .numNulls(4L)
+                    .range(Range.vector(10L, 20L))
+                    .build()));
+
+    BaseFileUpdatesExtractor extractor =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
+    BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
+        extractor.convertDiff(
+            InternalFilesDiff.builder()
+                .filesAdded(Arrays.asList(fileWithUnknownNullCount, fileWithUnknownSize))
+                .build(),
+            COMMIT_TIME,
+            HoodieIndexVersion.V1);
+
+    // file1 gets no column stats, so Hudi's data skipping always reads it. The unknown column size
+    // of file2 is written as 0.
+    Map<String, HoodieColumnRangeMetadata<Comparable>> expectedStats = new HashMap<>();
+    addStat(expectedStats, fileName2, "long_field", 10L, 20L, 4, 100, 0L);
+    assertWriteStatusesEquivalent(
+        Arrays.asList(
+            getExpectedWriteStatus(fileName1, partitionPath, Collections.emptyMap()),
+            getExpectedWriteStatus(fileName2, partitionPath, expectedStats)),
+        replaceMetadata.getWriteStatuses());
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {

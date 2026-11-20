@@ -26,6 +26,9 @@ import org.apache.xtable.model.schema.InternalField;
 /**
  * Captures column level statistics for a field.
  *
+ * <p>{@link #numNulls} and {@link #totalSize} are null when the source does not record them, so an
+ * unknown value is not mistaken for zero.
+ *
  * @since 0.1
  */
 @Value
@@ -33,7 +36,7 @@ import org.apache.xtable.model.schema.InternalField;
 public class ColumnStat {
   InternalField field;
   Range range;
-  long numNulls;
+  Long numNulls;
   long numValues;
-  long totalSize;
+  Long totalSize;
 }

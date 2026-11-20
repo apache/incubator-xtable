@@ -123,6 +123,47 @@ public class TestDeltaStatsExtractor {
   }
 
   @Test
+  void convertStatsWithUnknownNullCount() throws IOException {
+    InternalField intField =
+        InternalField.builder()
+            .name("int_field")
+            .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
+            .build();
+    InternalField stringField =
+        InternalField.builder()
+            .name("string_field")
+            .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
+            .build();
+    InternalSchema schema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(Arrays.asList(intField, stringField))
+            .build();
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            ColumnStat.builder().field(intField).numValues(10).range(Range.vector(1, 9)).build(),
+            ColumnStat.builder()
+                .field(stringField)
+                .numValues(10)
+                .numNulls(2L)
+                .range(Range.vector("a", "z"))
+                .build());
+
+    String actualStats =
+        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 10L, columnStats);
+
+    // int_field keeps its bounds, and its unknown null count is left out instead of written as 0.
+    assertEquals(
+        MAPPER.readTree(
+            "{\"numRecords\":10,"
+                + "\"minValues\":{\"int_field\":1,\"string_field\":\"a\"},"
+                + "\"maxValues\":{\"int_field\":9,\"string_field\":\"z\"},"
+                + "\"nullCount\":{\"string_field\":2}}"),
+        MAPPER.readTree(actualStats));
+  }
+
+  @Test
   void roundTripStatsConversion() throws IOException {
     InternalSchema schema = ColumnStatMapUtil.getSchema();
     List<InternalField> fields = schema.getAllFields();
@@ -145,7 +186,7 @@ public class TestDeltaStatsExtractor {
           if (dataType != InternalType.RECORD
               && dataType != InternalType.LIST
               && dataType != InternalType.MAP) {
-            ColumnStat columnStatWithoutSize = stat.toBuilder().totalSize(0).build();
+            ColumnStat columnStatWithoutSize = stat.toBuilder().totalSize(null).build();
             expected.add(columnStatWithoutSize);
           }
         });
@@ -184,25 +225,25 @@ public class TestDeltaStatsExtractor {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(1)
+                .numNulls(1L)
                 .range(Range.vector("a", "b"))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(2))
                 .numValues(100)
-                .numNulls(2)
+                .numNulls(2L)
                 .range(Range.vector(1, 2))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(4))
                 .numValues(100)
-                .numNulls(3)
+                .numNulls(3L)
                 .range(Range.vector(1.0, 2.0))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(5))
                 .numValues(100)
-                .numNulls(4)
+                .numNulls(4L)
                 .range(Range.vector(10, 20))
                 .build());
     assertEquals(expected, actualColumStats);
