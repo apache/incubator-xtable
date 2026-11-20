@@ -427,20 +427,19 @@ public class TestIcebergColumnStatsConverter {
                 null,
                 getIntAndStringBounds(1, "a"),
                 getIntAndStringBounds(9, "z"));
+    // A missing column size is unknown, not zero.
     List<ColumnStat> expected =
         Arrays.asList(
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
                 .numNulls(5L)
-                .totalSize(0L)
                 .range(Range.vector(1, 9))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(1))
                 .numValues(100)
                 .numNulls(0L)
-                .totalSize(0L)
                 .range(Range.vector("a", "z"))
                 .build());
     assertEquals(expected, actual);
@@ -456,23 +455,29 @@ public class TestIcebergColumnStatsConverter {
     Map<Integer, Long> nullCounts = new HashMap<>();
     nullCounts.put(1, 5L);
 
-    // A missing null count is unknown, not zero, so the field gets no stats at all.
+    // A missing null count is unknown, not zero, and the field keeps its other stats.
     List<ColumnStat> actual =
         IcebergColumnStatsConverter.getInstance()
             .fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
-    List<ColumnStat> expected =
-        Collections.singletonList(
-            ColumnStat.builder()
-                .field(fields.get(0))
-                .numValues(100)
-                .numNulls(5L)
-                .totalSize(10L)
-                .range(Range.vector(1, 9))
-                .build());
-    assertEquals(expected, actual);
+    ColumnStat intFieldStat =
+        ColumnStat.builder()
+            .field(fields.get(0))
+            .numValues(100)
+            .numNulls(5L)
+            .totalSize(10L)
+            .range(Range.vector(1, 9))
+            .build();
+    ColumnStat stringFieldStat =
+        ColumnStat.builder()
+            .field(fields.get(1))
+            .numValues(100)
+            .totalSize(20L)
+            .range(Range.vector("a", "z"))
+            .build();
+    assertEquals(Arrays.asList(intFieldStat, stringFieldStat), actual);
 
     assertEquals(
-        Collections.emptyList(),
+        Arrays.asList(intFieldStat.toBuilder().numNulls(null).build(), stringFieldStat),
         IcebergColumnStatsConverter.getInstance()
             .fromIceberg(fields, valueCounts, null, columnSizes, lowerBounds, upperBounds));
   }
@@ -550,7 +555,11 @@ public class TestIcebergColumnStatsConverter {
                 .field(fields.get(0))
                 .numValues(100)
                 .numNulls(5L)
-                .totalSize(0L)
+                .range(Range.vector(null, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
                 .range(Range.vector(null, 9))
                 .build(),
             ColumnStat.builder()
@@ -559,6 +568,38 @@ public class TestIcebergColumnStatsConverter {
                 .numNulls(0L)
                 .totalSize(30L)
                 .range(Range.vector(null, null))
+                .build());
+    assertEquals(expected, actual);
+  }
+
+  @Test
+  public void fromIcebergWithNullMapValues() {
+    List<InternalField> fields = getIntAndStringFields();
+    Map<Integer, Long> valueCounts = getCounts(100L, 100L);
+    valueCounts.put(2, null);
+    Map<Integer, Long> nullCounts = new HashMap<>();
+    nullCounts.put(1, null);
+    Map<Integer, Long> columnSizes = new HashMap<>();
+    columnSizes.put(1, null);
+    Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
+    lowerBounds.put(1, null);
+
+    // A null value is treated like a missing field, so string_field has no value count.
+    List<ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(
+                fields,
+                valueCounts,
+                nullCounts,
+                columnSizes,
+                lowerBounds,
+                getIntAndStringBounds(9, "z"));
+    List<ColumnStat> expected =
+        Collections.singletonList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .range(Range.vector(null, 9))
                 .build());
     assertEquals(expected, actual);
   }

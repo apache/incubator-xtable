@@ -98,23 +98,20 @@ public class IcebergColumnStatsConverter {
       Map<Integer, Long> size,
       Map<Integer, ByteBuffer> minValues,
       Map<Integer, ByteBuffer> maxValues) {
-    // Iceberg writers may omit any of these metrics. A field without a null count is skipped, like
-    // one without a value count, since a null count of zero would let targets skip the file for
-    // IS NULL filters. A missing column size is reported as zero.
-    if (valueCounts == null || valueCounts.isEmpty() || nullCounts == null) {
+    // Iceberg writers may omit any of these metrics, so a map may be null or lack a field. A null
+    // value is treated the same as a missing field. A field needs a value count to get a
+    // ColumnStat, and a missing null count or column size is left null as unknown.
+    if (valueCounts == null || valueCounts.isEmpty()) {
       return Collections.emptyList();
     }
     return fields.stream()
-        .filter(
-            field ->
-                valueCounts.containsKey(field.getFieldId())
-                    && nullCounts.containsKey(field.getFieldId()))
+        .filter(field -> valueCounts.get(field.getFieldId()) != null)
         .map(
             field -> {
               Integer fieldId = field.getFieldId();
               long numValues = valueCounts.get(fieldId);
-              long numNulls = nullCounts.get(fieldId);
-              long totalSize = size == null ? 0L : size.getOrDefault(fieldId, 0L);
+              Long numNulls = getOrNull(nullCounts, fieldId);
+              Long totalSize = getOrNull(size, fieldId);
               Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
               Object minValue = convertFromIcebergValue(fieldType, getOrNull(minValues, fieldId));
               Object maxValue = convertFromIcebergValue(fieldType, getOrNull(maxValues, fieldId));

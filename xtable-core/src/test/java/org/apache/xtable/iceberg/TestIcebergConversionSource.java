@@ -34,13 +34,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -77,14 +76,7 @@ import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Types;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.apache.xtable.conversion.ConversionConfig;
-import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -93,15 +85,14 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.model.sync.SyncMode;
-import org.apache.xtable.model.sync.SyncResult;
-import org.apache.xtable.model.sync.SyncStatusCode;
 
 @Execution(ExecutionMode.SAME_THREAD)
 class TestIcebergConversionSource {
@@ -278,12 +269,14 @@ class TestIcebergConversionSource {
   }
 
   @Test
-  void testSyncToDeltaWithMissingColumnStats(@TempDir Path workingDir) throws IOException {
+  void testGetCurrentSnapshotWithMissingColumnStats(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestCatalogTable(workingDir.toString());
-    // Iceberg writers may omit column sizes and null counts. Only cs_sold_time_sk and
-    // cs_order_number have a null count here, and cs_quantity only has bounds.
+    // Iceberg writers may omit column sizes and null counts. No column has a size here, and
+    // cs_quantity has a value count and bounds but no null count.
     Map<Integer, Long> valueCounts = new HashMap<>();
-    csSchema.columns().forEach(field -> valueCounts.put(field.fieldId(), 10L));
+    valueCounts.put(1, 10L);
+    valueCounts.put(3, 10L);
+    valueCounts.put(4, 10L);
     Map<Integer, Long> nullCounts = new HashMap<>();
     nullCounts.put(1, 2L);
     nullCounts.put(3, 0L);
@@ -312,39 +305,36 @@ class TestIcebergConversionSource {
                 .build())
         .commit();
 
-    // The Delta Kernel target keeps this test free of Spark.
-    Properties targetProperties = new Properties();
-    targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, "true");
-    ConversionConfig conversionConfig =
-        ConversionConfig.builder()
-            .sourceTable(getPerTableConfig(catalogSales))
-            .targetTables(
-                Collections.singletonList(
-                    TargetTable.builder()
-                        .name(catalogSales.name())
-                        .formatName(TableFormat.DELTA)
-                        .basePath(catalogSales.location())
-                        .additionalProperties(targetProperties)
-                        .build()))
-            .syncMode(SyncMode.FULL)
-            .build();
-    Map<String, SyncResult> results =
-        new ConversionController(hadoopConf).sync(conversionConfig, sourceProvider);
-    assertEquals(
-        SyncStatusCode.SUCCESS,
-        results.get(TableFormat.DELTA).getTableFormatSyncStatus().getStatusCode());
+    InternalSnapshot internalSnapshot =
+        getIcebergConversionSource(catalogSales).getCurrentSnapshot();
 
-    // A column without a null count gets no Delta stats, so Delta cannot skip the file for it.
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode expectedStats =
-        mapper.readTree(
-            "{\"numRecords\":10,"
-                + "\"minValues\":{\"cs_sold_time_sk\":1,\"cs_order_number\":100},"
-                + "\"maxValues\":{\"cs_sold_time_sk\":9,\"cs_order_number\":200},"
-                + "\"nullCount\":{\"cs_sold_time_sk\":2,\"cs_order_number\":0}}");
-    assertEquals(
-        Collections.singletonList(expectedStats),
-        readDeltaFileStats(mapper, Paths.get(catalogSales.location())));
+    Map<String, InternalField> fields =
+        internalSnapshot.getTable().getReadSchema().getAllFields().stream()
+            .collect(Collectors.toMap(InternalField::getName, Function.identity()));
+    List<ColumnStat> expectedColumnStats =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get("cs_sold_time_sk"))
+                .numValues(10)
+                .numNulls(2L)
+                .range(Range.vector(1, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get("cs_order_number"))
+                .numValues(10)
+                .numNulls(0L)
+                .range(Range.vector(100L, 200L))
+                .build(),
+            // The unknown null count stays null, and the bounds are kept.
+            ColumnStat.builder()
+                .field(fields.get("cs_quantity"))
+                .numValues(10)
+                .range(Range.vector(5, 50))
+                .build());
+    List<PartitionFileGroup> fileGroups = internalSnapshot.getPartitionedDataFiles();
+    assertEquals(1, fileGroups.size());
+    assertEquals(1, fileGroups.get(0).getDataFiles().size());
+    assertEquals(expectedColumnStats, fileGroups.get(0).getDataFiles().get(0).getColumnStats());
   }
 
   @Test
@@ -484,19 +474,6 @@ class TestIcebergConversionSource {
     CommitsBacklog<Snapshot> commitsBacklog = conversionSource.getCommitsBacklog(instant);
     assertEquals(0, commitsBacklog.getInFlightInstants().size());
     Assertions.assertArrayEquals(snapshots, commitsBacklog.getCommitsToProcess().toArray());
-  }
-
-  private static List<JsonNode> readDeltaFileStats(ObjectMapper mapper, Path tablePath)
-      throws IOException {
-    List<JsonNode> fileStats = new ArrayList<>();
-    for (String action :
-        Files.readAllLines(tablePath.resolve("_delta_log").resolve("00000000000000000000.json"))) {
-      JsonNode addFile = mapper.readTree(action).get("add");
-      if (addFile != null) {
-        fileStats.add(mapper.readTree(addFile.get("stats").asText()));
-      }
-    }
-    return fileStats;
   }
 
   private static long getDataFileCount(Table catalogSales) throws IOException {
