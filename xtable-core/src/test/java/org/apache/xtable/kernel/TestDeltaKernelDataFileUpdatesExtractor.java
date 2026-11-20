@@ -508,7 +508,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     return ColumnStat.builder()
         .field(field)
         .range(Range.vector(min.toEpochMilli(), max.toEpochMilli()))
-        .numNulls(0)
+        .numNulls(0L)
         .numValues(10)
         .build();
   }
@@ -517,7 +517,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     return ColumnStat.builder()
         .field(field)
         .range(Range.vector(min.toEpochMilli() * 1000, max.toEpochMilli() * 1000))
-        .numNulls(0)
+        .numNulls(0L)
         .numValues(10)
         .build();
   }
