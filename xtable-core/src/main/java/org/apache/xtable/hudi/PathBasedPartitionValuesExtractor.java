@@ -41,7 +41,7 @@ import org.apache.xtable.model.stat.Range;
 /** Extracts Partition Values for Hudi/Parquet from Partition Path. */
 @AllArgsConstructor
 public class PathBasedPartitionValuesExtractor {
-  private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
+  protected static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
   @NonNull protected final Map<String, String> pathToPartitionFieldFormat;
 
   public List<PartitionValue> extractPartitionValues(
