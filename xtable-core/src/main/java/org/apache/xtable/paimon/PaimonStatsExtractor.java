@@ -19,8 +19,10 @@
 package org.apache.xtable.paimon;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
@@ -50,21 +52,29 @@ public class PaimonStatsExtractor {
     return INSTANCE;
   }
 
-  public List<ColumnStat> extractColumnStats(DataFileMeta file, InternalSchema internalSchema) {
+  /**
+   * Extracts the column stats of a data file.
+   *
+   * @param file the data file
+   * @param fileSchema the schema the data file was written with, which its stats are laid out by
+   * @param internalSchema the schema to report the stats in
+   * @return the column stats
+   */
+  public List<ColumnStat> extractColumnStats(
+      DataFileMeta file, InternalSchema fileSchema, InternalSchema internalSchema) {
     List<ColumnStat> columnStats = new ArrayList<>();
-    Map<String, InternalField> fieldMap =
-        internalSchema.getAllFields().stream()
-            .collect(Collectors.toMap(InternalField::getPath, f -> f));
+    Map<String, InternalField> fieldMap = getFieldsByFileColumnName(fileSchema, internalSchema);
 
     // stats for all columns are present in valueStats, we can safely ignore file.keyStats()
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
       List<String> colNames = file.valueStatsCols();
       if (colNames == null) {
-        // if column names are not present, then stats are being collected for all columns
+        // if column names are not present, then stats are being collected for all columns of the
+        // schema the file was written with
         colNames =
-            internalSchema.getAllFields().stream()
-                .map(InternalField::getPath)
+            fileSchema.getFields().stream()
+                .map(InternalField::getName)
                 .collect(Collectors.toList());
       }
 
@@ -81,6 +91,32 @@ public class PaimonStatsExtractor {
     }
 
     return columnStats;
+  }
+
+  /**
+   * Maps the column names of the file's schema to the fields of the schema the stats are reported
+   * in. Columns are matched by field id, since a column can be renamed, dropped or added after the
+   * file was written. A column whose type changed is left out, since the file stores its stats in
+   * the old type.
+   */
+  private static Map<String, InternalField> getFieldsByFileColumnName(
+      InternalSchema fileSchema, InternalSchema internalSchema) {
+    Map<Integer, InternalField> fieldsById =
+        internalSchema.getFields().stream()
+            .collect(Collectors.toMap(InternalField::getFieldId, f -> f));
+    Map<String, InternalField> fieldsByFileColumnName = new HashMap<>();
+    for (InternalField fileField : fileSchema.getFields()) {
+      InternalField field = fieldsById.get(fileField.getFieldId());
+      if (field != null && hasSameType(fileField.getSchema(), field.getSchema())) {
+        fieldsByFileColumnName.put(fileField.getName(), field);
+      }
+    }
+    return fieldsByFileColumnName;
+  }
+
+  private static boolean hasSameType(InternalSchema fileSchema, InternalSchema schema) {
+    return fileSchema.getDataType() == schema.getDataType()
+        && Objects.equals(fileSchema.getMetadata(), schema.getMetadata());
   }
 
   private void collectColumnStats(
@@ -103,7 +139,7 @@ public class PaimonStatsExtractor {
 
       // Check if we already have stats for this field
       boolean alreadyExists =
-          columnStats.stream().anyMatch(cs -> cs.getField().getPath().equals(colName));
+          columnStats.stream().anyMatch(cs -> cs.getField().getPath().equals(field.getPath()));
       if (alreadyExists) {
         continue;
       }

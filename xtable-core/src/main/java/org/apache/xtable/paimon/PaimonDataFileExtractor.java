@@ -19,11 +19,14 @@
 package org.apache.xtable.paimon;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -48,6 +51,8 @@ public class PaimonDataFileExtractor {
 
   private final PaimonStatsExtractor statsExtractor = PaimonStatsExtractor.getInstance();
 
+  private final PaimonSchemaExtractor schemaExtractor = PaimonSchemaExtractor.getInstance();
+
   private static final PaimonDataFileExtractor INSTANCE = new PaimonDataFileExtractor();
 
   public static PaimonDataFileExtractor getInstance() {
@@ -57,10 +62,12 @@ public class PaimonDataFileExtractor {
   public List<InternalDataFile> toInternalDataFiles(
       FileStoreTable table, Snapshot snapshot, InternalSchema internalSchema) {
     List<InternalDataFile> result = new ArrayList<>();
+    Function<Long, InternalSchema> fileSchemas = fileSchemaLookup(table);
     Iterator<ManifestEntry> manifestEntryIterator =
         newSnapshotReader(table, snapshot).readFileIterator();
     while (manifestEntryIterator.hasNext()) {
-      result.add(toInternalDataFile(table, manifestEntryIterator.next(), internalSchema));
+      result.add(
+          toInternalDataFile(table, manifestEntryIterator.next(), internalSchema, fileSchemas));
     }
     return result;
   }
@@ -72,10 +79,14 @@ public class PaimonDataFileExtractor {
    * @param table the Paimon table
    * @param entry the manifest entry representing a data file
    * @param internalSchema the internal schema for partition value extraction
+   * @param fileSchemas looks up a schema by id, used for the schema the data file was written with
    * @return InternalDataFile representation
    */
   public InternalDataFile toInternalDataFile(
-      FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
+      FileStoreTable table,
+      ManifestEntry entry,
+      InternalSchema internalSchema,
+      Function<Long, InternalSchema> fileSchemas) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .partitionSubdirectory(Optional.of(bucketPath(entry)))
@@ -84,7 +95,9 @@ public class PaimonDataFileExtractor {
         .recordCount(entry.file().rowCount())
         .partitionValues(
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
-        .columnStats(statsExtractor.extractColumnStats(entry.file(), internalSchema))
+        .columnStats(
+            statsExtractor.extractColumnStats(
+                entry.file(), fileSchemas.apply(entry.file().schemaId()), internalSchema))
         .build();
   }
 
@@ -127,6 +140,7 @@ public class PaimonDataFileExtractor {
 
     Set<InternalDataFile> addedFiles = new HashSet<>();
     Set<InternalDataFile> removedFiles = new HashSet<>();
+    Function<Long, InternalSchema> fileSchemas = fileSchemaLookup(table);
 
     // For primary key tables, only consider top-level files (fully compacted)
     int topLevel = table.coreOptions().numLevels() - 1;
@@ -141,7 +155,7 @@ public class PaimonDataFileExtractor {
           continue;
         }
 
-        InternalDataFile dataFile = toInternalDataFile(table, entry, internalSchema);
+        InternalDataFile dataFile = toInternalDataFile(table, entry, internalSchema, fileSchemas);
         if (entry.kind() == FileKind.ADD) {
           addedFiles.add(dataFile);
         } else if (entry.kind() == FileKind.DELETE) {
@@ -157,6 +171,14 @@ public class PaimonDataFileExtractor {
         removedFiles.size());
 
     return InternalFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+  }
+
+  /** Returns a lookup of the table's schemas by id that reads each schema once. */
+  private Function<Long, InternalSchema> fileSchemaLookup(FileStoreTable table) {
+    Map<Long, InternalSchema> schemas = new HashMap<>();
+    return schemaId ->
+        schemas.computeIfAbsent(
+            schemaId, id -> schemaExtractor.toInternalSchema(table.schemaManager().schema(id)));
   }
 
   private SnapshotReader newSnapshotReader(FileStoreTable table, Snapshot snapshot) {
