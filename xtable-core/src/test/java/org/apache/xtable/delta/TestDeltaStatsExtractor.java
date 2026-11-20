@@ -238,13 +238,13 @@ public class TestDeltaStatsExtractor {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(3)
+                .numNulls(3L)
                 .range(Range.vector("a", "b"))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(2))
                 .numValues(100)
-                .numNulls(4)
+                .numNulls(4L)
                 .range(Range.vector(1, 2))
                 .build());
     assertEquals(expected, extractColumnStats(stats, fields));
@@ -268,13 +268,13 @@ public class TestDeltaStatsExtractor {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(5)
+                .numNulls(5L)
                 .range(Range.vector(10, 20))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(1))
                 .numValues(100)
-                .numNulls(0)
+                .numNulls(0L)
                 .range(Range.vector(1, 2))
                 .build());
     assertEquals(expected, extractColumnStats(stats, fields));
@@ -299,7 +299,7 @@ public class TestDeltaStatsExtractor {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(0)
+                .numNulls(0L)
                 .range(Range.vector(1, 2))
                 .build());
     assertEquals(expected, extractColumnStats(stats, fields));

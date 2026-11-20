@@ -812,9 +812,9 @@ public class ITDeltaKernelConversionSource {
     return ColumnStat.builder()
         .field(field)
         .range(Range.vector(min, max))
-        .numNulls(0)
+        .numNulls(0L)
         .numValues(numValues)
-        .totalSize(0)
+        .totalSize(0L)
         .build();
   }
 
