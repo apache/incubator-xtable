@@ -122,17 +122,15 @@ public class ITDeltaKernelConversionSource {
       ColumnStat.builder()
           .field(COL2_INT_FIELD)
           .range(Range.vector(2, 2))
-          .numNulls(0)
+          .numNulls(0L)
           .numValues(1)
-          .totalSize(0)
           .build();
   private static final ColumnStat COL1_COLUMN_STAT =
       ColumnStat.builder()
           .field(COL1_INT_FIELD)
           .range(Range.vector(1, 1))
-          .numNulls(0)
+          .numNulls(0L)
           .numValues(1)
-          .totalSize(0)
           .build();
 
   private DeltaKernelConversionSourceProvider conversionSourceProvider;

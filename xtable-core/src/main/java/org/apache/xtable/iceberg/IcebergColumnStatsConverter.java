@@ -63,9 +63,14 @@ public class IcebergColumnStatsConverter {
           Types.NestedField icebergField =
               schema.findField(IcebergSchemaExtractor.convertFromXTablePath(field.getPath()));
           int fieldId = icebergField.fieldId();
-          columnSizes.put(fieldId, columnStats.getTotalSize());
+          // Leave out unknown sizes and null counts. Iceberg treats missing metrics as unknown.
+          if (columnStats.getTotalSize() != null) {
+            columnSizes.put(fieldId, columnStats.getTotalSize());
+          }
           valueCounts.put(fieldId, columnStats.getNumValues());
-          nullValueCounts.put(fieldId, columnStats.getNumNulls());
+          if (columnStats.getNumNulls() != null) {
+            nullValueCounts.put(fieldId, columnStats.getNumNulls());
+          }
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
             lowerBounds.put(

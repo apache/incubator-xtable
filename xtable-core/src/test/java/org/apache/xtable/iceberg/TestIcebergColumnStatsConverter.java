@@ -96,56 +96,56 @@ public class TestIcebergColumnStatsConverter {
         ColumnStat.builder()
             .field(timestampField)
             .numValues(123)
-            .numNulls(32)
-            .totalSize(13)
+            .numNulls(32L)
+            .totalSize(13L)
             .range(Range.vector(10000000L, 20000000L))
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
             .field(dateField)
             .numValues(555)
-            .numNulls(15)
-            .totalSize(53)
+            .numNulls(15L)
+            .totalSize(53L)
             .range(Range.vector(18181, 18182))
             .build();
     ColumnStat groupIdStats =
         ColumnStat.builder()
             .field(groupId)
             .numValues(510)
-            .numNulls(200)
-            .totalSize(10)
+            .numNulls(200L)
+            .totalSize(10L)
             .range(Range.vector(-3, 3))
             .build();
     ColumnStat stringFieldStats =
         ColumnStat.builder()
             .field(stringField)
             .numValues(50)
-            .numNulls(0)
-            .totalSize(12)
+            .numNulls(0L)
+            .totalSize(12L)
             .range(Range.vector("yyyy", "zzzz"))
             .build();
     ColumnStat mapFieldKeyStats =
         ColumnStat.builder()
             .field(mapFieldKey)
             .numValues(10)
-            .numNulls(0)
-            .totalSize(12)
+            .numNulls(0L)
+            .totalSize(12L)
             .range(Range.vector("aaa", "abc"))
             .build();
     ColumnStat mapFieldValueStats =
         ColumnStat.builder()
             .field(mapFieldValue)
             .numValues(10)
-            .numNulls(0)
-            .totalSize(24)
+            .numNulls(0L)
+            .totalSize(24L)
             .range(Range.vector(0, 10))
             .build();
     ColumnStat arrayFieldElementStats =
         ColumnStat.builder()
             .field(arrayFieldElement)
             .numValues(5)
-            .numNulls(0)
-            .totalSize(48)
+            .numNulls(0L)
+            .totalSize(48L)
             .range(Range.vector(100, 1000))
             .build();
     List<ColumnStat> columnStats =
@@ -241,8 +241,8 @@ public class TestIcebergColumnStatsConverter {
         ColumnStat.builder()
             .field(dateField)
             .numValues(555)
-            .numNulls(15)
-            .totalSize(53)
+            .numNulls(15L)
+            .totalSize(53L)
             .range(Range.vector(null, null))
             .build();
     List<ColumnStat> columnStats = Collections.singletonList(dateColumnStats);
@@ -273,6 +273,39 @@ public class TestIcebergColumnStatsConverter {
     assertEquals(expected.valueCounts(), actual.valueCounts());
     assertEquals(expected.upperBounds(), actual.upperBounds());
     assertEquals(expected.lowerBounds(), actual.lowerBounds());
+  }
+
+  @Test
+  public void toIcebergWithUnknownNullCountAndColumnSize() {
+    Schema icebergSchema =
+        new Schema(
+            Types.NestedField.optional(1, "int_field", Types.IntegerType.get()),
+            Types.NestedField.optional(2, "string_field", Types.StringType.get()));
+    List<InternalField> fields = getIntAndStringFields();
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .range(Range.vector(1, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
+                .numNulls(5L)
+                .totalSize(20L)
+                .range(Range.vector("a", "z"))
+                .build());
+
+    Metrics actual =
+        IcebergColumnStatsConverter.getInstance().toIceberg(icebergSchema, 100, columnStats);
+
+    // The unknown null count and column size of int_field are left out instead of written as 0.
+    assertEquals(Collections.singletonMap(2, 20L), actual.columnSizes());
+    assertEquals(getCounts(100L, 100L), actual.valueCounts());
+    assertEquals(Collections.singletonMap(2, 5L), actual.nullValueCounts());
+    assertEquals(getIntAndStringBounds(1, "a"), actual.lowerBounds());
+    assertEquals(getIntAndStringBounds(9, "z"), actual.upperBounds());
   }
 
   @Test
@@ -347,36 +380,36 @@ public class TestIcebergColumnStatsConverter {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(123)
-                .numNulls(32)
-                .totalSize(13)
+                .numNulls(32L)
+                .totalSize(13L)
                 .range(Range.vector(1, 2))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(2))
                 .numValues(456)
-                .numNulls(456)
-                .totalSize(31)
+                .numNulls(456L)
+                .totalSize(31L)
                 .range(Range.vector(null, null))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(3))
                 .numValues(1000L)
                 .numNulls(789L)
-                .totalSize(42)
+                .totalSize(42L)
                 .range(Range.vector("a", "zzz"))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(4))
                 .numValues(1000L)
                 .numNulls(789L)
-                .totalSize(42)
+                .totalSize(42L)
                 .range(Range.vector(18181, 18182))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(5))
                 .numValues(1000L)
                 .numNulls(789L)
-                .totalSize(42)
+                .totalSize(42L)
                 .range(Range.vector(10000000L, 20000000L))
                 .build());
     assertEquals(expected, actual);
@@ -399,15 +432,15 @@ public class TestIcebergColumnStatsConverter {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(5)
-                .totalSize(0)
+                .numNulls(5L)
+                .totalSize(0L)
                 .range(Range.vector(1, 9))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(1))
                 .numValues(100)
-                .numNulls(0)
-                .totalSize(0)
+                .numNulls(0L)
+                .totalSize(0L)
                 .range(Range.vector("a", "z"))
                 .build());
     assertEquals(expected, actual);
@@ -432,8 +465,8 @@ public class TestIcebergColumnStatsConverter {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(5)
-                .totalSize(10)
+                .numNulls(5L)
+                .totalSize(10L)
                 .range(Range.vector(1, 9))
                 .build());
     assertEquals(expected, actual);
@@ -456,15 +489,15 @@ public class TestIcebergColumnStatsConverter {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(5)
-                .totalSize(10)
+                .numNulls(5L)
+                .totalSize(10L)
                 .range(Range.vector(null, null))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(1))
                 .numValues(100)
-                .numNulls(0)
-                .totalSize(20)
+                .numNulls(0L)
+                .totalSize(20L)
                 .range(Range.vector(null, null))
                 .build());
     assertEquals(expected, actual);
@@ -516,15 +549,15 @@ public class TestIcebergColumnStatsConverter {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(100)
-                .numNulls(5)
-                .totalSize(0)
+                .numNulls(5L)
+                .totalSize(0L)
                 .range(Range.vector(null, 9))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(2))
                 .numValues(100)
-                .numNulls(0)
-                .totalSize(30)
+                .numNulls(0L)
+                .totalSize(30L)
                 .range(Range.vector(null, null))
                 .build());
     assertEquals(expected, actual);
