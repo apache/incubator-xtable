@@ -1286,6 +1286,69 @@ public class ITConversionController {
     }
   }
 
+  // Delta readers skip files with the min and max stats in the Delta log, and add 1 ms to a
+  // timestamp max since Delta stats keep milliseconds. A filter just inside the min or max of a
+  // timestamp column must return the same rows from the Delta target as from the source, whatever
+  // the reader's session time zone. Each time zone gets its own table, since Delta caches the
+  // parsed stats per snapshot.
+  @ParameterizedTest
+  @ValueSource(strings = {"UTC", "Asia/Kolkata", "America/Los_Angeles"})
+  public void testTimestampFilterNearMinAndMaxIcebergToDelta(String sessionTimeZone) {
+    String tableName = getTableName();
+    String icebergTable = "default_iceberg.xtable_it." + tableName;
+    String basePath = tempDir.resolve("xtable_it").resolve(tableName).toString();
+    String dataPath = basePath + "/data";
+    // 2026-11-14T00:39:17.250Z and 2026-11-14T00:39:18.926789Z, in one data file.
+    long minMicros = 1794616757250000L;
+    long maxMicros = 1794616758926789L;
+    sparkSession.sql(
+        String.format("CREATE TABLE %s (id INT, ts TIMESTAMP) USING iceberg", icebergTable));
+    sparkSession.sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, timestamp_micros(%d)), (2, timestamp_micros(%d))",
+            icebergTable, minMicros, maxMicros));
+    ConversionConfig conversionConfig =
+        ConversionConfig.builder()
+            .sourceTable(
+                SourceTable.builder()
+                    .name(tableName)
+                    .formatName(ICEBERG)
+                    .basePath(basePath)
+                    .dataPath(dataPath)
+                    .additionalProperties(new Properties())
+                    .build())
+            .targetTables(
+                Collections.singletonList(
+                    TargetTable.builder()
+                        .name(tableName)
+                        .formatName(DELTA)
+                        .basePath(dataPath)
+                        .additionalProperties(new Properties())
+                        .build()))
+            .syncMode(SyncMode.INCREMENTAL)
+            .build();
+    Map<String, SyncResult> results =
+        conversionController.sync(conversionConfig, getConversionSourceProvider(ICEBERG));
+    assertEquals(
+        SyncStatusCode.SUCCESS, results.get(DELTA).getTableFormatSyncStatus().getStatusCode());
+
+    // A new session, so tests running at the same time keep the UTC session time zone.
+    SparkSession session = sparkSession.newSession();
+    session.conf().set("spark.sql.session.timeZone", sessionTimeZone);
+    for (String filter :
+        Arrays.asList(
+            String.format("ts > timestamp_micros(%d)", maxMicros - 1),
+            String.format("ts < timestamp_micros(%d)", minMicros + 1))) {
+      long sourceCount = session.read().format("iceberg").load(basePath).filter(filter).count();
+      long targetCount = session.read().format("delta").load(dataPath).filter(filter).count();
+      assertEquals(1, sourceCount, "Source row count for: " + filter);
+      assertEquals(
+          sourceCount,
+          targetCount,
+          String.format("Delta row count for %s in session time zone %s", filter, sessionTimeZone));
+    }
+  }
+
   private Map<String, String> getTimeTravelOption(String tableFormat, Instant time) {
     Map<String, String> options = new HashMap<>();
     switch (tableFormat) {

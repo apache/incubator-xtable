@@ -73,8 +73,8 @@ public class TestDeltaStatsExtractor {
     assertEquals(10, minValueStatsMap.get("long_field"));
     assertEquals("a", minValueStatsMap.get("string_field"));
     assertEquals(null, minValueStatsMap.get("null_string_field"));
-    assertEquals("2022-10-08 21:08:17", minValueStatsMap.get("timestamp_field"));
-    assertEquals("2022-10-08 21:08:17", minValueStatsMap.get("timestamp_micros_field"));
+    assertEquals("2022-10-08T21:08:17.000Z", minValueStatsMap.get("timestamp_field"));
+    assertEquals("2022-10-08T21:08:17.000Z", minValueStatsMap.get("timestamp_micros_field"));
     assertEquals(1.23, minValueStatsMap.get("float_field"));
     assertEquals(1.23, minValueStatsMap.get("double_field"));
     assertEquals(1.0, minValueStatsMap.get("decimal_field"));
@@ -91,8 +91,8 @@ public class TestDeltaStatsExtractor {
     assertEquals(20, maxValueStatsMap.get("long_field"));
     assertEquals("c", maxValueStatsMap.get("string_field"));
     assertEquals(null, maxValueStatsMap.get("null_string_field"));
-    assertEquals("2022-10-10 21:08:17", maxValueStatsMap.get("timestamp_field"));
-    assertEquals("2022-10-10 21:08:17", maxValueStatsMap.get("timestamp_micros_field"));
+    assertEquals("2022-10-10T21:08:17.000Z", maxValueStatsMap.get("timestamp_field"));
+    assertEquals("2022-10-10T21:08:17.000Z", maxValueStatsMap.get("timestamp_micros_field"));
     // TOD0: Local timestamp depends on env where it is run, it is non determinstic and this has to
     // be computed dynamically.
     // assertEquals("2022-10-10 14:08:17", maxValueStatsMap.get("local_timestamp_field"));
