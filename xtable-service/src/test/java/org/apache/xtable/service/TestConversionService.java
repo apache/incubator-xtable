@@ -36,6 +36,7 @@ import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,8 +44,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.apache.iceberg.SchemaParser;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
+import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.delta.DeltaConversionSourceConfig;
 import org.apache.xtable.iceberg.IcebergSchemaExtractor;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -107,6 +110,8 @@ class TestConversionService {
 
   @Test
   void convertToTargetHudi() {
+    Map<String, String> configurations = new HashMap<>();
+    configurations.put(DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS, "true");
     ConvertTableRequest req =
         ConvertTableRequest.builder()
             .sourceFormat(TableFormat.DELTA)
@@ -114,6 +119,7 @@ class TestConversionService {
             .sourceTablePath(SOURCE_PATH)
             .sourceDataPath(SOURCE_DATA_PATH)
             .targetFormats(Collections.singletonList(TableFormat.HUDI))
+            .configurations(configurations)
             .build();
 
     Schema avroSchema = new Schema.Parser().parse(HUDI_SCHEMA_JSON);
@@ -132,7 +138,16 @@ class TestConversionService {
 
       ConvertTableResponse resp = service.convertTable(req);
 
-      verify(controller).sync(any(), eq(provider));
+      ArgumentCaptor<ConversionConfig> conversionConfigCaptor =
+          ArgumentCaptor.forClass(ConversionConfig.class);
+      verify(controller).sync(conversionConfigCaptor.capture(), eq(provider));
+      assertEquals(
+          "true",
+          conversionConfigCaptor
+              .getValue()
+              .getSourceTable()
+              .getAdditionalProperties()
+              .getProperty(DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS));
       assertEquals(1, resp.getConvertedTables().size());
       ConvertedTable ct = resp.getConvertedTables().get(0);
       assertEquals(TableFormat.HUDI, ct.getTargetFormat());

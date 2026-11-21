@@ -50,6 +50,7 @@ import org.apache.hadoop.conf.Configuration;
 import com.fasterxml.jackson.annotation.JsonMerge;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -59,6 +60,7 @@ import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionSourceConfig;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
@@ -190,11 +192,7 @@ public class RunSync {
           "Running sync for basePath {} for following table formats {}",
           table.getTableBasePath(),
           tableFormatList);
-      Properties sourceProperties = new Properties();
-      if (table.getPartitionSpec() != null) {
-        sourceProperties.put(
-            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
-      }
+      Properties sourceProperties = getSourceProperties(table);
 
       SourceTable sourceTable =
           sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties);
@@ -211,6 +209,20 @@ public class RunSync {
         log.error("Error running sync for {}", table.getTableBasePath(), e);
       }
     }
+  }
+
+  @VisibleForTesting
+  static Properties getSourceProperties(DatasetConfig.Table table) {
+    Properties sourceProperties = new Properties();
+    if (table.getPartitionSpec() != null) {
+      sourceProperties.put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
+    }
+    if (table.getAllowUnsupportedDeletionVectors() != null) {
+      sourceProperties.put(
+          DeltaConversionSourceConfig.ALLOW_UNSUPPORTED_DELETION_VECTORS,
+          table.getAllowUnsupportedDeletionVectors());
+    }
+    return sourceProperties;
   }
 
   static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
@@ -284,7 +296,7 @@ public class RunSync {
           () -> {
             try {
               runSync(cmd);
-            } catch (IOException ex) {
+            } catch (Exception ex) {
               log.error("Sync operation failed", ex);
             }
           },
@@ -407,6 +419,9 @@ public class RunSync {
        * xtable.hudi.target.secondary.index.column} for a {@link TableFormat#HUDI} target.
        */
       Map<String, Map<String, String>> targetProperties;
+
+      @JsonDeserialize(using = StrictBooleanStringDeserializer.class)
+      String allowUnsupportedDeletionVectors;
     }
   }
 

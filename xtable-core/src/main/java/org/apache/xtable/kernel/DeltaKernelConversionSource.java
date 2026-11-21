@@ -24,9 +24,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +42,9 @@ import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.util.VectorUtils;
 
+import org.apache.xtable.delta.DeltaDeletionVectorHandler;
+import org.apache.xtable.delta.DeltaPathUtils;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -69,6 +74,10 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private final String basePath;
   private final String tableName;
   private final Engine engine;
+
+  @Builder.Default
+  private final DeltaDeletionVectorHandler deletionVectorHandler =
+      new DeltaDeletionVectorHandler(false);
 
   @Builder.Default
   private final DeltaKernelTableExtractor tableExtractor =
@@ -117,6 +126,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         tableExtractor.table(table, snapshot, engine, tableName, basePath);
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
     Map<String, InternalDataFile> removedFiles = new HashMap<>();
+    Set<String> dataFilesWithDeletionVectors = new HashSet<>();
     String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
     FileFormat fileFormat = actionsConverter.convertToFileFormat(provider);
 
@@ -128,6 +138,11 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     for (RowBackedAction action : actionsForVersion) {
       if (action instanceof AddFile) {
         AddFile addFile = (AddFile) action;
+        if (addFile.getDeletionVector().isPresent()) {
+          String dataFilePath = DeltaPathUtils.getFullPathToFile(tableBasePath, addFile.getPath());
+          deletionVectorHandler.onDeletionVectorFound(dataFilePath);
+          dataFilesWithDeletionVectors.add(dataFilePath);
+        }
         Map<String, String> partitionValues = VectorUtils.toJavaMap(addFile.getPartitionValues());
         InternalDataFile dataFile =
             actionsConverter.convertAddActionToInternalDataFile(
@@ -159,6 +174,9 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         removedFiles.put(dataFile.getPhysicalPath(), dataFile);
       }
     }
+
+    DeltaDeletionVectorHandler.removeDeletionVectorFileChanges(
+        addedFiles, removedFiles, dataFilesWithDeletionVectors);
 
     InternalFilesDiff internalFilesDiff =
         InternalFilesDiff.builder()
@@ -232,11 +250,13 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private List<PartitionFileGroup> getInternalDataFiles(
       Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {
     try (DataFileIterator fileIterator =
-        dataFileExtractor.iterator(snapshot, table, engine, schema)) {
+        dataFileExtractor.iterator(snapshot, table, engine, schema, deletionVectorHandler)) {
 
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       return PartitionFileGroup.fromFiles(dataFiles);
+    } catch (NotSupportedException e) {
+      throw e;
     } catch (Exception e) {
       throw new ReadException("Failed to iterate through Delta data files", e);
     }
