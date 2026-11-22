@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -106,9 +107,8 @@ public class ITDeltaConversionSource {
       ColumnStat.builder()
           .field(COL1_INT_FIELD)
           .range(Range.vector(1, 1))
-          .numNulls(0)
+          .numNulls(0L)
           .numValues(1)
-          .totalSize(0)
           .build();
 
   private static final InternalField COL2_INT_FIELD =
@@ -126,9 +126,8 @@ public class ITDeltaConversionSource {
       ColumnStat.builder()
           .field(COL2_INT_FIELD)
           .range(Range.vector(2, 2))
-          .numNulls(0)
+          .numNulls(0L)
           .numValues(1)
-          .totalSize(0)
           .build();
 
   @TempDir private static Path tempDir;
@@ -444,6 +443,142 @@ public class ITDeltaConversionSource {
                         .anyMatch(pv -> pv.getRange().getMaxValue() == null))
             .count();
     assertEquals(1, nullPartitionFiles);
+  }
+
+  @Test
+  void getCurrentSnapshotColumnMappingStatsTest() {
+    // Column mapping enabled after data exists keeps a as the physical name of a. After renaming a
+    // to a_old and re-adding a, a_old has physical name a and the new a has a col-<uuid> name.
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    sparkSession.sql(
+        "CREATE TABLE `" + tableName + "` (id INT, a INT) USING DELTA LOCATION '" + basePath + "'");
+    sparkSession.sql("INSERT INTO TABLE `" + tableName + "` VALUES (1, 10), (2, 20)");
+    sparkSession.sql(
+        "ALTER TABLE `"
+            + tableName
+            + "` SET TBLPROPERTIES ('delta.minReaderVersion'='2',"
+            + " 'delta.minWriterVersion'='5', 'delta.columnMapping.mode'='name')");
+    sparkSession.sql("ALTER TABLE `" + tableName + "` RENAME COLUMN a TO a_old");
+    sparkSession.sql("ALTER TABLE `" + tableName + "` ADD COLUMNS (a INT)");
+    sparkSession.sql("INSERT INTO TABLE `" + tableName + "` VALUES (3, 30, 300)");
+
+    InternalSnapshot snapshot = getCurrentSnapshot(tableName, basePath);
+
+    List<InternalField> fields = snapshot.getTable().getReadSchema().getFields();
+    assertEquals(
+        Arrays.asList("id", "a_old", "a"),
+        fields.stream().map(InternalField::getName).collect(Collectors.toList()));
+    InternalField id = fields.get(0);
+    InternalField aOld = fields.get(1);
+    InternalField a = fields.get(2);
+    assertEquals("a", aOld.getStorageName());
+    assertTrue(a.getStorageName().startsWith("col-"));
+    Map<Long, List<ColumnStat>> columnStatsByRecordCount = getColumnStatsByRecordCount(snapshot);
+    assertEquals(2, columnStatsByRecordCount.size());
+    // The file written before a was re-added has no stats for the new a.
+    assertEquals(
+        Arrays.asList(columnStat(id, 1, 2, 2), columnStat(aOld, 10, 20, 2)),
+        columnStatsByRecordCount.get(2L));
+    assertEquals(
+        Arrays.asList(
+            columnStat(id, 3, 3, 1), columnStat(aOld, 30, 30, 1), columnStat(a, 300, 300, 1)),
+        columnStatsByRecordCount.get(1L));
+  }
+
+  @Test
+  void getCurrentSnapshotColumnMappingNestedStatsTest() {
+    // Delta keys nested stats by the dot path of the field, for example s.x. Column mapping enabled
+    // after data exists keeps s, x and y as the physical names. After renaming s.x to x_old and
+    // re-adding s.x, s.x_old has physical path s.x and the new s.x has physical path s.col-<uuid>.
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` (id INT, s STRUCT<x: INT, y: STRING>) USING DELTA LOCATION '"
+            + basePath
+            + "'");
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (1, named_struct('x', 10, 'y', 'a')), (2, named_struct('x', 20, 'y', 'b'))");
+
+    // Without column mapping, the physical path is the logical path.
+    InternalSnapshot snapshot = getCurrentSnapshot(tableName, basePath);
+    Map<String, InternalField> fields = getFieldsByPath(snapshot);
+    assertEquals(
+        Arrays.asList(
+            columnStat(fields.get("id"), 1, 2, 2),
+            columnStat(fields.get("s.x"), 10, 20, 2),
+            columnStat(fields.get("s.y"), "a", "b", 2)),
+        getColumnStatsByRecordCount(snapshot).get(2L));
+
+    sparkSession.sql(
+        "ALTER TABLE `"
+            + tableName
+            + "` SET TBLPROPERTIES ('delta.minReaderVersion'='2',"
+            + " 'delta.minWriterVersion'='5', 'delta.columnMapping.mode'='name')");
+    sparkSession.sql("ALTER TABLE `" + tableName + "` RENAME COLUMN s.x TO x_old");
+    sparkSession.sql("ALTER TABLE `" + tableName + "` ADD COLUMNS (s.x INT)");
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (3, named_struct('x_old', 30, 'y', 'c', 'x', 300))");
+    assertColumnMappedNestedStats(tableName, basePath, "s");
+
+    // Renaming the struct keeps its physical name, so its fields keep their physical paths.
+    sparkSession.sql("ALTER TABLE `" + tableName + "` RENAME COLUMN s TO s_renamed");
+    assertColumnMappedNestedStats(tableName, basePath, "s_renamed");
+  }
+
+  private void assertColumnMappedNestedStats(String tableName, Path basePath, String struct) {
+    InternalSnapshot snapshot = getCurrentSnapshot(tableName, basePath);
+    Map<String, InternalField> fields = getFieldsByPath(snapshot);
+    InternalField id = fields.get("id");
+    InternalField xOld = fields.get(struct + ".x_old");
+    InternalField y = fields.get(struct + ".y");
+    InternalField x = fields.get(struct + ".x");
+    assertEquals("s", fields.get(struct).getStorageName());
+    assertEquals("x", xOld.getStorageName());
+    assertTrue(x.getStorageName().startsWith("col-"));
+    Map<Long, List<ColumnStat>> columnStatsByRecordCount = getColumnStatsByRecordCount(snapshot);
+    assertEquals(2, columnStatsByRecordCount.size());
+    // The file written before s.x was re-added has no stats for the new s.x.
+    assertEquals(
+        Arrays.asList(
+            columnStat(id, 1, 2, 2), columnStat(xOld, 10, 20, 2), columnStat(y, "a", "b", 2)),
+        columnStatsByRecordCount.get(2L));
+    assertEquals(
+        Arrays.asList(
+            columnStat(id, 3, 3, 1),
+            columnStat(xOld, 30, 30, 1),
+            columnStat(y, "c", "c", 1),
+            columnStat(x, 300, 300, 1)),
+        columnStatsByRecordCount.get(1L));
+  }
+
+  private InternalSnapshot getCurrentSnapshot(String tableName, Path basePath) {
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    return conversionSourceProvider.getConversionSourceInstance(tableConfig).getCurrentSnapshot();
+  }
+
+  private static Map<String, InternalField> getFieldsByPath(InternalSnapshot snapshot) {
+    return snapshot.getTable().getReadSchema().getAllFields().stream()
+        .collect(Collectors.toMap(InternalField::getPath, Function.identity()));
+  }
+
+  private static Map<Long, List<ColumnStat>> getColumnStatsByRecordCount(
+      InternalSnapshot snapshot) {
+    return snapshot.getPartitionedDataFiles().stream()
+        .flatMap(group -> group.getDataFiles().stream())
+        .collect(
+            Collectors.toMap(InternalDataFile::getRecordCount, InternalDataFile::getColumnStats));
   }
 
   @ParameterizedTest
@@ -829,6 +964,17 @@ public class ITDeltaConversionSource {
 
   private static Stream<Arguments> testWithPartitionToggle() {
     return Stream.of(Arguments.of(false), Arguments.of(true));
+  }
+
+  private static ColumnStat columnStat(
+      InternalField field, Object min, Object max, long numValues) {
+    return ColumnStat.builder()
+        .field(field)
+        .range(Range.vector(min, max))
+        .numNulls(0L)
+        .numValues(numValues)
+        .totalSize(0L)
+        .build();
   }
 
   private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {

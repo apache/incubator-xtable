@@ -41,6 +41,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import scala.collection.JavaConverters;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
@@ -58,9 +60,11 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 public class TestDeltaKernelDataFileUpdatesExtractor {
@@ -188,6 +192,60 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
         expectedModificationTime,
         addFile.getModificationTime(),
         "AddFile modification time should match expected time");
+  }
+
+  @Test
+  public void testColumnStatsWithUnknownNullCount() throws IOException {
+    String testFilePath = tempDir.resolve("test_data.parquet").toString();
+    Files.createFile(Paths.get(testFilePath));
+    List<InternalField> fields = testSchema.getFields();
+    InternalDataFile dataFile =
+        InternalDataFile.builder()
+            .physicalPath(testFilePath)
+            .fileSizeBytes(1024L)
+            .lastModified(Instant.now().toEpochMilli())
+            .recordCount(10L)
+            .partitionValues(Collections.emptyList())
+            .columnStats(
+                Arrays.asList(
+                    ColumnStat.builder()
+                        .field(fields.get(0))
+                        .numValues(10)
+                        .range(Range.vector(1, 9))
+                        .build(),
+                    ColumnStat.builder()
+                        .field(fields.get(1))
+                        .numValues(10)
+                        .numNulls(2L)
+                        .range(Range.vector("a", "z"))
+                        .build()))
+            .build();
+    DeltaKernelDataFileUpdatesExtractor extractorWithStats =
+        DeltaKernelDataFileUpdatesExtractor.builder()
+            .engine(engine)
+            .basePath(tempDir.toString())
+            .includeColumnStats(true)
+            .build();
+
+    List<RowBackedAction> actions =
+        JavaConverters.seqAsJavaList(
+            extractorWithStats.applyDiff(
+                InternalFilesDiff.builder().fileAdded(dataFile).build(),
+                testSchema,
+                tempDir.toString(),
+                physicalSchema));
+
+    // id keeps its bounds, and its unknown null count is left out instead of written as 0. Kernel
+    // does not write null values in the stats maps.
+    AddFile addFile = (AddFile) actions.get(0);
+    ObjectMapper mapper = new ObjectMapper();
+    assertEquals(
+        mapper.readTree(
+            "{\"numRecords\":10,"
+                + "\"minValues\":{\"id\":1,\"name\":\"a\"},"
+                + "\"maxValues\":{\"id\":9,\"name\":\"z\"},"
+                + "\"nullCount\":{\"name\":2}}"),
+        mapper.readTree(addFile.getStatsJson().get()));
   }
 
   @Test

@@ -448,9 +448,9 @@ public class ITHudiConversionTarget {
                 ColumnStat.builder()
                     .field(SCHEMA.getFields().get(0))
                     .range(Range.vector("id3", "id4"))
-                    .numNulls(0)
+                    .numNulls(0L)
                     .numValues(2)
-                    .totalSize(5)
+                    .totalSize(5L)
                     .build()))
         .build();
   }
@@ -962,23 +962,23 @@ public class ITHudiConversionTarget {
             ColumnStat.builder()
                 .field(SCHEMA.getFields().get(0))
                 .range(Range.vector("id1", "id2"))
-                .numNulls(0)
+                .numNulls(0L)
                 .numValues(2)
-                .totalSize(5)
+                .totalSize(5L)
                 .build(),
             ColumnStat.builder()
                 .field(SCHEMA.getFields().get(1))
                 .range(Range.vector("a", "b"))
-                .numNulls(1)
+                .numNulls(1L)
                 .numValues(3)
-                .totalSize(10)
+                .totalSize(10L)
                 .build(),
             ColumnStat.builder()
                 .field(SCHEMA.getFields().get(2))
                 .range(Range.vector("content1", "content2"))
-                .numNulls(0)
+                .numNulls(0L)
                 .numValues(2)
-                .totalSize(5)
+                .totalSize(5L)
                 .build());
     return InternalDataFile.builder()
         .physicalPath(

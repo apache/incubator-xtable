@@ -63,9 +63,14 @@ public class IcebergColumnStatsConverter {
           Types.NestedField icebergField =
               schema.findField(IcebergSchemaExtractor.convertFromXTablePath(field.getPath()));
           int fieldId = icebergField.fieldId();
-          columnSizes.put(fieldId, columnStats.getTotalSize());
+          // Leave out unknown sizes and null counts. Iceberg treats missing metrics as unknown.
+          if (columnStats.getTotalSize() != null) {
+            columnSizes.put(fieldId, columnStats.getTotalSize());
+          }
           valueCounts.put(fieldId, columnStats.getNumValues());
-          nullValueCounts.put(fieldId, columnStats.getNumNulls());
+          if (columnStats.getNumNulls() != null) {
+            nullValueCounts.put(fieldId, columnStats.getNumNulls());
+          }
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
             lowerBounds.put(
@@ -93,20 +98,23 @@ public class IcebergColumnStatsConverter {
       Map<Integer, Long> size,
       Map<Integer, ByteBuffer> minValues,
       Map<Integer, ByteBuffer> maxValues) {
+    // Iceberg writers may omit any of these metrics, so a map may be null or lack a field. A null
+    // value is treated the same as a missing field. A field needs a value count to get a
+    // ColumnStat, and a missing null count or column size is left null as unknown.
     if (valueCounts == null || valueCounts.isEmpty()) {
       return Collections.emptyList();
     }
     return fields.stream()
-        .filter(field -> valueCounts.containsKey(field.getFieldId()))
+        .filter(field -> valueCounts.get(field.getFieldId()) != null)
         .map(
             field -> {
               Integer fieldId = field.getFieldId();
               long numValues = valueCounts.get(fieldId);
-              long numNulls = nullCounts.get(fieldId);
-              long totalSize = size.get(fieldId);
+              Long numNulls = getOrNull(nullCounts, fieldId);
+              Long totalSize = getOrNull(size, fieldId);
               Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
-              Object minValue = convertFromIcebergValue(fieldType, minValues.get(fieldId));
-              Object maxValue = convertFromIcebergValue(fieldType, maxValues.get(fieldId));
+              Object minValue = convertFromIcebergValue(fieldType, getOrNull(minValues, fieldId));
+              Object maxValue = convertFromIcebergValue(fieldType, getOrNull(maxValues, fieldId));
               Range range = Range.vector(minValue, maxValue);
               return ColumnStat.builder()
                   .field(field)
@@ -117,6 +125,10 @@ public class IcebergColumnStatsConverter {
                   .build();
             })
         .collect(CustomCollectors.toList(fields.size()));
+  }
+
+  private static <T> T getOrNull(Map<Integer, T> stats, Integer fieldId) {
+    return stats == null ? null : stats.get(fieldId);
   }
 
   private Object convertFromIcebergValue(Type fieldType, ByteBuffer value) {

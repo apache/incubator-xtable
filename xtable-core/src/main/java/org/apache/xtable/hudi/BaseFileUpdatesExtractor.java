@@ -374,14 +374,28 @@ public class BaseFileUpdatesExtractor {
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
       String fileName, List<ColumnStat> columnStatMap, HoodieIndexVersion indexVersion) {
-    return columnStatMap.stream()
-        .filter(
-            entry ->
-                !InternalType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
+    List<ColumnStat> scalarColumnStats =
+        columnStatMap.stream()
+            .filter(
+                entry ->
+                    !InternalType.NON_SCALAR_TYPES.contains(
+                        entry.getField().getSchema().getDataType()))
+            .collect(Collectors.toList());
+    // Hudi's column stats index cannot store an unknown null count, and a count of 0 would let
+    // Hudi skip the file for IS NULL filters. Dropping only that column is not enough: when a
+    // query also filters on a column the file has stats for, Hudi gives the dropped column null
+    // bounds, and a range filter on it then skips the file. Hudi's data skipping always reads a
+    // file that is not in the index, so leave the whole file out.
+    if (scalarColumnStats.stream().anyMatch(columnStat -> columnStat.getNumNulls() == null)) {
+      return Collections.emptyMap();
+    }
+    return scalarColumnStats.stream()
         .map(
             columnStat -> {
               ValueMetadata valueMetadata =
                   XTableValueMetadata.getValueMetadata(columnStat, indexVersion);
+              // Hudi does not use the column size for pruning, so an unknown size is written as 0.
+              long totalSize = columnStat.getTotalSize() == null ? 0L : columnStat.getTotalSize();
               return HoodieColumnRangeMetadata.<Comparable>create(
                   fileName,
                   convertFromXTablePath(columnStat.getField().getPath()),
@@ -389,7 +403,7 @@ public class BaseFileUpdatesExtractor {
                   valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMaxValue()),
                   columnStat.getNumNulls(),
                   columnStat.getNumValues(),
-                  columnStat.getTotalSize(),
+                  totalSize,
                   -1L,
                   valueMetadata);
             })
