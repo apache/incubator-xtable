@@ -271,8 +271,10 @@ public class DeltaKernelDataFileUpdatesExtractor {
         }
       }
 
-      // Add null count
-      nullCounts.put(column, columnStat.getNumNulls());
+      // Add null count, unless it is unknown
+      if (columnStat.getNumNulls() != null) {
+        nullCounts.put(column, columnStat.getNumNulls());
+      }
     }
 
     return new DataFileStatistics(recordCount, minValues, maxValues, nullCounts);

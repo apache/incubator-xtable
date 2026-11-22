@@ -157,8 +157,8 @@ public class DeltaStatsUtils {
                             ? DeltaValueConverter.convertFromDeltaColumnStatValue(
                                 maxRaw, field.getSchema())
                             : null;
-                    long nullCount =
-                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : 0;
+                    Long nullCount =
+                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : null;
 
                     Range range = Range.vector(minValue, maxValue);
                     return ColumnStat.builder()
@@ -217,11 +217,14 @@ public class DeltaStatsUtils {
   private static Map<String, Object> getNullCount(List<ColumnStat> validColumnStats) {
     // TODO: Additional work needed to track nulls maps & arrays.
     Map<String, Object> jsonObject = new HashMap<>();
-    validColumnStats.forEach(
-        columnStat -> {
-          String[] pathParts = columnStat.getField().getPathParts();
-          insertValueAtPath(jsonObject, pathParts, columnStat.getNumNulls());
-        });
+    // Leave out unknown null counts. Delta treats a missing null count as unknown.
+    validColumnStats.stream()
+        .filter(columnStat -> columnStat.getNumNulls() != null)
+        .forEach(
+            columnStat -> {
+              String[] pathParts = columnStat.getField().getPathParts();
+              insertValueAtPath(jsonObject, pathParts, columnStat.getNumNulls());
+            });
     return jsonObject;
   }
 

@@ -245,160 +245,160 @@ public class ColumnStatMapUtil {
     ColumnStat longColumnStats =
         ColumnStat.builder()
             .field(LONG_FIELD)
-            .numNulls(4)
+            .numNulls(4L)
             .range(Range.vector(10L, 20L))
             .numValues(50)
-            .totalSize(123)
+            .totalSize(123L)
             .build();
     ColumnStat stringColumnStats =
         ColumnStat.builder()
             .field(STRING_FIELD)
-            .numNulls(1)
+            .numNulls(1L)
             .range(Range.vector("a", "c"))
             .numValues(50)
-            .totalSize(500)
+            .totalSize(500L)
             .build();
     ColumnStat nullStringColumnStats =
         ColumnStat.builder()
             .field(NULL_STRING_FIELD)
-            .numNulls(3)
+            .numNulls(3L)
             .range(Range.vector(null, null))
             .numValues(50)
-            .totalSize(0)
+            .totalSize(0L)
             .build();
     ColumnStat timeStampColumnStats =
         ColumnStat.builder()
             .field(TIMESTAMP_FIELD)
-            .numNulls(105)
+            .numNulls(105L)
             .range(Range.vector(1665263297000L, 1665436097000L))
             .numValues(50)
-            .totalSize(999)
+            .totalSize(999L)
             .build();
     ColumnStat timeStampMicrosColumnStats =
         ColumnStat.builder()
             .field(TIMESTAMP_MICROS_FIELD)
-            .numNulls(1)
+            .numNulls(1L)
             .range(Range.vector(1665263297000000L, 1665436097000000L))
             .numValues(50)
-            .totalSize(400)
+            .totalSize(400L)
             .build();
     ColumnStat localTimeStampColumnStats =
         ColumnStat.builder()
             .field(LOCAL_TIMESTAMP_FIELD)
-            .numNulls(1)
+            .numNulls(1L)
             .range(Range.vector(1665263297000L, 1665436097000L))
             .numValues(50)
-            .totalSize(400)
+            .totalSize(400L)
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
             .field(DATE_FIELD)
-            .numNulls(250)
+            .numNulls(250L)
             .range(Range.vector(18181, 18547))
             .numValues(50)
-            .totalSize(12345)
+            .totalSize(12345L)
             .build();
     ColumnStat arrayLongElementColumnStats =
         ColumnStat.builder()
             .field(ARRAY_LONG_FIELD)
-            .numNulls(2)
+            .numNulls(2L)
             .range(Range.vector(50L, 100L))
             .numValues(50)
-            .totalSize(1234)
+            .totalSize(1234L)
             .build();
     ColumnStat mapKeyStringColumnStats =
         ColumnStat.builder()
             .field(MAP_KEY_STRING_FIELD)
-            .numNulls(3)
+            .numNulls(3L)
             .range(Range.vector("key1", "key2"))
             .numValues(50)
-            .totalSize(1234)
+            .totalSize(1234L)
             .build();
     ColumnStat mapValueLongColumnStats =
         ColumnStat.builder()
             .field(MAP_VALUE_LONG_FIELD)
-            .numNulls(3)
+            .numNulls(3L)
             .range(Range.vector(200L, 300L))
             .numValues(50)
-            .totalSize(1234)
+            .totalSize(1234L)
             .build();
     ColumnStat nestedArrayStringElementColumnStats =
         ColumnStat.builder()
             .field(NESTED_ARRAY_STRING_FIELD_ELEMENT)
-            .numNulls(7)
+            .numNulls(7L)
             .range(Range.vector("nested1", "nested2"))
             .numValues(50)
-            .totalSize(1234)
+            .totalSize(1234L)
             .build();
     ColumnStat nestedLongColumnStats =
         ColumnStat.builder()
             .field(NESTED_LONG_FIELD)
-            .numNulls(4)
+            .numNulls(4L)
             .range(Range.vector(500L, 600L))
             .numValues(50)
-            .totalSize(1234)
+            .totalSize(1234L)
             .build();
     ColumnStat decimalColumnStats =
         ColumnStat.builder()
             .field(DECIMAL_FIELD)
-            .numNulls(1)
+            .numNulls(1L)
             .range(Range.vector(new BigDecimal("1.00"), new BigDecimal("2.00")))
             .numValues(50)
-            .totalSize(123)
+            .totalSize(123L)
             .build();
     ColumnStat floatColumnStats =
         ColumnStat.builder()
             .field(FLOAT_FIELD)
-            .numNulls(2)
+            .numNulls(2L)
             .range(Range.vector(1.23f, 6.54321f))
             .numValues(50)
-            .totalSize(123)
+            .totalSize(123L)
             .build();
     ColumnStat doubleColumnStats =
         ColumnStat.builder()
             .field(DOUBLE_FIELD)
-            .numNulls(3)
+            .numNulls(3L)
             .range(Range.vector(1.23, 6.54321))
             .numValues(50)
-            .totalSize(123)
+            .totalSize(123L)
             .build();
     ColumnStat nestedStringColumnStats =
         ColumnStat.builder()
             .field(NESTED_STRING_FIELD)
-            .numNulls(1)
+            .numNulls(1L)
             .range(Range.vector("alice", "zion"))
             .numValues(50)
-            .totalSize(500)
+            .totalSize(500L)
             .build();
 
     ColumnStat ignoredColumnStatsNestedStructFieldPrimitive =
         ColumnStat.builder()
             .field(NESTED_STRUCT_FIELD_PRIMITIVE)
-            .numNulls(0)
+            .numNulls(0L)
             .range(Range.scalar("IGNORED"))
             .build();
     ColumnStat ignoredColumnStatsArrayLongField =
         ColumnStat.builder()
             .field(ARRAY_LONG_FIELD)
-            .numNulls(0)
+            .numNulls(0L)
             .range(Range.scalar("IGNORED"))
             .build();
     ColumnStat ignoredColumnStatsMapStringField =
         ColumnStat.builder()
             .field(MAP_STRING_LONG_FIELD)
-            .numNulls(0)
+            .numNulls(0L)
             .range(Range.scalar("IGNORED"))
             .build();
     ColumnStat ignoredColumnStatsNestedStructField =
         ColumnStat.builder()
             .field(NESTED_STRUCT_FIELD)
-            .numNulls(0)
+            .numNulls(0L)
             .range(Range.scalar("IGNORED"))
             .build();
     ColumnStat ignoredColumnStatsNestedArrayStringField =
         ColumnStat.builder()
             .field(NESTED_ARRAY_STRING_FIELD)
-            .numNulls(0)
+            .numNulls(0L)
             .range(Range.scalar("IGNORED"))
             .build();
 
