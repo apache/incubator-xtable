@@ -174,11 +174,7 @@ public class TestDeltaStatsExtractor {
     String stats =
         DeltaStatsExtractor.getInstance()
             .convertStatsToDeltaFormat(schema, numRecords, columnStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
-    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> actualColumStats = actual.getColumnStats();
-    long actualNumRecords = actual.getNumRecords();
+    FileStats actual = extractFileStats(stats, fields);
 
     Set<ColumnStat> expected = new HashSet<>();
     columnStats.forEach(
@@ -191,8 +187,8 @@ public class TestDeltaStatsExtractor {
             expected.add(columnStatWithoutSize);
           }
         });
-    assertEquals(expected, new HashSet<>(actualColumStats));
-    assertEquals(numRecords, actualNumRecords);
+    assertEquals(expected, new HashSet<>(actual.getColumnStats()));
+    assertEquals(numRecords, actual.getNumRecords());
   }
 
   @Test
@@ -210,16 +206,12 @@ public class TestDeltaStatsExtractor {
     deltaStats.put("tightBounds", Boolean.TRUE);
     deltaStats.put("nonExisting", minValues);
     String stats = MAPPER.writeValueAsString(deltaStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
-    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> actualColumStats = actual.getColumnStats();
-    long actualNumRecords = actual.getNumRecords();
-    Set<String> unsupportedStats = extractor.getUnsupportedStats();
+    FileStats actual = extractFileStats(stats, fields);
+    Set<String> unsupportedStats = DeltaStatsExtractor.getInstance().getUnsupportedStats();
     assertEquals(2, unsupportedStats.size());
     assertTrue(unsupportedStats.contains("tightBounds"));
     assertTrue(unsupportedStats.contains("nonExisting"));
-    assertEquals(numRecords, actualNumRecords);
+    assertEquals(numRecords, actual.getNumRecords());
 
     List<ColumnStat> expected =
         Arrays.asList(
@@ -247,7 +239,7 @@ public class TestDeltaStatsExtractor {
                 .numNulls(4L)
                 .range(Range.vector(10, 20))
                 .build());
-    assertEquals(expected, actualColumStats);
+    assertEquals(expected, actual.getColumnStats());
   }
 
   @Test
@@ -272,13 +264,115 @@ public class TestDeltaStatsExtractor {
   @Test
   void convertNullStatsToInternalRepresentation() {
     List<InternalField> fields = getSchemaFields();
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, null, null, null);
-    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> actualColumStats = actual.getColumnStats();
-    long actualNumRecords = actual.getNumRecords();
-    assertEquals(Collections.emptyList(), actualColumStats);
-    assertEquals(0, actualNumRecords);
+    FileStats actual = extractFileStats(null, fields);
+    assertEquals(Collections.emptyList(), actual.getColumnStats());
+    assertEquals(0, actual.getNumRecords());
+  }
+
+  @Test
+  void convertStatsWithColumnMappingPhysicalNames() {
+    // With column mapping, the stats are keyed by physical name at every level of nesting.
+    List<InternalField> fields =
+        Arrays.asList(
+            columnMappedField("top_level_string", "col-1f2e", null, InternalType.STRING),
+            columnMappedField("nested", "col-3d4c", null, InternalType.RECORD),
+            columnMappedField("int_field", "col-5b6a", "nested", InternalType.INT));
+    String stats =
+        "{\"numRecords\":100,"
+            + "\"minValues\":{\"col-1f2e\":\"a\",\"col-3d4c\":{\"col-5b6a\":1}},"
+            + "\"maxValues\":{\"col-1f2e\":\"b\",\"col-3d4c\":{\"col-5b6a\":2}},"
+            + "\"nullCount\":{\"col-1f2e\":3,\"col-3d4c\":{\"col-5b6a\":4}}}";
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(3L)
+                .range(Range.vector("a", "b"))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(2))
+                .numValues(100)
+                .numNulls(4L)
+                .range(Range.vector(1, 2))
+                .build());
+    FileStats actual = extractFileStats(stats, fields);
+    assertEquals(expected, actual.getColumnStats());
+    assertEquals(100, actual.getNumRecords());
+  }
+
+  @Test
+  void convertStatsWithColumnMappingSwappedNames() {
+    // Column mapping enabled on an existing table keeps the old names as physical names. After a
+    // and b swap names, each logical name is the other column's physical name.
+    List<InternalField> fields =
+        Arrays.asList(
+            columnMappedField("a", "b", null, InternalType.INT),
+            columnMappedField("b", "a", null, InternalType.INT));
+    String stats =
+        "{\"numRecords\":100,"
+            + "\"minValues\":{\"a\":1,\"b\":10},"
+            + "\"maxValues\":{\"a\":2,\"b\":20},"
+            + "\"nullCount\":{\"a\":0,\"b\":5}}";
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(5L)
+                .range(Range.vector(10, 20))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
+                .numNulls(0L)
+                .range(Range.vector(1, 2))
+                .build());
+    FileStats actual = extractFileStats(stats, fields);
+    assertEquals(expected, actual.getColumnStats());
+    assertEquals(100, actual.getNumRecords());
+  }
+
+  @Test
+  void convertStatsWithColumnMappingReAddedColumn() {
+    // After renaming a to a_old, a_old keeps physical name a and a re-added a gets a new physical
+    // name. A file written before the re-add has stats keyed by a, but none for the new a. The new
+    // a is a DATE, so the INT stats of a_old do not parse as its stats.
+    List<InternalField> fields =
+        Arrays.asList(
+            columnMappedField("a_old", "a", null, InternalType.INT),
+            columnMappedField("a", "col-1f2e", null, InternalType.DATE));
+    String stats =
+        "{\"numRecords\":100,"
+            + "\"minValues\":{\"a\":1},"
+            + "\"maxValues\":{\"a\":2},"
+            + "\"nullCount\":{\"a\":0}}";
+    List<ColumnStat> expected =
+        Collections.singletonList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(0L)
+                .range(Range.vector(1, 2))
+                .build());
+    FileStats actual = extractFileStats(stats, fields);
+    assertEquals(expected, actual.getColumnStats());
+    assertEquals(100, actual.getNumRecords());
+  }
+
+  private static FileStats extractFileStats(String stats, List<InternalField> fields) {
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
+    return DeltaStatsExtractor.getInstance().getColumnStatsForFile(addFile, fields);
+  }
+
+  private static InternalField columnMappedField(
+      String name, String physicalName, String parentPath, InternalType dataType) {
+    return InternalField.builder()
+        .name(name)
+        .storageName(physicalName)
+        .parentPath(parentPath)
+        .schema(InternalSchema.builder().dataType(dataType).build())
+        .build();
   }
 
   private List<InternalField> getSchemaFields() {
