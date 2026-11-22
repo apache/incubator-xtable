@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# TEMPORARY: compares IT concurrency settings for xtable-core. Not for merge.
-name: IT Tuning Experiment
+name: IT Tuning Experiment (temporary, not for merge)
 
 on:
   push:
@@ -52,7 +51,7 @@ jobs:
         run: nproc; free -g
 
       - name: Build upstream modules
-        run: ./mvnw -B -ntp install -pl xtable-core -am -DskipTests -Dmaven.build.cache.enabled=false
+        run: ./mvnw -B -ntp install -pl xtable-core -am -DskipTests -Dmaven.build.cache.enabled=false -Dspotless.check.skip=true
 
       - name: Run xtable-core ITs
         run: |
