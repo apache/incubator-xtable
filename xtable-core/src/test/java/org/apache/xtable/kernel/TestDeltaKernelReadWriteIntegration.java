@@ -50,6 +50,7 @@ import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.SnapshotImpl;
 
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
@@ -220,7 +221,7 @@ public class TestDeltaKernelReadWriteIntegration {
     assertEquals(3, dataFiles.size(), "Should have all 3 partitioned files");
 
     // Verify partition columns in Delta metadata
-    Table deltaTable = Table.forPath(engine, basePath.toString());
+    Table deltaTable = Table.forPath(engine, createTargetTable(tableName, basePath).getBasePath());
     Snapshot deltaSnapshot = deltaTable.getLatestSnapshot(engine);
     SnapshotImpl snapshotImpl = (SnapshotImpl) deltaSnapshot;
     Set<String> partitionColumns = snapshotImpl.getMetadata().getPartitionColNames();
@@ -365,19 +366,27 @@ public class TestDeltaKernelReadWriteIntegration {
   // ==================== Helper Methods ====================
 
   private DeltaKernelConversionTarget createWriter(String tableName, Path basePath) {
-    return new DeltaKernelConversionTarget(
-        TargetTable.builder()
-            .name(tableName)
-            .basePath(basePath.toString())
-            .metadataRetention(Duration.of(1, ChronoUnit.HOURS))
-            .formatName(TableFormat.DELTA)
-            .build(),
-        engine);
+    return new DeltaKernelConversionTarget(createTargetTable(tableName, basePath), engine);
+  }
+
+  private TargetTable createTargetTable(String tableName, Path basePath) {
+    return TargetTable.builder()
+        .name(tableName)
+        .basePath(basePath.toString())
+        .metadataRetention(Duration.of(1, ChronoUnit.HOURS))
+        .formatName(TableFormat.DELTA)
+        .build();
   }
 
   private DeltaKernelConversionSource createReader(String tableName, Path basePath) {
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
     return DeltaKernelConversionSource.builder()
-        .basePath(basePath.toString())
+        .basePath(sourceTable.getBasePath())
         .tableName(tableName)
         .engine(engine)
         .build();

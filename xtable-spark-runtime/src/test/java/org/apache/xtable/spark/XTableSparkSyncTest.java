@@ -251,12 +251,12 @@ class XTableSparkSyncTest {
         XTableSyncService.targetTables(spec, "/warehouse/customer/data");
 
     TargetTable hudi = targetTables.get(0);
-    assertEquals("file:///warehouse/customer/data", hudi.getBasePath());
+    assertEquals("/warehouse/customer/data", hudi.getBasePath());
     assertEquals(
         "c_email_address",
         hudi.getAdditionalProperties().getProperty("xtable.hudi.target.secondary.index.column"));
     TargetTable delta = targetTables.get(1);
-    assertEquals("file:///warehouse/customer", delta.getBasePath());
+    assertEquals("/warehouse/customer", delta.getBasePath());
     assertNull(
         delta.getAdditionalProperties().getProperty("xtable.hudi.target.secondary.index.column"));
     assertEquals(

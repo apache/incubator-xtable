@@ -347,7 +347,11 @@ public class TestIcebergSync {
             .load(basePath.toString())
             .currentSnapshot()
             .manifestListLocation();
-    Files.delete(Paths.get(URI.create(manifestFile)));
+    Path manifestPath =
+        manifestFile.startsWith("file:")
+            ? Paths.get(URI.create(manifestFile))
+            : Paths.get(manifestFile);
+    Files.delete(manifestPath);
 
     Optional<Instant> actual =
         getConversionTarget().getTableMetadata().map(TableSyncMetadata::getLastInstantSynced);

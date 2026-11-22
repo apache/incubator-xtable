@@ -91,8 +91,8 @@ class TestRunSync {
             datasetConfig.getDatasets().get(0), null, Arrays.asList(HUDI, DELTA));
 
     // a Hudi target sits at the data path, other targets at the table root
-    Assertions.assertEquals("file:///tmp/warehouse/people/data", targetTables.get(0).getBasePath());
-    Assertions.assertEquals("file:///tmp/warehouse/people", targetTables.get(1).getBasePath());
+    Assertions.assertEquals("/tmp/warehouse/people/data", targetTables.get(0).getBasePath());
+    Assertions.assertEquals("/tmp/warehouse/people", targetTables.get(1).getBasePath());
     Properties hudiProperties = new Properties();
     hudiProperties.setProperty("xtable.hudi.target.secondary.index.column", "email");
     Assertions.assertEquals(hudiProperties, targetTables.get(0).getAdditionalProperties());

@@ -229,8 +229,9 @@ public class HudiBackedSecondaryIndexReader
       HoodiePairData<String, String> recordKeysBySecondaryKey =
           tableMetadata.readSecondaryIndexDataTableRecordKeysWithKeys(
               HoodieJavaRDD.of(secondaryKeys), PARTITION_NAME_SECONDARY_INDEX_PREFIX + columnName);
-      // capture the field so the closure does not serialize the index instance
-      String dataPath = this.dataPath;
+      // capture the path so the closure does not serialize the index instance
+      String dataPath =
+          metaClient.getBasePath().makeQualified(metaClient.getStorage().getUri()).toString();
       JavaRDD<Row> lookupResults =
           toJavaPairRDD(recordKeysBySecondaryKey)
               .map(

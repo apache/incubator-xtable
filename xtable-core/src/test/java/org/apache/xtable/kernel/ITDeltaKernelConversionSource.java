@@ -210,7 +210,7 @@ public class ITDeltaKernelConversionSource {
             .fields(fields)
             .build(),
         DataLayoutStrategy.FLAT,
-        "file://" + basePath,
+        tableConfig.getBasePath(),
         snapshot.getTable().getLatestMetadataPath(),
         Collections.emptyList());
     // Validate data files
@@ -269,7 +269,7 @@ public class ITDeltaKernelConversionSource {
             .fields(fields)
             .build(),
         DataLayoutStrategy.FLAT,
-        "file://" + basePath,
+        tableConfig.getBasePath(),
         internalTable.getLatestMetadataPath(),
         Collections.emptyList());
   }
@@ -321,7 +321,7 @@ public class ITDeltaKernelConversionSource {
             .fields(fields)
             .build(),
         DataLayoutStrategy.HIVE_STYLE_PARTITION,
-        "file://" + basePath,
+        tableConfig.getBasePath(),
         snapshot.getTable().getLatestMetadataPath(),
         Collections.singletonList(
             InternalPartitionField.builder()
@@ -607,7 +607,7 @@ public class ITDeltaKernelConversionSource {
             .formatName(TableFormat.DELTA)
             .build();
     DeltaKernelSchemaExtractor schemaExtractor = DeltaKernelSchemaExtractor.getInstance();
-    Table table = Table.forPath(engine, basePath.toString());
+    Table table = Table.forPath(engine, tableConfig.getBasePath());
     Snapshot snapshot = table.getLatestSnapshot(engine);
     io.delta.kernel.types.StructType schema = snapshot.getSchema();
     InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
