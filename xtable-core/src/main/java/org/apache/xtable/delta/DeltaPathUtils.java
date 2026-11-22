@@ -18,14 +18,20 @@
  
 package org.apache.xtable.delta;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.fs.Path;
+
+import com.google.common.escape.Escaper;
+import com.google.common.net.PercentEscaper;
 
 import org.apache.xtable.paths.PathUtils;
 
@@ -35,6 +41,11 @@ import org.apache.xtable.paths.PathUtils;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaPathUtils {
+
+  // RFC 3986 path characters minus ':', so a relative first segment can't be read as a scheme.
+  private static final Escaper PATH_ESCAPER = new PercentEscaper("-._~!$&'()*+,;=@/", false);
+  private static final Pattern SCHEME_AUTHORITY =
+      Pattern.compile("^[A-Za-z][A-Za-z0-9+.-]*:(//[^/]*)?");
 
   /**
    * Resolves the path of an AddFile or RemoveFile action against the table base path.
@@ -73,46 +84,23 @@ public class DeltaPathUtils {
    */
   public static String getPathForDeltaLog(String tableBasePath, String dataFilePath) {
     return isUnderBasePath(tableBasePath, dataFilePath)
-        ? encodeRelative(PathUtils.getRelativePath(dataFilePath, tableBasePath))
+        ? PATH_ESCAPER.escape(PathUtils.getRelativePath(dataFilePath, tableBasePath))
         : encodeAbsolute(dataFilePath);
   }
 
-  private static String decode(String deltaLogPath) {
-    URI uri;
-    try {
-      uri = new URI(deltaLogPath);
-    } catch (URISyntaxException e) {
-      return deltaLogPath;
-    }
-    String rawPath = uri.getRawPath();
-    if (rawPath == null
-        || uri.getRawQuery() != null
-        || uri.getRawFragment() != null
-        || !deltaLogPath.endsWith(rawPath)) {
-      return deltaLogPath;
-    }
-    return deltaLogPath.substring(0, deltaLogPath.length() - rawPath.length()) + uri.getPath();
-  }
-
-  private static String encodeRelative(String path) {
-    if (path.startsWith(Path.SEPARATOR)) {
-      return encodeAbsolute(path);
-    }
-    try {
-      String rawPath = new URI(null, null, Path.SEPARATOR + path, null).getRawPath();
-      return rawPath.substring(1).replace(":", "%3A");
-    } catch (URISyntaxException e) {
-      return path;
-    }
-  }
-
   private static String encodeAbsolute(String path) {
-    URI uri = new Path(path).toUri();
-    String decodedPath = uri.getPath();
-    if (decodedPath == null || !path.endsWith(decodedPath)) {
-      return path;
+    Matcher m = SCHEME_AUTHORITY.matcher(path);
+    int start = m.find() ? m.end() : 0;
+    return path.substring(0, start) + PATH_ESCAPER.escape(path.substring(start));
+  }
+
+  private static String decode(String path) {
+    try {
+      // URLDecoder treats '+' as a space, which isn't true for URI paths.
+      return URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
+    } catch (UnsupportedEncodingException | IllegalArgumentException e) {
+      return path; // not valid encoding, so it's an unencoded path from an older XTable
     }
-    return path.substring(0, path.length() - decodedPath.length()) + uri.getRawPath();
   }
 
   private static boolean isUnderBasePath(String tableBasePath, String dataFilePath) {

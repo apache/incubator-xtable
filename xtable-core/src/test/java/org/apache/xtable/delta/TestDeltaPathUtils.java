@@ -67,7 +67,11 @@ class TestDeltaPathUtils {
         Arguments.of(
             "s3a://bucket/tab",
             "level=level 1/part-0.parquet",
-            "s3a://bucket/tab/level=level 1/part-0.parquet"));
+            "s3a://bucket/tab/level=level 1/part-0.parquet"),
+        Arguments.of(
+            "s3a://bucket/tab",
+            "level=100%/part-0.parquet",
+            "s3a://bucket/tab/level=100%/part-0.parquet"));
   }
 
   @ParameterizedTest
@@ -112,6 +116,10 @@ class TestDeltaPathUtils {
             "s3a://bucket/target/tab",
             "s3://bucket/source/level=level 1/part-0.parquet",
             "s3://bucket/source/level=level%201/part-0.parquet"),
+        Arguments.of(
+            "file:///tmp/tab",
+            "file:/tmp/other/level=level 1/part-0.parquet",
+            "file:/tmp/other/level=level%201/part-0.parquet"),
         Arguments.of(
             "s3a://bucket/tab",
             "s3a://bucket/tab/ts=2024-01-01 10:00:00/part-0.parquet",
