@@ -973,7 +973,6 @@ public class ITDeltaConversionSource {
         .range(Range.vector(min, max))
         .numNulls(0L)
         .numValues(numValues)
-        .totalSize(0L)
         .build();
   }
 
