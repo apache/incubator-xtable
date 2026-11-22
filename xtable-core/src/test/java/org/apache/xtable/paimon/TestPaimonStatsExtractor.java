@@ -401,6 +401,44 @@ public class TestPaimonStatsExtractor {
   }
 
   @Test
+  void testStatsWithoutNullCount() {
+    Schema schema =
+        Schema.newBuilder()
+            .primaryKey("id")
+            .column("id", DataTypes.INT())
+            .column("a", DataTypes.INT())
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .option("full-compaction.delta-commits", "1")
+            .option("metadata.stats-dense-store", "false")
+            .option("fields.a.stats-mode", "none")
+            .build();
+
+    FileStoreTable table =
+        ((TestPaimonTable)
+                TestPaimonTable.createTable(
+                    "no_null_count", null, tempDir, new Configuration(), false, schema))
+            .getPaimonTable();
+
+    TestPaimonTable.writeRows(table, Arrays.asList(GenericRow.of(1, null), GenericRow.of(2, 20)));
+
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(table.schema());
+    List<ColumnStat> stats =
+        extractor
+            .toInternalDataFiles(table, table.snapshotManager().latestSnapshot(), internalSchema)
+            .get(0)
+            .getColumnStats();
+
+    // Paimon stores no null count for a, so the number of nulls is unknown, not zero
+    ColumnStat idStat = getColumnStat(stats, "id");
+    assertEquals(Range.vector(1, 2), idStat.getRange());
+    assertEquals(0, idStat.getNumNulls());
+    ColumnStat aStat = getColumnStat(stats, "a");
+    assertNull(aStat.getRange());
+    assertNull(aStat.getNumNulls());
+  }
+
+  @Test
   void testPaimonDropStats() {
     Schema schema =
         Schema.newBuilder()

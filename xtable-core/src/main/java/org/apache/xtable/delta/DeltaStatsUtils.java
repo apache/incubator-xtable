@@ -157,8 +157,8 @@ public class DeltaStatsUtils {
                             ? DeltaValueConverter.convertFromDeltaColumnStatValue(
                                 maxRaw, field.getSchema())
                             : null;
-                    long nullCount =
-                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : 0;
+                    Long nullCount =
+                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : null;
 
                     Range range = Range.vector(minValue, maxValue);
                     return ColumnStat.builder()

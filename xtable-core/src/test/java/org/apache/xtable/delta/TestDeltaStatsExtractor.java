@@ -20,6 +20,7 @@ package org.apache.xtable.delta;
 
 import static org.apache.xtable.testutil.ColumnStatMapUtil.getColumnStats;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -247,6 +248,25 @@ public class TestDeltaStatsExtractor {
                 .range(Range.vector(10, 20))
                 .build());
     assertEquals(expected, actualColumStats);
+  }
+
+  @Test
+  void convertStatsWithoutNullCountToInternalRepresentation() throws IOException {
+    List<InternalField> fields = getSchemaFields();
+    Map<String, Object> deltaStats = new HashMap<>();
+    deltaStats.put("minValues", generateMap("a", 1, 1.0, 10));
+    deltaStats.put("maxValues", generateMap("b", 2, 2.0, 20));
+    deltaStats.put("numRecords", 100L);
+    String stats = MAPPER.writeValueAsString(deltaStats);
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
+    List<ColumnStat> actualColumStats =
+        DeltaStatsExtractor.getInstance().getColumnStatsForFile(addFile, fields).getColumnStats();
+
+    // Without a nullCount the number of nulls is unknown, not zero
+    assertEquals(4, actualColumStats.size());
+    for (ColumnStat columnStat : actualColumStats) {
+      assertNull(columnStat.getNumNulls(), columnStat.getField().getName());
+    }
   }
 
   @Test
