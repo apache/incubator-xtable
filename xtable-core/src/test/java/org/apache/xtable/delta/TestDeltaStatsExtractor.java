@@ -132,11 +132,7 @@ public class TestDeltaStatsExtractor {
     String stats =
         DeltaStatsExtractor.getInstance()
             .convertStatsToDeltaFormat(schema, numRecords, columnStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
-    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> actualColumStats = actual.getColumnStats();
-    long actualNumRecords = actual.getNumRecords();
+    FileStats actual = extractFileStats(stats, fields);
 
     Set<ColumnStat> expected = new HashSet<>();
     columnStats.forEach(
@@ -149,8 +145,8 @@ public class TestDeltaStatsExtractor {
             expected.add(columnStatWithoutSize);
           }
         });
-    assertEquals(expected, new HashSet<>(actualColumStats));
-    assertEquals(numRecords, actualNumRecords);
+    assertEquals(expected, new HashSet<>(actual.getColumnStats()));
+    assertEquals(numRecords, actual.getNumRecords());
   }
 
   @Test
@@ -168,16 +164,12 @@ public class TestDeltaStatsExtractor {
     deltaStats.put("tightBounds", Boolean.TRUE);
     deltaStats.put("nonExisting", minValues);
     String stats = MAPPER.writeValueAsString(deltaStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
-    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> actualColumStats = actual.getColumnStats();
-    long actualNumRecords = actual.getNumRecords();
-    Set<String> unsupportedStats = extractor.getUnsupportedStats();
+    FileStats actual = extractFileStats(stats, fields);
+    Set<String> unsupportedStats = DeltaStatsExtractor.getInstance().getUnsupportedStats();
     assertEquals(2, unsupportedStats.size());
     assertTrue(unsupportedStats.contains("tightBounds"));
     assertTrue(unsupportedStats.contains("nonExisting"));
-    assertEquals(numRecords, actualNumRecords);
+    assertEquals(numRecords, actual.getNumRecords());
 
     List<ColumnStat> expected =
         Arrays.asList(
@@ -205,19 +197,15 @@ public class TestDeltaStatsExtractor {
                 .numNulls(4)
                 .range(Range.vector(10, 20))
                 .build());
-    assertEquals(expected, actualColumStats);
+    assertEquals(expected, actual.getColumnStats());
   }
 
   @Test
   void convertNullStatsToInternalRepresentation() {
     List<InternalField> fields = getSchemaFields();
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, null, null, null);
-    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> actualColumStats = actual.getColumnStats();
-    long actualNumRecords = actual.getNumRecords();
-    assertEquals(Collections.emptyList(), actualColumStats);
-    assertEquals(0, actualNumRecords);
+    FileStats actual = extractFileStats(null, fields);
+    assertEquals(Collections.emptyList(), actual.getColumnStats());
+    assertEquals(0, actual.getNumRecords());
   }
 
   @Test
@@ -247,7 +235,9 @@ public class TestDeltaStatsExtractor {
                 .numNulls(4L)
                 .range(Range.vector(1, 2))
                 .build());
-    assertEquals(expected, extractColumnStats(stats, fields));
+    FileStats actual = extractFileStats(stats, fields);
+    assertEquals(expected, actual.getColumnStats());
+    assertEquals(100, actual.getNumRecords());
   }
 
   @Test
@@ -277,7 +267,9 @@ public class TestDeltaStatsExtractor {
                 .numNulls(0L)
                 .range(Range.vector(1, 2))
                 .build());
-    assertEquals(expected, extractColumnStats(stats, fields));
+    FileStats actual = extractFileStats(stats, fields);
+    assertEquals(expected, actual.getColumnStats());
+    assertEquals(100, actual.getNumRecords());
   }
 
   @Test
@@ -302,14 +294,14 @@ public class TestDeltaStatsExtractor {
                 .numNulls(0L)
                 .range(Range.vector(1, 2))
                 .build());
-    assertEquals(expected, extractColumnStats(stats, fields));
+    FileStats actual = extractFileStats(stats, fields);
+    assertEquals(expected, actual.getColumnStats());
+    assertEquals(100, actual.getNumRecords());
   }
 
-  private static List<ColumnStat> extractColumnStats(String stats, List<InternalField> fields) {
+  private static FileStats extractFileStats(String stats, List<InternalField> fields) {
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
-    return DeltaStatsExtractor.getInstance()
-        .getColumnStatsForFile(addFile, fields)
-        .getColumnStats();
+    return DeltaStatsExtractor.getInstance().getColumnStatsForFile(addFile, fields);
   }
 
   private static InternalField columnMappedField(

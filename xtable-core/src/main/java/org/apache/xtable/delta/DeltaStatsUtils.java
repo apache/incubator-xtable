@@ -52,6 +52,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.schema.SchemaUtils;
 
 /**
  * Shared utility for Delta stats conversion between XTable internal format and Delta format. Used
@@ -190,10 +191,9 @@ public class DeltaStatsUtils {
     Map<String, String> physicalPaths = new HashMap<>();
     for (InternalField field : fields) {
       String name = field.getStorageName() != null ? field.getStorageName() : field.getName();
-      String parentPath = field.getParentPath();
       physicalPaths.put(
           field.getPath(),
-          StringUtils.isEmpty(parentPath) ? name : physicalPaths.get(parentPath) + "." + name);
+          SchemaUtils.getFullyQualifiedPath(physicalPaths.get(field.getParentPath()), name));
     }
     return physicalPaths;
   }
