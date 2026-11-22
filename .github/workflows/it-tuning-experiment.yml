@@ -21,6 +21,9 @@ on:
   push:
     branches:
       - "ci/it-parallelism-tuning"
+  pull_request:
+    branches:
+      - "main"
   workflow_dispatch:
 
 jobs:
