@@ -29,13 +29,17 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -51,7 +55,9 @@ import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.ContentScanTask;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.PartitionSpecParser;
@@ -67,6 +73,7 @@ import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.parquet.Parquet;
+import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.conversion.SourceTable;
@@ -78,7 +85,9 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -257,6 +266,75 @@ class TestIcebergConversionSource {
 
     verify(spyPartitionConverter, never()).toXTable(any(), any(), any());
     verify(spyDataFileExtractor, never()).fromIceberg(any(), any(), any());
+  }
+
+  @Test
+  void testGetCurrentSnapshotWithMissingColumnStats(@TempDir Path workingDir) throws IOException {
+    Table catalogSales = createTestCatalogTable(workingDir.toString());
+    // Iceberg writers may omit column sizes and null counts. No column has a size here, and
+    // cs_quantity has a value count and bounds but no null count.
+    Map<Integer, Long> valueCounts = new HashMap<>();
+    valueCounts.put(1, 10L);
+    valueCounts.put(3, 10L);
+    valueCounts.put(4, 10L);
+    Map<Integer, Long> nullCounts = new HashMap<>();
+    nullCounts.put(1, 2L);
+    nullCounts.put(3, 0L);
+    Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
+    lowerBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 1));
+    lowerBounds.put(3, Conversions.toByteBuffer(Types.LongType.get(), 100L));
+    lowerBounds.put(4, Conversions.toByteBuffer(Types.IntegerType.get(), 5));
+    Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
+    upperBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 9));
+    upperBounds.put(3, Conversions.toByteBuffer(Types.LongType.get(), 200L));
+    upperBounds.put(4, Conversions.toByteBuffer(Types.IntegerType.get(), 50));
+    PartitionData partitionInfo = new PartitionData(csPartitionSpec.partitionType());
+    partitionInfo.set(0, 1);
+    catalogSales
+        .newAppend()
+        .appendFile(
+            DataFiles.builder(catalogSales.spec())
+                .withPath(
+                    String.join(
+                        "/", catalogSales.location(), "data", UUID.randomUUID() + ".parquet"))
+                .withFormat(org.apache.iceberg.FileFormat.PARQUET)
+                .withFileSizeInBytes(100)
+                .withPartition(partitionInfo)
+                .withMetrics(
+                    new Metrics(10L, null, valueCounts, nullCounts, null, lowerBounds, upperBounds))
+                .build())
+        .commit();
+
+    InternalSnapshot internalSnapshot =
+        getIcebergConversionSource(catalogSales).getCurrentSnapshot();
+
+    Map<String, InternalField> fields =
+        internalSnapshot.getTable().getReadSchema().getAllFields().stream()
+            .collect(Collectors.toMap(InternalField::getName, Function.identity()));
+    List<ColumnStat> expectedColumnStats =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get("cs_sold_time_sk"))
+                .numValues(10)
+                .numNulls(2L)
+                .range(Range.vector(1, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get("cs_order_number"))
+                .numValues(10)
+                .numNulls(0L)
+                .range(Range.vector(100L, 200L))
+                .build(),
+            // The unknown null count stays null, and the bounds are kept.
+            ColumnStat.builder()
+                .field(fields.get("cs_quantity"))
+                .numValues(10)
+                .range(Range.vector(5, 50))
+                .build());
+    List<PartitionFileGroup> fileGroups = internalSnapshot.getPartitionedDataFiles();
+    assertEquals(1, fileGroups.size());
+    assertEquals(1, fileGroups.get(0).getDataFiles().size());
+    assertEquals(expectedColumnStats, fileGroups.get(0).getDataFiles().get(0).getColumnStats());
   }
 
   @Test
