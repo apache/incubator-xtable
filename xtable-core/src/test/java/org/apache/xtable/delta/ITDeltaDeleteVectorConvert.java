@@ -50,6 +50,7 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.testutil.ITTestUtils;
 
 public class ITDeltaDeleteVectorConvert {
   @TempDir private static Path tempDir;
@@ -62,7 +63,7 @@ public class ITDeltaDeleteVectorConvert {
     sparkSession =
         SparkSession.builder()
             .appName("TestDeltaTable")
-            .master("local[4]")
+            .master(ITTestUtils.SPARK_MASTER)
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
             .config(
                 "spark.sql.catalog.spark_catalog",

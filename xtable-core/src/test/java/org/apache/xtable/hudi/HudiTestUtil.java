@@ -50,6 +50,8 @@ import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 
+import org.apache.xtable.testutil.ITTestUtils;
+
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
 
@@ -147,7 +149,7 @@ public class HudiTestUtil {
         .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         .set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
         .set("spark.databricks.delta.schema.autoMerge.enabled", "true")
-        .setMaster("local[4]");
+        .setMaster(ITTestUtils.SPARK_MASTER);
   }
 
   @Value

@@ -117,6 +117,11 @@
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
         <skipITs>${skipTests}</skipITs>
+        <!-- IT concurrency knobs; defaults match prior behaviour (JUnit threads = cores). -->
+        <it.forkCount>6</it.forkCount>
+        <it.junit.strategy>dynamic</it.junit.strategy>
+        <it.junit.parallelism>4</it.junit.parallelism>
+        <it.spark.master>local[4]</it.spark.master>
     </properties>
 
     <dependencies>
@@ -870,9 +875,15 @@
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>
                     <reuseForks>false</reuseForks>
-                    <forkCount>6</forkCount>
+                    <forkCount>${it.forkCount}</forkCount>
                     <trimStackTrace>false</trimStackTrace>
-                    <argLine>-Xmx1500m -Duser.timezone=UTC</argLine>
+                    <argLine>-Xmx1500m -Duser.timezone=UTC -Dxtable.test.spark.master=${it.spark.master}</argLine>
+                    <properties>
+                        <configurationParameters>
+                            junit.jupiter.execution.parallel.config.strategy=${it.junit.strategy}
+                            junit.jupiter.execution.parallel.config.fixed.parallelism=${it.junit.parallelism}
+                        </configurationParameters>
+                    </properties>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>

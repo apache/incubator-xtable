@@ -1,0 +1,84 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# TEMPORARY: compares IT concurrency settings for xtable-core. Not for merge.
+name: IT Tuning Experiment
+
+on:
+  push:
+    branches:
+      - "ci/it-parallelism-tuning"
+  workflow_dispatch:
+
+jobs:
+  core-its:
+    name: core ITs (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: baseline-f6-jdyn-s4, forks: 6, strategy: dynamic, par: 4, spark: "local[4]" }
+          - { name: f3-j2-s2, forks: 3, strategy: fixed, par: 2, spark: "local[2]" }
+          - { name: f2-j2-s2, forks: 2, strategy: fixed, par: 2, spark: "local[2]" }
+          - { name: f3-j2-s1, forks: 3, strategy: fixed, par: 2, spark: "local[1]" }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Runner info
+        run: nproc; free -g
+
+      - name: Build upstream modules
+        run: ./mvnw -B -ntp install -pl xtable-core -am -DskipTests -Dmaven.build.cache.enabled=false
+
+      - name: Run xtable-core ITs
+        run: |
+          vmstat -t 15 > vmstat.log &
+          start=$(date +%s)
+          ./mvnw -B -ntp verify -pl xtable-core -DskipUTs -Dmaven.build.cache.enabled=false \
+            -Dspotless.check.skip=true \
+            -Dit.forkCount=${{ matrix.forks }} \
+            -Dit.junit.strategy=${{ matrix.strategy }} \
+            -Dit.junit.parallelism=${{ matrix.par }} \
+            "-Dit.spark.master=${{ matrix.spark }}"
+          echo "IT_WALL_SECONDS=$(( $(date +%s) - start ))" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo '```'
+            grep -h "testsuite " xtable-core/target/failsafe-reports/TEST-*.xml \
+              | sed -E 's/.*name="([^"]+)".*time="([^"]+)".*/\2 \1/' | sort -rn
+            echo "--- vmstat: max run queue, min free MB, max swap-out"
+            awk 'NR>2 {r=($1>r)?$1:r; f=(f==""||$4<f)?$4:f; so=($8>so)?$8:so} END {print r, int(f/1024), so}' vmstat.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-${{ matrix.name }}
+          path: |
+            vmstat.log
+            xtable-core/target/failsafe-reports/TEST-*.xml

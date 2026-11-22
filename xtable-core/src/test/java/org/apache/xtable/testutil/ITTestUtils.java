@@ -38,6 +38,9 @@ import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 public class ITTestUtils {
   public static final String TEST_CATALOG_TYPE = "test";
+  // Set by failsafe (it.spark.master) so CI can tune Spark threads per test.
+  public static final String SPARK_MASTER =
+      System.getProperty("xtable.test.spark.master", "local[4]");
 
   public static void validateTable(
       InternalTable internalTable,

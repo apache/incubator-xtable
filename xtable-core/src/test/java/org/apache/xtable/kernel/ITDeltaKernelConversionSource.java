@@ -81,6 +81,7 @@ import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.testutil.ITTestUtils;
 
 public class ITDeltaKernelConversionSource {
   private static final InternalField COL1_INT_FIELD =
@@ -143,7 +144,7 @@ public class ITDeltaKernelConversionSource {
     sparkSession =
         SparkSession.builder()
             .appName("TestDeltaTable")
-            .master("local[4]")
+            .master(ITTestUtils.SPARK_MASTER)
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
             .config(
                 "spark.sql.catalog.spark_catalog",
