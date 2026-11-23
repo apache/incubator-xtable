@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -248,7 +248,7 @@ public class TestHudiFileStatsExtractor {
     HoodieTableMetaClient mockMetaClient = createMockMetaClient(tempDir);
 
     HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
-    when(mockMetadataTable.getColumnStats(any(), anyString())).thenReturn(Collections.emptyMap());
+    when(mockMetadataTable.getColumnStats(any(), anyList())).thenReturn(Collections.emptyMap());
 
     HudiFileStatsExtractor extractor = new HudiFileStatsExtractor(mockMetaClient);
     List<InternalDataFile> output =
@@ -272,22 +272,24 @@ public class TestHudiFileStatsExtractor {
 
     // Metadata table only returns stats for fileWithStats; fileWithoutStats is missing entirely
     HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
-    when(mockMetadataTable.getColumnStats(any(), anyString()))
+    when(mockMetadataTable.getColumnStats(any(), anyList()))
         .thenAnswer(
             invocation -> {
-              String fieldName = invocation.getArgument(1);
-              if (fieldName.equals("long_field")) {
-                Map<Pair<String, String>, HoodieMetadataColumnStats> statsMap = new HashMap<>();
+              List<String> fieldNames = invocation.getArgument(1);
+              if (fieldNames.contains("long_field")) {
+                Map<Pair<String, String>, List<HoodieMetadataColumnStats>> statsMap =
+                    new HashMap<>();
                 statsMap.put(
                     fileWithStatsPair,
-                    HoodieMetadataColumnStats.newBuilder()
-                        .setFileName(fileWithStatsPair.getRight())
-                        .setColumnName(fieldName)
-                        .setValueCount(2L)
-                        .setNullCount(1L)
-                        .setTotalSize(16L)
-                        .setIsDeleted(false)
-                        .build());
+                    Collections.singletonList(
+                        HoodieMetadataColumnStats.newBuilder()
+                            .setFileName(fileWithStatsPair.getRight())
+                            .setColumnName("long_field")
+                            .setValueCount(2L)
+                            .setNullCount(1L)
+                            .setTotalSize(16L)
+                            .setIsDeleted(false)
+                            .build()));
                 return statsMap;
               }
               return Collections.emptyMap();
@@ -336,22 +338,24 @@ public class TestHudiFileStatsExtractor {
     HoodieTableMetaClient mockMetaClient = createMockMetaClient(tempDir);
 
     HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
-    when(mockMetadataTable.getColumnStats(any(), anyString()))
+    when(mockMetadataTable.getColumnStats(any(), anyList()))
         .thenAnswer(
             invocation -> {
-              String fieldName = invocation.getArgument(1);
-              Map<Pair<String, String>, HoodieMetadataColumnStats> statsMap = new HashMap<>();
-              statsMap.put(
-                  filePair,
-                  HoodieMetadataColumnStats.newBuilder()
-                      .setFileName(filePair.getRight())
-                      .setColumnName(fieldName)
-                      .setValueCount(0L)
-                      .setNullCount(0L)
-                      .setTotalSize(0L)
-                      .setIsDeleted(false)
-                      .build());
-              return statsMap;
+              List<String> fieldNames = invocation.getArgument(1);
+              List<HoodieMetadataColumnStats> stats =
+                  fieldNames.stream()
+                      .map(
+                          fieldName ->
+                              HoodieMetadataColumnStats.newBuilder()
+                                  .setFileName(filePair.getRight())
+                                  .setColumnName(fieldName)
+                                  .setValueCount(0L)
+                                  .setNullCount(0L)
+                                  .setTotalSize(0L)
+                                  .setIsDeleted(false)
+                                  .build())
+                      .collect(Collectors.toList());
+              return Collections.singletonMap(filePair, stats);
             });
 
     HudiFileStatsExtractor extractor = new HudiFileStatsExtractor(mockMetaClient);

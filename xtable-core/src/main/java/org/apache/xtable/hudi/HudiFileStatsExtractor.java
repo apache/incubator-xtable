@@ -146,24 +146,20 @@ public class HudiFileStatsExtractor {
       return Stream.empty();
     }
     List<Pair<String, String>> filePaths = new ArrayList<>(filePathsToDataFile.keySet());
+    // One lookup for all columns: each lookup scans the column stats partition's file slices.
     Map<Pair<String, String>, List<Pair<InternalField, HoodieMetadataColumnStats>>> stats =
-        nameFieldMap.entrySet().parallelStream()
-            .flatMap(
-                fieldNameToField -> {
-                  String fieldName = fieldNameToField.getKey();
-                  InternalField field = fieldNameToField.getValue();
-                  return metadataTable.getColumnStats(filePaths, fieldName).entrySet().stream()
-                      .map(
-                          filePairToStats ->
-                              Pair.of(
-                                  filePairToStats.getKey(),
-                                  Pair.of(field, filePairToStats.getValue())));
-                })
+        metadataTable
+            .getColumnStats(filePaths, new ArrayList<>(nameFieldMap.keySet()))
+            .entrySet()
+            .stream()
             .collect(
-                Collectors.groupingBy(
+                Collectors.toMap(
                     Map.Entry::getKey,
-                    Collectors.mapping(
-                        Map.Entry::getValue, CustomCollectors.toList(nameFieldMap.size()))));
+                    fileToStats ->
+                        fileToStats.getValue().stream()
+                            .filter(stat -> nameFieldMap.containsKey(stat.getColumnName()))
+                            .map(stat -> Pair.of(nameFieldMap.get(stat.getColumnName()), stat))
+                            .collect(CustomCollectors.toList(fileToStats.getValue().size()))));
     List<InternalDataFile> withStats = new ArrayList<>();
     List<InternalDataFile> filesWithoutStats = new ArrayList<>();
     for (Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile :
