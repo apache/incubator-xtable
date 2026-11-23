@@ -471,8 +471,7 @@ public class ITConversionController {
 
       tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      // When partitioned, the next step only writes a new partition, so the next check still
-      // catches any error from this sync.
+      // Partitioned: the next check still covers this sync.
       if (!isPartitioned) {
         checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
       }
@@ -483,8 +482,7 @@ public class ITConversionController {
         conversionController.sync(conversionConfig, conversionSourceProvider);
         checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
 
-        // Drops partition. Not checked here: files left behind or removed in error would still
-        // show up as a row mismatch after the partition is re-populated below.
+        // Not checked here: an error would still show up after the partition is re-populated.
         tableWithUpdatedSchema.deleteSpecialPartition();
         conversionController.sync(conversionConfig, conversionSourceProvider);
 
