@@ -102,7 +102,9 @@ jobs:
             maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
 
       - name: Build all module with Maven
-        run: ./mvnw clean install -ntp -B
+        # -T 2: the modules after xtable-core depend only on it (or on each other
+        # through short chains), so two can test at once instead of in sequence.
+        run: ./mvnw clean install -ntp -B -T 2
 
       # Guard against a module starting to cache large artifacts again: warn and
       # skip the save rather than churn the repository-wide 10 GB cache budget,
