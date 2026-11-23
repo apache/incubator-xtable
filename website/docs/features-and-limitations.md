@@ -28,8 +28,9 @@ This reduces friction by eliminating the manual step of registering tables in mu
 HMS and AWS Glue are the two catalogs supported right now, support for other catalogs (Unity, Apache Polaris, Apache Gravitino, DataHub) coming soon. 
 
 ### Secondary index for Iceberg tables
-A sync to a Hudi target can build a secondary index on a column of an Iceberg source table and keep it current on each later sync.
-The index is stored as a Hudi metadata table in the data folder of the table, and Spark sessions with the XTable Spark SQL extensions use it to read only the files that hold the values of a point lookup.
+A sync to a Hudi target can build a secondary index on a column of an Iceberg source table, and each later sync updates the index.
+The index is stored as a Hudi metadata table under the data path of the table.
+For a point lookup, the index returns the exact data files that hold the matching rows, so Spark sessions with the XTable Spark SQL extensions read only those files instead of scanning the table.
 See [Secondary index for Iceberg tables](/docs/how-to-index).
 
 ### Writing Hudi tables as Iceberg tables

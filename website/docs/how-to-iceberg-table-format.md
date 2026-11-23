@@ -9,18 +9,19 @@ Apache Hudi 1.1 added pluggable table formats ([RFC-93](https://github.com/apach
 a Hudi writer can keep the metadata of another table format next to its own, in the same commit.
 Apache XTable™ (Incubating) provides the Apache Iceberg implementation in the
 `xtable-iceberg-pluggable-tf` module. With it, every Hudi write, clean, rollback, savepoint and
-archive also commits an Iceberg snapshot in the table folder, so the table reads as a standard
-Iceberg table right after the write, without a separate sync job.
+archive also commits an Iceberg snapshot under the table base path, so the table reads as a
+standard Iceberg table right after the write, without a separate sync job.
 
-Iceberg decides which Hudi commits are visible: a Hudi commit whose Iceberg snapshot was not
-committed is treated as pending and is rolled back by the next write, and a failed Iceberg commit
-fails the Hudi operation.
+The Iceberg metadata is the source of truth for the table. A Hudi commit is visible only after its
+Iceberg snapshot is committed: a Hudi commit without an Iceberg snapshot is treated as pending and
+is rolled back by the next write, and a failed Iceberg commit fails the Hudi operation.
 
 ## Setting up Spark
 
-You need Hudi 1.2.x for this. Alongside the Hudi Spark bundle your job already uses, add four
-XTable jars and the Iceberg Spark runtime. The XTable jars are on Maven Central from 0.5.0, so you
-can download them directly:
+The Iceberg table format requires Apache Hudi 1.2.x. In addition to the Hudi Spark bundle, the
+Spark job needs the `xtable-iceberg-pluggable-tf` jar, its XTable dependencies (`xtable-core`,
+`xtable-api` and `xtable-hudi-support-utils`) and the Iceberg Spark runtime. The XTable jars are
+available on Maven Central from 0.5.0:
 
 ```shell md title="shell"
 REPO=https://repo1.maven.org/maven2/org/apache/xtable
@@ -31,9 +32,9 @@ curl -O $REPO/xtable-api/$VERSION/xtable-api-$VERSION.jar
 curl -O $REPO/xtable-hudi-support-utils/$VERSION/xtable-hudi-support-utils-$VERSION.jar
 ```
 
-The Iceberg Spark runtime is there because the XTable jars don't bundle Iceberg. Your writer uses
-it to commit each snapshot, and you can read the table back as Iceberg in the same session. The
-example below is for Spark 3.5, so pick the bundles that match your Spark version.
+The XTable jars do not bundle Iceberg, so the Iceberg Spark runtime is required. The Hudi writer
+uses it to commit each snapshot, and the same Spark session can read the table as Iceberg. The
+example below is for Spark 3.5; use the Hudi and Iceberg bundles that match the Spark version.
 
 ```shell md title="shell"
 XTABLE_JARS=xtable-iceberg-pluggable-tf_2.12-$VERSION.jar,\
@@ -50,15 +51,13 @@ spark-shell \
 
 `spark-submit` takes the same `--jars` and `--conf` options.
 
-Each commit can log a warning, `Skipping a ConversionTarget whose engine library is not on the
-classpath`, for the Delta targets of `xtable-core`. The Iceberg format does not use them, so you
-can ignore it.
-
 :::caution Every writer needs the jars
-When the module is not on the classpath, Hudi writes the table in its native format without an
-error. Iceberg then does not see the commits of that writer, and the next writer that has the jars
-rolls them back. Put the jars on every job that writes the table, including table services such as
-clean and clustering that run in separate jobs.
+Hudi loads the table format through the Java `ServiceLoader`. When the
+`xtable-iceberg-pluggable-tf` jar is not on the classpath, Hudi does not fail: it falls back to its
+native format, even when `hoodie.table.format` is `ICEBERG`. The commits of that writer have no
+Iceberg snapshot, so the next writer that has the jars rolls them back. Add the jars to every job
+that writes the table, including table services such as clean and clustering that run in separate
+jobs.
 :::
 
 ## Creating a table
@@ -82,19 +81,29 @@ df.write.format("hudi")
 ```
 
 Upserts, deletes, insert overwrite, clean, clustering, rollbacks and savepoints work as on any Hudi
-table. Pass `hoodie.metadata.enable=false` on every write, and in SQL sessions set it before you
-run `UPDATE`, `DELETE`, `MERGE INTO` or a procedure.
+table.
+
+`hoodie.metadata.enable` is a writer setting, and Hudi enables the metadata table on every write
+that does not set it to `false`, even when earlier writes of the table did. Such a write builds
+the metadata table and its commit fails; the next write with the setting off removes the metadata
+table and rolls the failed commit back. A DataFrame write passes the setting as an option, as in
+the example above. A Spark SQL session sets it once, before any `UPDATE`, `DELETE`, `MERGE INTO` or
+procedure call:
+
+```sql md title="sql"
+SET hoodie.metadata.enable=false;
+```
 
 ## Reading the table
 
-The same folder reads as both formats:
+The same base path reads as both formats:
 
 ```scala md title="scala"
 spark.read.format("hudi").load(basePath)
 spark.read.format("iceberg").load(basePath)
 ```
 
-The Iceberg metadata is in the `metadata/` folder under the base path, so any engine that reads
+The Iceberg metadata is under `metadata/` in the base path, so any engine that reads
 Iceberg tables by path, or a catalog that registers the latest `metadata.json` file, reads the
 table without Hudi.
 
@@ -106,7 +115,13 @@ table without Hudi.
 - Identity partitioning only. Timestamp-based and custom key generators with typed partition
   fields are refused.
 - Restore is refused before it changes the table.
-- One writer at a time.
+- Spark SQL `UPDATE` fails on a table whose record key column is `NOT NULL`, for example one
+  created from a Scala DataFrame with a primitive key column, with `Cannot add field id as an
+  identifier field: not a required field`. `DELETE`, `MERGE INTO` and DataFrame upserts work on
+  such a table, and `UPDATE` works on a table created with `CREATE TABLE` in Spark SQL.
+- Multi-writer is not supported. Only one job can write the table at a time, including table
+  services.
 - The Iceberg table uses format version 2.
-- Write the table only through Hudi. Other engines read it as an Iceberg table, but Hudi does not
-  see snapshots that an Iceberg writer commits.
+- Hudi is the only supported writer. Any engine can read the table as Iceberg, but writes must go
+  through Hudi. A snapshot that an Iceberg writer commits directly is not recorded on the Hudi
+  timeline, so Hudi readers and writers do not see its data.

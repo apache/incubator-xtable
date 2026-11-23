@@ -7,7 +7,7 @@ title: "Secondary index for Iceberg tables"
 
 Apache XTable™ (Incubating) can keep a secondary index on a column of an Apache Iceberg table. The
 index maps each value of the column to the data files that hold it, and is stored as an Apache Hudi
-metadata table under `.hoodie/` in the data folder of the table. Using an index takes two parts:
+metadata table under `.hoodie/` in the data path of the table. Using an index takes two parts:
 
 1. An XTable sync job [builds the index and keeps it current](#building-the-index-with-a-sync-job).
 2. Spark sessions with the XTable Spark SQL extensions [use the index](#querying-with-the-index) for
@@ -36,7 +36,12 @@ datasets:
         xtable.hudi.target.secondary.index.column: c_email_address
 ```
 
-Run the sync with either jar, for example:
+Run the sync with the jar that fits the deployment:
+
+- The utilities jar runs `RunSync` as a standalone Java process, for example a scheduled job or a
+  service outside Spark. It builds the index in a local Spark session on one machine.
+- The Spark runtime jar runs `XTableSparkSync` on an existing Spark cluster, so the index build is
+  distributed across the executors.
 
 ```shell md title="shell"
 # utilities jar, built from source, which starts a local Spark session for the
@@ -65,8 +70,8 @@ the changes of the new snapshots.
   change. A sync with another column fails before it commits.
 - Other `xtable.hudi.target.*` settings tune the index, for example the
   `xtable.hudi.target.metadata.record.index.*` file group counts.
-- To remove the index, remove the Hudi target from the sync job and delete the `.hoodie/` folder in
-  the data folder of the table. The data files of the table are not changed. A later sync with
+- To remove the index, remove the Hudi target from the sync job and delete `.hoodie/` under the
+  data path of the table. The data files of the table are not changed. A later sync with
   another column builds a new index.
 
 ## Querying with the index
@@ -99,7 +104,7 @@ The extensions work with any Iceberg catalog that Spark is configured with.
 ### Running queries
 
 The extensions find the index by themselves: when a query filters an Iceberg table, they look for
-the Hudi metadata in the data folder of the table. When a filter compares an indexed column with
+the Hudi metadata in the data path of the table. When a filter compares an indexed column with
 literals, for example `email = 'x'` or `email IN ('x', 'y')`, possibly combined with other filters
 by `AND`, the extensions look the values up in the index and read only the files that hold them.
 The query returns the same rows as without the index.
@@ -117,7 +122,9 @@ spark.table("prod.db.customer").where(col("c_email_address") == "a@example.com")
 spark.read.format("iceberg").load("prod.db.customer").where(col("c_email_address") == "a@example.com")
 ```
 
-The driver log shows for each query whether the index was used and how many files it selected.
+At the `INFO` level of the `org.apache.xtable` logger, the driver log shows for each query
+whether the index was used and how many files it selected, for example
+`Using the index of prod.db.customer on c_email_address for 1 keys: reading 1 of 64 candidate files`.
 
 ### When the index is not used
 
