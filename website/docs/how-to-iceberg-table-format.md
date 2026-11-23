@@ -8,9 +8,10 @@ title: "Write Hudi tables as Iceberg tables"
 Apache Hudi 1.1 added pluggable table formats ([RFC-93](https://github.com/apache/hudi/blob/master/rfc/rfc-93/rfc-93.md)):
 a Hudi writer can keep the metadata of another table format next to its own, in the same commit.
 Apache XTable™ (Incubating) provides the Apache Iceberg implementation in the
-`xtable-iceberg-pluggable-tf` module. With it, every Hudi write, clean, rollback, savepoint and
-archive also commits an Iceberg snapshot under the table base path, so the table reads as a
-standard Iceberg table right after the write, without a separate sync job.
+`xtable-iceberg-pluggable-tf` module. With it, every Hudi write, clean, rollback and savepoint
+also commits an Iceberg snapshot under the table base path, so the table reads as a standard
+Iceberg table right after the write, without a separate sync job. When Hudi archives instants,
+the module expires the Iceberg snapshots of those instants.
 
 The Iceberg metadata is the source of truth for the table. A Hudi commit is visible only after its
 Iceberg snapshot is committed: a Hudi commit without an Iceberg snapshot is treated as pending and

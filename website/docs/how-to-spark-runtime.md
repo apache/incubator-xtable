@@ -30,8 +30,9 @@ full list of releases.
 
 From 0.5.0, the jar is built against Hudi 1.2.x, so a sync with a Hudi source or target needs the
 Hudi 1.2.x Spark bundle on the classpath. Hudi 1.2.x reads tables written by Hudi 0.14.x, 0.15.x
-and 1.0.x without upgrading them. Use the 0.4.0 jar on a cluster that has to stay on Hudi 0.x
-jars.
+and 1.0.x without upgrading them. Use the 0.4.0 jar on a cluster that has to stay on Hudi 0.14.x.
+The 0.4.0 jar does not work with Hudi 0.15.x or later: a sync with a Hudi source fails with
+`NoSuchMethodError` ([#941](https://github.com/apache/incubator-xtable/issues/941)).
 
 ## Adding the sync to a Spark job
 
