@@ -18,15 +18,20 @@ process or a separate cluster to keep a table interoperable across formats.
 ## Getting the jar
 
 The jar is published to Maven Central as
-`org.apache.xtable:xtable-spark-runtime_2.12:0.4.0-incubating`. Download it once:
+`org.apache.xtable:xtable-spark-runtime_2.12:0.5.0-incubating`. Download it once:
 
 ```shell md title="shell"
-curl -O https://repo1.maven.org/maven2/org/apache/xtable/xtable-spark-runtime_2.12/0.4.0-incubating/xtable-spark-runtime_2.12-0.4.0-incubating.jar
+curl -O https://repo1.maven.org/maven2/org/apache/xtable/xtable-spark-runtime_2.12/0.5.0-incubating/xtable-spark-runtime_2.12-0.5.0-incubating.jar
 ```
 
 Every engine dependency is `provided`, so the jar is about 4 MB and reuses the Hudi, Iceberg and
 Delta libraries your cluster already has. See the [Downloads](/releases/downloads) page for the
 full list of releases.
+
+From 0.5.0, the jar is built against Hudi 1.2.x, so a sync with a Hudi source or target needs the
+Hudi 1.2.x Spark bundle on the classpath. Hudi 1.2.x reads tables written by Hudi 0.14.x, 0.15.x
+and 1.0.x without upgrading them. Use the 0.4.0 jar on a cluster that has to stay on Hudi 0.x
+jars.
 
 ## Adding the sync to a Spark job
 
@@ -37,7 +42,7 @@ Add the jar to the `spark-submit` you already use, alongside your application ja
 
 ```shell md title="shell"
 $SPARK_HOME/bin/spark-submit \
-  --jars xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  --jars xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --class com.example.OrdersJob \
   orders-job.jar
 ```
@@ -133,7 +138,7 @@ bundle. Pass the jar as the application jar rather than with `--jars`:
 $SPARK_HOME/bin/spark-submit \
   --class org.apache.xtable.spark.XTableSparkSync \
   --master 'local[*]' \
-  xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --basepath /path/to/hudi_table \
   --sourceformat HUDI \
   --targets ICEBERG,DELTA
@@ -167,7 +172,7 @@ datasets:
 ```shell md title="shell"
 $SPARK_HOME/bin/spark-submit \
   --class org.apache.xtable.spark.XTableSparkSync \
-  xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --datasetconfig my_config.yaml
 ```
 
@@ -185,7 +190,7 @@ A table entry can also set `targetProperties`, keyed by target format, for examp
 | `--datapath` | Path to the data files, when it differs from the base path. |
 | `--tablename` | Table name. Defaults to the last segment of the base path. |
 | `--namespace` | Dot-separated table namespace. |
-| `--partitionspec` | Hudi source partition field spec, for example `level:VALUE`. |
+| `--partitionspec` | Partition field spec of a Hudi or Parquet source, for example `level:VALUE`. |
 | `--usedeltakernel` | Force Delta Kernel for a Delta source or target. |
 | `--help` | Print the usage text. |
 
@@ -246,7 +251,7 @@ in a job. For the sync job:
 - Leave `hudi` out of `--datalake-formats`, so that Glue does not add its own Hudi jars.
 
 ```text md title="Glue job parameters"
---extra-jars       s3://<bucket>/jars/xtable-spark-runtime_2.12-<version>.jar,s3://<bucket>/jars/hudi-spark3.5-bundle_2.12-1.2.1.jar
+--extra-jars       s3://<bucket>/jars/xtable-spark-runtime_2.12-0.5.0-incubating.jar,s3://<bucket>/jars/hudi-spark3.5-bundle_2.12-1.2.1.jar
 --user-jars-first  true
 --conf             spark.serializer=org.apache.spark.serializer.KryoSerializer
 ```

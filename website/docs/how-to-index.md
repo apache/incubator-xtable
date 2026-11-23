@@ -39,8 +39,9 @@ datasets:
 Run the sync with either jar, for example:
 
 ```shell md title="shell"
-# utilities jar, which starts a local Spark session for the index build. It
-# bundles Spark 3.4, so add the Hudi Spark 3.4 bundle for the Spark engine.
+# utilities jar, built from source, which starts a local Spark session for the
+# index build. It bundles Spark 3.4, so add the Hudi Spark 3.4 bundle for the
+# Spark engine.
 java -cp xtable-utilities/target/xtable-utilities_2.12-<version>-bundled.jar:hudi-spark3.4-bundle_2.12-1.2.1.jar \
   org.apache.xtable.utilities.RunSync \
   --datasetConfig index_config.yaml
@@ -49,7 +50,7 @@ java -cp xtable-utilities/target/xtable-utilities_2.12-<version>-bundled.jar:hud
 $SPARK_HOME/bin/spark-submit \
   --class org.apache.xtable.spark.XTableSparkSync \
   --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
-  xtable-spark-runtime_2.12-<version>.jar \
+  xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --datasetconfig index_config.yaml
 ```
 
@@ -73,19 +74,15 @@ the changes of the new snapshots.
 ### Setting up Spark
 
 The extensions need Spark 3.x with Scala 2.12, the Iceberg Spark runtime and the Hudi Spark bundle.
-They ship in the [XTable Spark runtime jar](how-to-spark-runtime), so no other XTable jar is needed.
-Until a release includes them, build the jar from source:
-
-```shell
-./mvnw -pl xtable-spark-runtime -am package -DskipTests
-```
+They ship in the [XTable Spark runtime jar](how-to-spark-runtime) from 0.5.0, so no other XTable
+jar is needed.
 
 Put these jars on the classpath of the driver and the executors. Use
 `spark.driver.extraClassPath` and `spark.executor.extraClassPath` rather than `--jars`, so that
 XTable and Hudi are loaded by the same class loader. The versions below are for Spark 3.5; use the
 bundles that match your Spark version.
 
-- `xtable-spark-runtime/target/xtable-spark-runtime_2.12-<version>.jar`
+- `org.apache.xtable:xtable-spark-runtime_2.12:0.5.0-incubating`
 - `org.apache.hudi:hudi-spark3.5-bundle_2.12:1.2.1`
 - `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.9.2`
 

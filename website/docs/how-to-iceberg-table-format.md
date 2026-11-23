@@ -18,21 +18,28 @@ fails the Hudi operation.
 
 ## Setting up Spark
 
-The module needs Hudi 1.2.x. Until a release includes it, build the jars from source:
+You need Hudi 1.2.x for this. Alongside the Hudi Spark bundle your job already uses, add four
+XTable jars and the Iceberg Spark runtime. The XTable jars are on Maven Central from 0.5.0, so you
+can download them directly:
 
 ```shell md title="shell"
-./mvnw -pl xtable-hudi-support/xtable-iceberg-pluggable-tf -am package -DskipTests
+REPO=https://repo1.maven.org/maven2/org/apache/xtable
+VERSION=0.5.0-incubating
+curl -O $REPO/xtable-iceberg-pluggable-tf_2.12/$VERSION/xtable-iceberg-pluggable-tf_2.12-$VERSION.jar
+curl -O $REPO/xtable-core_2.12/$VERSION/xtable-core_2.12-$VERSION.jar
+curl -O $REPO/xtable-api/$VERSION/xtable-api-$VERSION.jar
+curl -O $REPO/xtable-hudi-support-utils/$VERSION/xtable-hudi-support-utils-$VERSION.jar
 ```
 
-A Hudi writer needs four XTable jars next to its own Hudi Spark bundle. Add the Iceberg Spark runtime
-to read the table as Iceberg from the same session. The versions below are for Spark 3.5; use the
-bundles that match your Spark version.
+The Iceberg Spark runtime is there because the XTable jars don't bundle Iceberg. Your writer uses
+it to commit each snapshot, and you can read the table back as Iceberg in the same session. The
+example below is for Spark 3.5, so pick the bundles that match your Spark version.
 
 ```shell md title="shell"
-XTABLE_JARS=xtable-hudi-support/xtable-iceberg-pluggable-tf/target/xtable-iceberg-pluggable-tf_2.12-<version>.jar,\
-xtable-core/target/xtable-core_2.12-<version>.jar,\
-xtable-api/target/xtable-api-<version>.jar,\
-xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-<version>.jar
+XTABLE_JARS=xtable-iceberg-pluggable-tf_2.12-$VERSION.jar,\
+xtable-core_2.12-$VERSION.jar,\
+xtable-api-$VERSION.jar,\
+xtable-hudi-support-utils-$VERSION.jar
 
 spark-shell \
   --jars $XTABLE_JARS,hudi-spark3.5-bundle_2.12-1.2.1.jar,iceberg-spark-runtime-3.5_2.12-1.9.2.jar \
