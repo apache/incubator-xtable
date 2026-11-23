@@ -142,6 +142,12 @@ public class HudiTestUtil {
         .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
         .set("spark.sql.shuffle.partitions", "1")
         .set("spark.default.parallelism", "1")
+        // Delta rebuilds snapshots with its own partition count (default 50), ignoring the
+        // shuffle setting above. Values follow Delta's and Hudi's own test setups.
+        .set("spark.databricks.delta.snapshotPartitions", "1")
+        .set("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
+        .set("spark.ui.enabled", "false")
+        .set("spark.ui.showConsoleProgress", "false")
         .set("spark.sql.session.timeZone", "UTC")
         .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
