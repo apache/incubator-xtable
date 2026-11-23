@@ -115,6 +115,30 @@ curl https://dist.apache.org/repos/dist/dev/incubator/xtable/KEYS > ../KEYS
 echo "Checking Signature"
 (bash -c "gpg --import ../KEYS $REDIRECT" && bash -c "gpg --verify apache-xtable-${RELEASE_VERSION}.src.tgz.asc apache-xtable-${RELEASE_VERSION}.src.tgz $REDIRECT" && echo -e "\t\tSignature Check - [OK]\n") || (echo -e "\t\tSignature Check - [ERROR]\n\t\t Run with --verbose to get details\n" && exit 1)
 
+# Reads the archive directly: macOS tar hides ._* entries when listing or extracting
+echo "Checking the entries of apache-xtable-${RELEASE_VERSION}.src.tgz"
+python3 -I - apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-${RELEASE_VERSION} <<'PY'
+import sys, tarfile
+archive, top = sys.argv[1], sys.argv[2]
+# git archive writes the commit id as a global "comment" header; tars that copy
+# extended attributes add SCHILY.xattr.* or LIBARCHIVE.xattr.* keys
+allowed_pax = {"comment", "path", "linkpath", "size", "mtime", "uid", "gid", "uname", "gname"}
+problems = []
+for m in tarfile.open(archive).getmembers():
+    base = m.name.rstrip("/").rsplit("/", 1)[-1]
+    if base.startswith("._") or base in (".DS_Store", "__MACOSX"):
+        problems.append(f"{m.name}: macOS metadata")
+    if m.name != top and not m.name.startswith(top + "/") or ".." in m.name.split("/"):
+        problems.append(f"{m.name}: outside {top}/")
+    if (m.uid, m.gid) != (0, 0):
+        problems.append(f"{m.name}: owner {m.uid}/{m.gid}")
+    if set(m.pax_headers) - allowed_pax:
+        problems.append(f"{m.name}: pax headers {sorted(set(m.pax_headers) - allowed_pax)}")
+if problems:
+    sys.exit(f"\t\t{len(problems)} bad entries, e.g. {problems[:3]} [ERROR]")
+PY
+echo -e "\t\tArchive entries clean? - [OK]\n"
+
 # Untar
 (bash -c "tar -zxf apache-xtable-${RELEASE_VERSION}.src.tgz $REDIRECT") || (echo -e "\t\t Unable to untar apache-xtable-${RELEASE_VERSION}.src.tgz - [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
 cd apache-xtable-${RELEASE_VERSION}

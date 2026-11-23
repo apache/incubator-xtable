@@ -96,56 +96,56 @@ public class TestIcebergColumnStatsConverter {
         ColumnStat.builder()
             .field(timestampField)
             .numValues(123)
-            .numNulls(32)
-            .totalSize(13)
+            .numNulls(32L)
+            .totalSize(13L)
             .range(Range.vector(10000000L, 20000000L))
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
             .field(dateField)
             .numValues(555)
-            .numNulls(15)
-            .totalSize(53)
+            .numNulls(15L)
+            .totalSize(53L)
             .range(Range.vector(18181, 18182))
             .build();
     ColumnStat groupIdStats =
         ColumnStat.builder()
             .field(groupId)
             .numValues(510)
-            .numNulls(200)
-            .totalSize(10)
+            .numNulls(200L)
+            .totalSize(10L)
             .range(Range.vector(-3, 3))
             .build();
     ColumnStat stringFieldStats =
         ColumnStat.builder()
             .field(stringField)
             .numValues(50)
-            .numNulls(0)
-            .totalSize(12)
+            .numNulls(0L)
+            .totalSize(12L)
             .range(Range.vector("yyyy", "zzzz"))
             .build();
     ColumnStat mapFieldKeyStats =
         ColumnStat.builder()
             .field(mapFieldKey)
             .numValues(10)
-            .numNulls(0)
-            .totalSize(12)
+            .numNulls(0L)
+            .totalSize(12L)
             .range(Range.vector("aaa", "abc"))
             .build();
     ColumnStat mapFieldValueStats =
         ColumnStat.builder()
             .field(mapFieldValue)
             .numValues(10)
-            .numNulls(0)
-            .totalSize(24)
+            .numNulls(0L)
+            .totalSize(24L)
             .range(Range.vector(0, 10))
             .build();
     ColumnStat arrayFieldElementStats =
         ColumnStat.builder()
             .field(arrayFieldElement)
             .numValues(5)
-            .numNulls(0)
-            .totalSize(48)
+            .numNulls(0L)
+            .totalSize(48L)
             .range(Range.vector(100, 1000))
             .build();
     List<ColumnStat> columnStats =
@@ -241,8 +241,8 @@ public class TestIcebergColumnStatsConverter {
         ColumnStat.builder()
             .field(dateField)
             .numValues(555)
-            .numNulls(15)
-            .totalSize(53)
+            .numNulls(15L)
+            .totalSize(53L)
             .range(Range.vector(null, null))
             .build();
     List<ColumnStat> columnStats = Collections.singletonList(dateColumnStats);
@@ -273,6 +273,39 @@ public class TestIcebergColumnStatsConverter {
     assertEquals(expected.valueCounts(), actual.valueCounts());
     assertEquals(expected.upperBounds(), actual.upperBounds());
     assertEquals(expected.lowerBounds(), actual.lowerBounds());
+  }
+
+  @Test
+  public void toIcebergWithUnknownNullCountAndColumnSize() {
+    Schema icebergSchema =
+        new Schema(
+            Types.NestedField.optional(1, "int_field", Types.IntegerType.get()),
+            Types.NestedField.optional(2, "string_field", Types.StringType.get()));
+    List<InternalField> fields = getIntAndStringFields();
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .range(Range.vector(1, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
+                .numNulls(5L)
+                .totalSize(20L)
+                .range(Range.vector("a", "z"))
+                .build());
+
+    Metrics actual =
+        IcebergColumnStatsConverter.getInstance().toIceberg(icebergSchema, 100, columnStats);
+
+    // The unknown null count and column size of int_field are left out instead of written as 0.
+    assertEquals(Collections.singletonMap(2, 20L), actual.columnSizes());
+    assertEquals(getCounts(100L, 100L), actual.valueCounts());
+    assertEquals(Collections.singletonMap(2, 5L), actual.nullValueCounts());
+    assertEquals(getIntAndStringBounds(1, "a"), actual.lowerBounds());
+    assertEquals(getIntAndStringBounds(9, "z"), actual.upperBounds());
   }
 
   @Test
@@ -347,39 +380,256 @@ public class TestIcebergColumnStatsConverter {
             ColumnStat.builder()
                 .field(fields.get(0))
                 .numValues(123)
-                .numNulls(32)
-                .totalSize(13)
+                .numNulls(32L)
+                .totalSize(13L)
                 .range(Range.vector(1, 2))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(2))
                 .numValues(456)
-                .numNulls(456)
-                .totalSize(31)
+                .numNulls(456L)
+                .totalSize(31L)
                 .range(Range.vector(null, null))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(3))
                 .numValues(1000L)
                 .numNulls(789L)
-                .totalSize(42)
+                .totalSize(42L)
                 .range(Range.vector("a", "zzz"))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(4))
                 .numValues(1000L)
                 .numNulls(789L)
-                .totalSize(42)
+                .totalSize(42L)
                 .range(Range.vector(18181, 18182))
                 .build(),
             ColumnStat.builder()
                 .field(fields.get(5))
                 .numValues(1000L)
                 .numNulls(789L)
-                .totalSize(42)
+                .totalSize(42L)
                 .range(Range.vector(10000000L, 20000000L))
                 .build());
     assertEquals(expected, actual);
+  }
+
+  @Test
+  public void fromIcebergWithNullColumnSizes() {
+    List<InternalField> fields = getIntAndStringFields();
+    List<ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(
+                fields,
+                getCounts(100L, 100L),
+                getCounts(5L, 0L),
+                null,
+                getIntAndStringBounds(1, "a"),
+                getIntAndStringBounds(9, "z"));
+    // A missing column size is unknown, not zero.
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(5L)
+                .range(Range.vector(1, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
+                .numNulls(0L)
+                .range(Range.vector("a", "z"))
+                .build());
+    assertEquals(expected, actual);
+  }
+
+  @Test
+  public void fromIcebergWithMissingNullCount() {
+    List<InternalField> fields = getIntAndStringFields();
+    Map<Integer, Long> valueCounts = getCounts(100L, 100L);
+    Map<Integer, Long> columnSizes = getCounts(10L, 20L);
+    Map<Integer, ByteBuffer> lowerBounds = getIntAndStringBounds(1, "a");
+    Map<Integer, ByteBuffer> upperBounds = getIntAndStringBounds(9, "z");
+    Map<Integer, Long> nullCounts = new HashMap<>();
+    nullCounts.put(1, 5L);
+
+    // A missing null count is unknown, not zero, and the field keeps its other stats.
+    List<ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
+    ColumnStat intFieldStat =
+        ColumnStat.builder()
+            .field(fields.get(0))
+            .numValues(100)
+            .numNulls(5L)
+            .totalSize(10L)
+            .range(Range.vector(1, 9))
+            .build();
+    ColumnStat stringFieldStat =
+        ColumnStat.builder()
+            .field(fields.get(1))
+            .numValues(100)
+            .totalSize(20L)
+            .range(Range.vector("a", "z"))
+            .build();
+    assertEquals(Arrays.asList(intFieldStat, stringFieldStat), actual);
+
+    assertEquals(
+        Arrays.asList(intFieldStat.toBuilder().numNulls(null).build(), stringFieldStat),
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(fields, valueCounts, null, columnSizes, lowerBounds, upperBounds));
+  }
+
+  @Test
+  public void fromIcebergWithNullBounds() {
+    List<InternalField> fields = getIntAndStringFields();
+    List<ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(
+                fields, getCounts(100L, 100L), getCounts(5L, 0L), getCounts(10L, 20L), null, null);
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(5L)
+                .totalSize(10L)
+                .range(Range.vector(null, null))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
+                .numNulls(0L)
+                .totalSize(20L)
+                .range(Range.vector(null, null))
+                .build());
+    assertEquals(expected, actual);
+  }
+
+  @Test
+  public void fromIcebergWithMixedMissingStats() {
+    List<InternalField> fields =
+        Arrays.asList(
+            InternalField.builder()
+                .fieldId(1)
+                .name("int_field")
+                .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+                .build(),
+            InternalField.builder()
+                .fieldId(2)
+                .name("no_null_count_field")
+                .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+                .build(),
+            InternalField.builder()
+                .fieldId(3)
+                .name("long_field")
+                .schema(InternalSchema.builder().dataType(InternalType.LONG).build())
+                .build(),
+            InternalField.builder()
+                .fieldId(4)
+                .name("no_value_count_field")
+                .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+                .build());
+    Map<Integer, Long> valueCounts = new HashMap<>();
+    valueCounts.put(1, 100L);
+    valueCounts.put(2, 100L);
+    valueCounts.put(3, 100L);
+    Map<Integer, Long> nullCounts = new HashMap<>();
+    nullCounts.put(1, 5L);
+    nullCounts.put(3, 0L);
+    nullCounts.put(4, 0L);
+    Map<Integer, Long> columnSizes = new HashMap<>();
+    columnSizes.put(3, 30L);
+    Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
+    upperBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 9));
+    upperBounds.put(2, Conversions.toByteBuffer(Types.IntegerType.get(), 9));
+
+    List<ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(fields, valueCounts, nullCounts, columnSizes, null, upperBounds);
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(5L)
+                .range(Range.vector(null, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(1))
+                .numValues(100)
+                .range(Range.vector(null, 9))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(2))
+                .numValues(100)
+                .numNulls(0L)
+                .totalSize(30L)
+                .range(Range.vector(null, null))
+                .build());
+    assertEquals(expected, actual);
+  }
+
+  @Test
+  public void fromIcebergWithNullMapValues() {
+    List<InternalField> fields = getIntAndStringFields();
+    Map<Integer, Long> valueCounts = getCounts(100L, 100L);
+    valueCounts.put(2, null);
+    Map<Integer, Long> nullCounts = new HashMap<>();
+    nullCounts.put(1, null);
+    Map<Integer, Long> columnSizes = new HashMap<>();
+    columnSizes.put(1, null);
+    Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
+    lowerBounds.put(1, null);
+
+    // A null value is treated like a missing field, so string_field has no value count.
+    List<ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(
+                fields,
+                valueCounts,
+                nullCounts,
+                columnSizes,
+                lowerBounds,
+                getIntAndStringBounds(9, "z"));
+    List<ColumnStat> expected =
+        Collections.singletonList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .range(Range.vector(null, 9))
+                .build());
+    assertEquals(expected, actual);
+  }
+
+  private static List<InternalField> getIntAndStringFields() {
+    return Arrays.asList(
+        InternalField.builder()
+            .fieldId(1)
+            .name("int_field")
+            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+            .build(),
+        InternalField.builder()
+            .fieldId(2)
+            .name("string_field")
+            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
+            .build());
+  }
+
+  private static Map<Integer, Long> getCounts(long intFieldCount, long stringFieldCount) {
+    Map<Integer, Long> counts = new HashMap<>();
+    counts.put(1, intFieldCount);
+    counts.put(2, stringFieldCount);
+    return counts;
+  }
+
+  private static Map<Integer, ByteBuffer> getIntAndStringBounds(int intValue, String stringValue) {
+    Map<Integer, ByteBuffer> bounds = new HashMap<>();
+    bounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), intValue));
+    bounds.put(2, Conversions.toByteBuffer(Types.StringType.get(), stringValue));
+    return bounds;
   }
 
   private Map<Integer, ByteBuffer> getBoundsMap(

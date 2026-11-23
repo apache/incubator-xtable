@@ -51,7 +51,10 @@ add the `-Dmaven.build.cache.enabled=false` parameter. For example, `./mvnw clea
    Code style check is tied to compile phase by default, so code style violations will lead to build failures.
 
 # Running the bundled jar
-1. Get a pre-built bundled jar or create the jar with `./mvnw install -DskipTests`
+**Note:** The `xtable-utilities` bundled jar and the Docker image built from it are local convenience builds, not release
+artifacts, and carry no LICENSE or NOTICE for what they bundle. The jar includes `jol-core` (GPL-2.0 with Classpath Exception).
+
+1. Build the jar with `./mvnw install -DskipTests`
 2. Create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI
@@ -116,13 +119,13 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-5. Run with `java -jar xtable-utilities/target/xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
+5. Run with `java -jar xtable-utilities/target/xtable-utilities_2.12-0.6.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
 can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/xtable-utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
 The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
 The config in custom hadoop config file will override the default hadoop configurations. For an example
 of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
-The bundled jar includes Iceberg's `org.apache.iceberg.aws.glue.GlueCatalog` and `org.apache.iceberg.aws.s3.S3FileIO`. Other catalog implementations must be added to the classpath, which means running with `java -cp xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar:my-catalog.jar org.apache.xtable.utilities.RunSync ...` instead of `java -jar`.
+The bundled jar includes Iceberg's `org.apache.iceberg.aws.glue.GlueCatalog` and `org.apache.iceberg.aws.s3.S3FileIO`. Other catalog implementations must be added to the classpath, which means running with `java -cp xtable-utilities_2.12-0.6.0-SNAPSHOT-bundled.jar:my-catalog.jar org.apache.xtable.utilities.RunSync ...` instead of `java -jar`.
 
 # Running using docker
 

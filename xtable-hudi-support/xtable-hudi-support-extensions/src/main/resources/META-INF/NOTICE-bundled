@@ -6,6 +6,16 @@ The Apache Software Foundation (https://www.apache.org/).
 
 --------------------------------------------------------------------------------
 
+This binary artifact bundles the following Apache Software Foundation projects:
+
+Apache Log4j 1.x Compatibility API
+Copyright 1999-2023 The Apache Software Foundation
+
+Apache Log4j API
+Copyright 1999-2023 The Apache Software Foundation
+
+--------------------------------------------------------------------------------
+
 This binary artifact bundles the following projects with NOTICE:
 
 --------------------------------------------------------------------------------
@@ -37,30 +47,6 @@ NOTICE:
 | | WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 | | See the License for the specific language governing permissions and
 | | limitations under the License.
-
---------------------------------------------------------------------------------
-
-Group: org.apache.logging.log4j Name: log4j-1.2-api Version: 2.22.0
-
-NOTICE:
-| Apache Log4j 1.x Compatibility API
-| Copyright 1999-2023 The Apache Software Foundation
-|
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
-
---------------------------------------------------------------------------------
-
-Group: org.apache.logging.log4j Name: log4j-api Version: 2.22.0
-
-NOTICE:
-| Apache Log4j API
-| Copyright 1999-2023 The Apache Software Foundation
-|
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
 
 --------------------------------------------------------------------------------
 
