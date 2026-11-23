@@ -85,6 +85,9 @@ public class TestXTableSyncTool {
             .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
             .set("spark.sql.shuffle.partitions", "1")
             .set("spark.default.parallelism", "1")
+            .set("spark.databricks.delta.snapshotPartitions", "1")
+            .set("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
+            .set("spark.ui.enabled", "false")
             .setMaster("local[4]");
     spark = SparkSession.builder().config(sparkConf).getOrCreate();
   }
