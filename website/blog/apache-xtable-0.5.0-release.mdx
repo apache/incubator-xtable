@@ -1,0 +1,82 @@
+---
+title: "Apache XTable™ (Incubating) 0.5.0 Release"
+description: "Apache XTable™ (Incubating) 0.5.0 moves to Apache Hudi 1.2.1, adds a Hudi-backed secondary index for any source table, and fixes the license issues left open in 0.4.0."
+author: Apache XTable Community
+category: blog
+image: /images/xtable-write-anywhere.png
+tags:
+- apache xtable
+- release
+- hudi
+- iceberg
+- secondary index
+date: 2026-11-23
+---
+
+We are pleased to announce the release of 0.5.0-incubating, which lands 79 commits from
+15 contributors.
+See the [release notes](/releases/release-0.5.0-incubating) for the complete list of changes.
+
+<!--truncate-->
+
+Apache XTable™ (Incubating) converts metadata between Apache Hudi, Apache Iceberg and Delta Lake
+without rewriting any data files. It also supports Apache Paimon and Apache Parquet tables as
+sources.
+
+## Release Highlights
+
+### Apache Hudi 1.x
+
+XTable now builds against Apache Hudi 1.2.1, up from 0.14.0. The Hudi source and target support
+Hudi table version 9, and the Hudi target builds the column stats index for existing Hudi tables.
+
+A new module, `xtable-iceberg-pluggable-tf`, plugs into Hudi's pluggable table format. A Hudi writer
+with this module on its classpath commits Iceberg metadata alongside every Hudi commit, so the
+table stays readable as Iceberg without a separate sync.
+
+### Secondary index for any source table
+
+The Hudi target can now build a Hudi record index and secondary index over the files it registers.
+This works for any source format that XTable reads, so an Iceberg or Delta table can get a
+secondary index too. The sync job builds the index and keeps it up to date.
+
+New Spark SQL extensions, shipped in `xtable-spark-runtime`, read that index. Once the extensions
+are configured, point lookups on Iceberg tables in Spark use the index without any change to the
+queries.
+
+### Bug fixes
+
+This release fixes several bugs in the Delta, Hudi and Parquet conversions. Some highlights:
+
+* Delta tables with column mapping enabled now convert with correct partition values, instead of
+  null ones.
+* Delta data files outside the table base path keep their absolute paths.
+* A Hudi CLEAN that runs before an incremental sync no longer leaves deleted files in the target.
+* Parquet source files now report their record counts.
+
+### Packaging and licensing
+
+The license issues listed as known issues in 0.4.0 are fixed. Every bundled jar now carries
+complete license metadata for its shaded dependencies, and the build checks it. The
+`xtable-utilities` bundled jar also shrank from 1.1 GB to 423 MB, and it now includes Iceberg's
+`GlueCatalog` and `S3FileIO`.
+
+## Getting the release
+
+Download the source release, its signature and its checksum from the
+[Downloads](/releases/downloads) page. Always verify the signature before you use the release.
+
+The binary artifacts are on Maven Central under the `org.apache.xtable` group. For example, add the
+Spark runtime jar as `org.apache.xtable:xtable-spark-runtime_2.12:0.5.0-incubating`.
+
+## Getting involved
+
+Apache XTable™ (Incubating) grows through its contributors. We track work in
+[GitHub issues](https://github.com/apache/incubator-xtable/issues) and we discuss it on the
+[dev mailing list](mailto:dev@xtable.apache.org).
+
+The easiest way to start is to:
+
+1. Try 0.5.0-incubating on your own tables and tell us how it goes.
+2. Join the [community sync](/community/sync) and the dev mailing list.
+3. Pick up a [good first issue](https://github.com/apache/incubator-xtable/contribute).
