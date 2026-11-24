@@ -277,9 +277,7 @@ public class TestHudiFileStatsExtractor {
             invocation -> {
               List<String> fieldNames = invocation.getArgument(1);
               if (fieldNames.contains("long_field")) {
-                Map<Pair<String, String>, List<HoodieMetadataColumnStats>> statsMap =
-                    new HashMap<>();
-                statsMap.put(
+                return Collections.singletonMap(
                     fileWithStatsPair,
                     Collections.singletonList(
                         HoodieMetadataColumnStats.newBuilder()
@@ -290,7 +288,6 @@ public class TestHudiFileStatsExtractor {
                             .setTotalSize(16L)
                             .setIsDeleted(false)
                             .build()));
-                return statsMap;
               }
               return Collections.emptyMap();
             });

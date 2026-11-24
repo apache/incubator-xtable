@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -157,8 +158,12 @@ public class HudiFileStatsExtractor {
                     Map.Entry::getKey,
                     fileToStats ->
                         fileToStats.getValue().stream()
-                            .filter(stat -> nameFieldMap.containsKey(stat.getColumnName()))
-                            .map(stat -> Pair.of(nameFieldMap.get(stat.getColumnName()), stat))
+                            .map(
+                                stat -> {
+                                  InternalField field = nameFieldMap.get(stat.getColumnName());
+                                  return field == null ? null : Pair.of(field, stat);
+                                })
+                            .filter(Objects::nonNull)
                             .collect(CustomCollectors.toList(fileToStats.getValue().size()))));
     List<InternalDataFile> withStats = new ArrayList<>();
     List<InternalDataFile> filesWithoutStats = new ArrayList<>();
