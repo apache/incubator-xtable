@@ -77,6 +77,14 @@ jobs:
           path: ~/.m2/wrapper/dists
           key: m2-wrapper-${{ runner.os }}-${{ hashFiles('**/.mvn/wrapper/maven-wrapper.properties') }}
 
+      # The build cache does not hash the project version, so after a version bump
+      # it restores jars named for the old one. Keying on the version avoids that.
+      - name: Read project version
+        id: project-version
+        run: |
+          version=$(./mvnw -q -N -ntp help:evaluate -Dexpression=project.version -DforceStdout)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       # A separate cache from the repository above: the build cache extension
       # configured in .mvn/extensions.xml writes to ~/.m2/build-cache, so
       # without this it starts empty every run and never restores a module.
@@ -97,9 +105,9 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.m2/build-cache
-          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
+          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ steps.project-version.outputs.version }}-${{ github.sha }}
           restore-keys: |
-            maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
+            maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ steps.project-version.outputs.version }}-
 
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B -T 2
@@ -137,7 +145,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ~/.m2/build-cache
-          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
+          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ steps.project-version.outputs.version }}-${{ github.sha }}
 
       # `install` above puts this project's own artifacts into ~/.m2/repository,
       # including the bundled jars (~1.2 GB, xtable-utilities alone is ~1 GB).
