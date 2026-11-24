@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -1035,7 +1035,7 @@ public class ITDeltaConversionSource {
     assertTrue(
         commitsBacklog.getCommitsToProcess().size() >= 2,
         "backlog must span multiple commits for this assertion to be meaningful");
-    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test
@@ -1091,7 +1091,7 @@ public class ITDeltaConversionSource {
     }
     // The refresh comes from the commit's own metaData action, not a snapshot reload: the only
     // snapshot read is the baseline at the first commit.
-    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any(), any());
   }
 
   @Test
@@ -1134,8 +1134,15 @@ public class ITDeltaConversionSource {
     // With reuse disabled the pre-optimization behaviour is restored in full: one snapshot
     // reconstruction per commit, and no second listing of the log for commit-file mtimes.
     verify(spiedDeltaLog, times(commitsBacklog.getCommitsToProcess().size()))
-        .getSnapshotAt(anyLong(), any());
-    verify(spiedDeltaLog, never()).getChangeLogFiles(anyLong(), anyBoolean());
+        .getSnapshotAt(anyLong(), any(), any());
+    // getChanges lists the log through getChangeLogFiles once per call; any other listing is
+    // XTable's own.
+    int getChangesCalls =
+        (int)
+            mockingDetails(spiedDeltaLog).getInvocations().stream()
+                .filter(invocation -> invocation.getMethod().getName().equals("getChanges"))
+                .count();
+    verify(spiedDeltaLog, times(getChangesCalls)).getChangeLogFiles(anyLong(), anyBoolean());
   }
 
   @Test

@@ -113,7 +113,7 @@ public class ITIcebergTableFormat {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 
@@ -409,7 +409,7 @@ public class ITIcebergTableFormat {
         options.put("as.of.instant", DATE_FORMAT.format(time));
         break;
       case ICEBERG:
-        options.put("as-of-timestamp", String.valueOf(time.toEpochMilli()));
+        options.put("timestampAsOf", DATE_FORMAT.format(time));
         break;
       default:
         throw new IllegalArgumentException("Unknown table format: " + tableFormat);

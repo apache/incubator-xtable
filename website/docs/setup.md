@@ -3,7 +3,7 @@
 This page covers the essential steps to setup Apache XTable™ (incubating) in your environment.
 
 ## Pre-requisites
-1. Building the project requires Java 11 and Maven to be setup and configured using PATH or environment variables. 
+1. Building the project requires Java 17 and Maven to be setup and configured using PATH or environment variables. 
 2. Clone the Apache XTable™ (Incubating) project GitHub [repository](https://github.com/apache/incubator-xtable) in your environment.
 
 ## Steps

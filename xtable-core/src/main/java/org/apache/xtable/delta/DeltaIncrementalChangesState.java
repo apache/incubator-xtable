@@ -60,7 +60,7 @@ public class DeltaIncrementalChangesState {
   public DeltaIncrementalChangesState(
       DeltaLog deltaLog, Long versionToStartFrom, boolean loadCommitTimestamps) {
     List<Tuple2<Long, List<Action>>> changesList =
-        getChangesList(deltaLog.getChanges(versionToStartFrom, false));
+        getChangesList(DeltaSparkShim.getChanges(deltaLog, versionToStartFrom));
     Long maxSeenVersion = null;
     for (Tuple2<Long, List<Action>> change : changesList) {
       Long versionNumber = change._1();
@@ -74,7 +74,7 @@ public class DeltaIncrementalChangesState {
       // against, so it holds regardless of the writer's clock. This pass reads no file contents.
       Iterator<Tuple2<Object, FileStatus>> logFiles =
           JavaConverters.asJavaIteratorConverter(
-                  deltaLog.getChangeLogFiles(versionToStartFrom, false))
+                  DeltaSparkShim.getChangeLogFiles(deltaLog, versionToStartFrom))
               .asJava();
       while (logFiles.hasNext()) {
         Tuple2<Object, FileStatus> logFile = logFiles.next();
@@ -121,12 +121,12 @@ public class DeltaIncrementalChangesState {
   }
 
   private List<Tuple2<Long, List<Action>>> getChangesList(
-      scala.collection.Iterator<Tuple2<Object, Seq<Action>>> scalaIterator) {
+      scala.collection.Iterator<? extends Tuple2<Object, ? extends Seq<Action>>> scalaIterator) {
     List<Tuple2<Long, List<Action>>> changesList = new ArrayList<>();
-    Iterator<Tuple2<Object, Seq<Action>>> javaIterator =
+    Iterator<? extends Tuple2<Object, ? extends Seq<Action>>> javaIterator =
         JavaConverters.asJavaIteratorConverter(scalaIterator).asJava();
     while (javaIterator.hasNext()) {
-      Tuple2<Object, Seq<Action>> currentChange = javaIterator.next();
+      Tuple2<Object, ? extends Seq<Action>> currentChange = javaIterator.next();
       changesList.add(
           new Tuple2<>(
               (Long) currentChange._1(),

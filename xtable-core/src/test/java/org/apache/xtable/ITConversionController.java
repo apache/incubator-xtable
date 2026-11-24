@@ -147,7 +147,7 @@ public class ITConversionController {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 
@@ -1189,6 +1189,13 @@ public class ITConversionController {
       // tmp now has physical name "level"; level has physical name "street".
       table.renameColumn("level", "tmp");
       table.renameColumn("street", "level");
+      // Delta 3 writes parquet ids for map keys and values only under IcebergCompatV2, without
+      // which Iceberg cannot read the maps of files that carry ids. IcebergCompatV2 forbids
+      // renaming a partition column, so it is enabled after the renames.
+      sparkSession.sql(
+          String.format(
+              "ALTER TABLE delta.`%s` SET TBLPROPERTIES ('delta.enableIcebergCompatV2'='true')",
+              table.getBasePath()));
       table.insertRows(10);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());

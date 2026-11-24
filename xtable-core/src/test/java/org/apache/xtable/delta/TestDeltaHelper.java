@@ -171,6 +171,10 @@ public class TestDeltaHelper {
       tableBuilder.property("delta.minReaderVersion", "2");
       tableBuilder.property("delta.minWriterVersion", "5");
       tableBuilder.property("delta.columnMapping.mode", "name");
+      // Delta 3 writes Parquet field ids for column mapped fields, but for the key, value and
+      // element of maps and lists only under IcebergCompatV2. Iceberg resolves the columns of
+      // a file that has field ids by id, so without them it cannot read the map keys.
+      tableBuilder.property("delta.enableIcebergCompatV2", "true");
     }
     tableBuilder.execute();
   }

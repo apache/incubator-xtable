@@ -209,7 +209,7 @@
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <artifactId>${delta.artifact.prefix}_${scala.binary.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
@@ -441,7 +441,7 @@
                             <include>dev.failsafe:failsafe</include>
                             <include>dnsjava:dnsjava</include>
                             <include>io.airlift:aircompressor</include>
-                            <include>io.delta:delta-core_${scala.binary.version}</include>
+                            <include>io.delta:${delta.artifact.prefix}_${scala.binary.version}</include>
                             <include>io.delta:delta-hive_${scala.binary.version}</include>
                             <include>io.delta:delta-kernel-api</include>
                             <include>io.delta:delta-kernel-defaults</include>
@@ -548,6 +548,8 @@
                             <include>org.apache.curator:curator-client</include>
                             <include>org.apache.curator:curator-framework</include>
                             <include>org.apache.curator:curator-recipes</include>
+                            <include>org.apache.datasketches:datasketches-java</include>
+                            <include>org.apache.datasketches:datasketches-memory</include>
                             <include>org.apache.derby:derby</include>
                             <include>org.apache.hadoop.thirdparty:hadoop-shaded-guava</include>
                             <include>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_25</include>
@@ -622,12 +624,14 @@
                             <include>org.apache.parquet:parquet-jackson</include>
                             <include>org.apache.slider:slider-core</include>
                             <include>org.apache.spark:spark-catalyst_${scala.binary.version}</include>
+                            <include>org.apache.spark:spark-common-utils_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-core_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-kvstore_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-launcher_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-network-common_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-network-shuffle_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-sketch_${scala.binary.version}</include>
+                            <include>org.apache.spark:spark-sql-api_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-sql_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-tags_${scala.binary.version}</include>
                             <include>org.apache.spark:spark-unsafe_${scala.binary.version}</include>

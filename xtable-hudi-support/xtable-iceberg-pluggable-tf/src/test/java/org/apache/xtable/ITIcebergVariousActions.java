@@ -117,7 +117,7 @@ public class ITIcebergVariousActions {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 

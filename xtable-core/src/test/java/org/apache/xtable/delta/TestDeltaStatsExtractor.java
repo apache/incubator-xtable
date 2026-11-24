@@ -37,6 +37,8 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.delta.actions.AddFile;
 
+import scala.Option;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -250,7 +252,19 @@ public class TestDeltaStatsExtractor {
     deltaStats.put("maxValues", generateMap("b", 2, 2.0, 20));
     deltaStats.put("numRecords", 100L);
     String stats = MAPPER.writeValueAsString(deltaStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
+    AddFile addFile =
+        new AddFile(
+            "file://path/to/file",
+            null,
+            0,
+            0,
+            true,
+            stats,
+            null,
+            null,
+            Option.empty(),
+            Option.empty(),
+            Option.empty());
     List<ColumnStat> actualColumStats =
         DeltaStatsExtractor.getInstance().getColumnStatsForFile(addFile, fields).getColumnStats();
 
@@ -361,7 +375,19 @@ public class TestDeltaStatsExtractor {
   }
 
   private static FileStats extractFileStats(String stats, List<InternalField> fields) {
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
+    AddFile addFile =
+        new AddFile(
+            "file://path/to/file",
+            null,
+            0,
+            0,
+            true,
+            stats,
+            null,
+            null,
+            Option.empty(),
+            Option.empty(),
+            Option.empty());
     return DeltaStatsExtractor.getInstance().getColumnStatsForFile(addFile, fields);
   }
 

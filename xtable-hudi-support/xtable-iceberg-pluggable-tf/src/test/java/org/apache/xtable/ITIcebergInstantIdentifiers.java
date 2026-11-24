@@ -68,7 +68,7 @@ class ITIcebergInstantIdentifiers {
   @AfterAll
   static void teardown() {
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 
