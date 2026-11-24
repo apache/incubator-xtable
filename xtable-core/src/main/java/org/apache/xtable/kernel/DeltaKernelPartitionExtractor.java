@@ -20,6 +20,7 @@ package org.apache.xtable.kernel;
 
 import static org.apache.xtable.collectors.CustomCollectors.toList;
 import static org.apache.xtable.delta.Constants.DELTA_GENERATION_EXPRESSION;
+import static org.apache.xtable.delta.Constants.DELTA_COLUMN_MAPPING_NAME;
 import static org.apache.xtable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
 import static org.apache.xtable.delta.DeltaValueConverter.convertToDeltaPartitionValue;
 
@@ -112,6 +113,13 @@ public class DeltaKernelPartitionExtractor {
    */
   private List<InternalPartitionField> getInternalPartitionFields(
       StructType partitionSchema, InternalSchema internalSchema) {
+    Map<String, String> logicalToStorageName =
+        partitionSchema.fields().stream()
+            .filter(field -> field.getMetadata().contains(DELTA_COLUMN_MAPPING_NAME))
+            .collect(
+                Collectors.toMap(
+                    StructField::getName,
+                    field -> field.getMetadata().getString(DELTA_COLUMN_MAPPING_NAME)));
     PeekingIterator<StructField> itr =
         Iterators.peekingIterator(partitionSchema.fields().iterator());
     List<InternalPartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().size());
@@ -136,13 +144,19 @@ public class DeltaKernelPartitionExtractor {
         if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType) {
           partitionFields.add(
               getPartitionWithDateTransform(
-                  currPartitionField.getName(), parsedGeneratedExpr, internalSchema));
+                  currPartitionField.getName(),
+                  parsedGeneratedExpr,
+                  internalSchema,
+                  logicalToStorageName));
           itr.next(); // consume the field.
         } else if (ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
             == parsedGeneratedExpr.generatedExprType) {
           partitionFields.add(
               getPartitionWithDateFormatTransform(
-                  currPartitionField.getName(), parsedGeneratedExpr, internalSchema));
+                  currPartitionField.getName(),
+                  parsedGeneratedExpr,
+                  internalSchema,
+                  logicalToStorageName));
           itr.next(); // consume the field.
         } else {
           // consume until we hit field with no generated expression or generated expression
@@ -166,7 +180,8 @@ public class DeltaKernelPartitionExtractor {
             }
           }
           partitionFields.add(
-              getPartitionColumnsForHourOrDayOrMonthOrYear(parsedGeneratedExprs, internalSchema));
+              getPartitionColumnsForHourOrDayOrMonthOrYear(
+                  parsedGeneratedExprs, internalSchema, logicalToStorageName));
         }
       }
     }
@@ -174,7 +189,9 @@ public class DeltaKernelPartitionExtractor {
   }
 
   private InternalPartitionField getPartitionColumnsForHourOrDayOrMonthOrYear(
-      List<ParsedGeneratedExpr> parsedGeneratedExprs, InternalSchema internalSchema) {
+      List<ParsedGeneratedExpr> parsedGeneratedExprs,
+      InternalSchema internalSchema,
+      Map<String, String> logicalToStorageName) {
     if (parsedGeneratedExprs.size() > 4) {
       throw new IllegalStateException("Invalid partition transform");
     }
@@ -185,6 +202,10 @@ public class DeltaKernelPartitionExtractor {
     List<String> partitionColumns =
         parsedGeneratedExprs.stream()
             .map(parsedGeneratedExpr -> parsedGeneratedExpr.partitionColumnName)
+            .map(
+                partitionColumnName ->
+                    logicalToStorageName.getOrDefault(
+                        partitionColumnName, partitionColumnName))
             .collect(toList(parsedGeneratedExprs.size()));
     return InternalPartitionField.builder()
         .sourceField(
@@ -200,12 +221,15 @@ public class DeltaKernelPartitionExtractor {
   private InternalPartitionField getPartitionWithDateTransform(
       String partitionColumnName,
       ParsedGeneratedExpr parsedGeneratedExpr,
-      InternalSchema internalSchema) {
+      InternalSchema internalSchema,
+      Map<String, String> logicalToStorageName) {
     return InternalPartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(internalSchema, parsedGeneratedExpr.sourceColumn))
-        .partitionFieldNames(Collections.singletonList(partitionColumnName))
+        .partitionFieldNames(
+            Collections.singletonList(
+                logicalToStorageName.getOrDefault(partitionColumnName, partitionColumnName)))
         .transformType(PartitionTransformType.DAY)
         .build();
   }
@@ -213,12 +237,15 @@ public class DeltaKernelPartitionExtractor {
   private InternalPartitionField getPartitionWithDateFormatTransform(
       String partitionColumnName,
       ParsedGeneratedExpr parsedGeneratedExpr,
-      InternalSchema internalSchema) {
+      InternalSchema internalSchema,
+      Map<String, String> logicalToStorageName) {
     return InternalPartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(internalSchema, parsedGeneratedExpr.sourceColumn))
-        .partitionFieldNames(Collections.singletonList(partitionColumnName))
+        .partitionFieldNames(
+            Collections.singletonList(
+                logicalToStorageName.getOrDefault(partitionColumnName, partitionColumnName)))
         .transformType(parsedGeneratedExpr.internalPartitionTransformType)
         .build();
   }
