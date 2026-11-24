@@ -102,7 +102,7 @@ jobs:
             maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
 
       - name: Build all module with Maven
-        run: ./mvnw clean install -ntp -B
+        run: ./mvnw clean install -ntp -B -T 2
 
       # Guard against a module starting to cache large artifacts again: warn and
       # skip the save rather than churn the repository-wide 10 GB cache budget,
