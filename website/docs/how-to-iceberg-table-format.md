@@ -73,7 +73,7 @@ val basePath = "s3://example-warehouse/db/trips"
 df.write.format("hudi")
   .option("hoodie.table.name", "trips")
   .option("hoodie.datasource.write.recordkey.field", "id")
-  .option("hoodie.datasource.write.precombine.field", "ts")
+  .option("hoodie.table.ordering.fields", "ts")
   .option("hoodie.datasource.write.partitionpath.field", "city")
   .option("hoodie.table.format", "ICEBERG")
   .option("hoodie.metadata.enable", "false")
