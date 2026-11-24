@@ -193,6 +193,35 @@ public class TestDeltaKernelPartitionExtractor {
   }
 
   @Test
+  public void testGeneratedPartitionColumnUsesPhysicalNameWithColumnMapping() {
+    StructField mappedDateOfBirth =
+        new StructField(
+            "dateOfBirth",
+            DateType.DATE,
+            false,
+            FieldMetadata.builder()
+                .putString("delta.generationExpression", "CAST(birthDate AS DATE)")
+                .putString("delta.columnMapping.physicalName", PHYSICAL_NAME)
+                .build());
+    StructType tableSchema =
+        new StructType(
+            Arrays.asList(
+                STRUCT_FIELD_MAP.get("id"),
+                STRUCT_FIELD_MAP.get("birthDate"),
+                mappedDateOfBirth));
+    StructType partitionSchema = new StructType(Collections.singletonList(mappedDateOfBirth));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+
+    assertEquals(
+        Collections.singletonList(PHYSICAL_NAME),
+        internalPartitionFields.get(0).getPartitionFieldNames());
+  }
+
+  @Test
   public void testDateFormatPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
