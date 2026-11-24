@@ -18,13 +18,20 @@
  
 package org.apache.xtable.delta;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.fs.Path;
+
+import com.google.common.escape.Escaper;
+import com.google.common.net.PercentEscaper;
 
 import org.apache.xtable.paths.PathUtils;
 
@@ -35,6 +42,11 @@ import org.apache.xtable.paths.PathUtils;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaPathUtils {
 
+  // RFC 3986 path characters minus ':', so a relative first segment can't be read as a scheme.
+  private static final Escaper PATH_ESCAPER = new PercentEscaper("-._~!$&'()*+,;=@/", false);
+  private static final Pattern SCHEME_AUTHORITY =
+      Pattern.compile("^[A-Za-z][A-Za-z0-9+.-]*:(//[^/]*)?");
+
   /**
    * Resolves the path of an AddFile or RemoveFile action against the table base path.
    *
@@ -44,16 +56,18 @@ public class DeltaPathUtils {
    * non-existent location and silently drop records from the converted table.
    *
    * @param tableBasePath the table base path
-   * @param dataFilePath the path recorded in the Delta log (relative or absolute)
-   * @return the full absolute path to the file
+   * @param dataFilePath the path recorded in the Delta log (relative or absolute), URI-encoded as
+   *     the Delta protocol stores it
+   * @return the full absolute path to the file, decoded
    */
   public static String getFullPathToFile(String tableBasePath, String dataFilePath) {
+    String decodedPath = decode(dataFilePath);
     if (isAbsolutePath(dataFilePath)) {
-      return dataFilePath;
+      return decodedPath;
     }
     return tableBasePath.endsWith(Path.SEPARATOR)
-        ? tableBasePath + dataFilePath
-        : tableBasePath + Path.SEPARATOR + dataFilePath;
+        ? tableBasePath + decodedPath
+        : tableBasePath + Path.SEPARATOR + decodedPath;
   }
 
   /**
@@ -66,12 +80,27 @@ public class DeltaPathUtils {
    *
    * @param tableBasePath the table base path
    * @param dataFilePath the path to the data file, relative or absolute
-   * @return the path to record in the Delta log
+   * @return the path to record in the Delta log, URI-encoded as the Delta protocol expects
    */
   public static String getPathForDeltaLog(String tableBasePath, String dataFilePath) {
     return isUnderBasePath(tableBasePath, dataFilePath)
-        ? PathUtils.getRelativePath(dataFilePath, tableBasePath)
-        : dataFilePath;
+        ? PATH_ESCAPER.escape(PathUtils.getRelativePath(dataFilePath, tableBasePath))
+        : encodeAbsolute(dataFilePath);
+  }
+
+  private static String encodeAbsolute(String path) {
+    Matcher m = SCHEME_AUTHORITY.matcher(path);
+    int start = m.find() ? m.end() : 0;
+    return path.substring(0, start) + PATH_ESCAPER.escape(path.substring(start));
+  }
+
+  private static String decode(String path) {
+    try {
+      // URLDecoder treats '+' as a space, which isn't true for URI paths.
+      return URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
+    } catch (UnsupportedEncodingException | IllegalArgumentException e) {
+      return path; // not valid encoding, so it's an unencoded path from an older XTable
+    }
   }
 
   private static boolean isUnderBasePath(String tableBasePath, String dataFilePath) {
