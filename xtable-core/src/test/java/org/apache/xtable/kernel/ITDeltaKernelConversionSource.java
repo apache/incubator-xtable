@@ -150,6 +150,9 @@ public class ITDeltaKernelConversionSource {
             .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
             .config("spark.sql.shuffle.partitions", "1")
             .config("spark.default.parallelism", "1")
+            .config("spark.databricks.delta.snapshotPartitions", "1")
+            .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
+            .config("spark.ui.enabled", "false")
             .config("spark.serializer", KryoSerializer.class.getName())
             .getOrCreate();
   }
