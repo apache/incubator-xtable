@@ -25,8 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javax.inject.Singleton;
-
 import lombok.SneakyThrows;
 
 import org.apache.avro.Schema;
@@ -59,7 +57,6 @@ import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 /**
  * Extracts {@link InternalTable} a canonical representation of table at a point in time for Hudi.
  */
-@Singleton
 public class HudiTableExtractor {
   private static final ObjectMapper MAPPER =
       new ObjectMapper()

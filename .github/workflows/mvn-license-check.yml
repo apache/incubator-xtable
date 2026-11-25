@@ -32,7 +32,7 @@ on:
 # Kept in step with mvn-ci-build.yml: this job writes the cache that job reads,
 # and the JDK is part of the key on both sides.
 env:
-  JDK_VERSION: '11'
+  JDK_VERSION: '17'
 
 jobs:
   build:

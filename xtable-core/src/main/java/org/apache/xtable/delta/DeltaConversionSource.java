@@ -41,8 +41,6 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.Metadata;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
-import scala.Option;
-
 import com.google.common.base.Preconditions;
 
 import io.delta.tables.DeltaTable;
@@ -130,7 +128,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
               getChangesState().getCommitTimestamp(versionNumber));
       fileFormat = actionsConverter.convertToFileFormat(metadataAtVersion.format().provider());
     } else {
-      Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
+      Snapshot snapshotAtVersion = DeltaSparkShim.getSnapshotAt(deltaLog, versionNumber);
       tableAtVersion = tableExtractor.table(snapshotAtVersion, tableName);
       fileFormat =
           actionsConverter.convertToFileFormat(snapshotAtVersion.metadata().format().provider());
@@ -205,10 +203,12 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
-        deltaLog
-            .history()
-            .getActiveCommitAtTime(
-                Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
+        DeltaSparkShim.getActiveCommitAtTime(
+            deltaLog,
+            Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()),
+            true,
+            false,
+            true);
     long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
     resetState(versionNumberAtLastSyncInstant + 1);
     return CommitsBacklog.<Long>builder()
@@ -224,7 +224,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
-        deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
+        DeltaSparkShim.getActiveCommitAtTime(deltaLog, Timestamp.from(instant), true, false, true);
     // There is a chance earliest commit of the table is returned if the instant is before the
     // earliest commit of the table, hence the additional check.
     Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
@@ -263,7 +263,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     }
     if (cachedMetadata == null) {
       // baseline; the snapshot is read for its metadata and not retained
-      cachedMetadata = deltaLog.getSnapshotAt(versionNumber, Option.empty()).metadata();
+      cachedMetadata = DeltaSparkShim.getSnapshotAt(deltaLog, versionNumber).metadata();
     } else if (metadataInCommit != null) {
       cachedMetadata = metadataInCommit;
     }

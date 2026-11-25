@@ -27,8 +27,6 @@ import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Metadata;
 
-import scala.Option;
-
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -44,7 +42,7 @@ public class DeltaTableExtractor {
   private static final DeltaSchemaExtractor schemaExtractor = DeltaSchemaExtractor.getInstance();
 
   public InternalTable table(DeltaLog deltaLog, String tableName, Long version) {
-    Snapshot snapshot = deltaLog.getSnapshotAt(version, Option.empty());
+    Snapshot snapshot = DeltaSparkShim.getSnapshotAt(deltaLog, version);
     return table(snapshot, tableName);
   }
 

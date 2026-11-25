@@ -51,7 +51,18 @@ class TestDeltaActionsConverter {
 
     DeletionVectorDescriptor deletionVector = null;
     AddFile addFileAction =
-        new AddFile(filePath, null, size, time, dataChange, stats, null, deletionVector);
+        new AddFile(
+            filePath,
+            null,
+            size,
+            time,
+            dataChange,
+            stats,
+            null,
+            deletionVector,
+            Option.empty(),
+            Option.empty(),
+            Option.empty());
     Assertions.assertNull(actionsConverter.extractDeletionVectorFile(snapshot, addFileAction));
 
     deletionVector =
@@ -59,7 +70,18 @@ class TestDeltaActionsConverter {
             filePath, size, 42, Option.empty(), Option.empty());
 
     addFileAction =
-        new AddFile(filePath, null, size, time, dataChange, stats, null, deletionVector);
+        new AddFile(
+            filePath,
+            null,
+            size,
+            time,
+            dataChange,
+            stats,
+            null,
+            deletionVector,
+            Option.empty(),
+            Option.empty(),
+            Option.empty());
 
     Assertions.assertEquals(
         filePath, actionsConverter.extractDeletionVectorFile(snapshot, addFileAction));

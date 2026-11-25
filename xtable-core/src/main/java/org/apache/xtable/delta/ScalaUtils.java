@@ -31,7 +31,9 @@ public class ScalaUtils {
         javaMap.entrySet().stream()
             .map(e -> Tuple2.apply(e.getKey(), e.getValue()))
             .collect(Collectors.toList());
-    scala.collection.Seq<Tuple2<String, String>> seq = JavaConverters.asScalaBuffer(tuples).toSeq();
-    return scala.collection.immutable.Map$.MODULE$.apply(seq);
+    scala.collection.immutable.Seq<Tuple2<String, String>> seq =
+        JavaConverters.asScalaBuffer(tuples).toList();
+    // Scala 2.13 erases the result of Map.apply to Object
+    return (scala.collection.immutable.Map) scala.collection.immutable.Map$.MODULE$.apply(seq);
   }
 }
