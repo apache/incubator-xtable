@@ -21,6 +21,7 @@ package org.apache.xtable.hudi;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
@@ -37,6 +39,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
+import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
 import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.exception.UpdateException;
@@ -72,6 +75,10 @@ public class HudiTableManager {
    * @return {@link HoodieTableMetaClient} if table exists, otherwise null
    */
   public Optional<HoodieTableMetaClient> loadTableMetaClientIfExists(String tableDataPath) {
+    if (!metaFolderExists(tableDataPath, configuration)) {
+      log.info("Hudi table does not exist, will be created on first sync");
+      return Optional.empty();
+    }
     try {
       return Optional.of(
           HoodieTableMetaClient.builder()
@@ -82,6 +89,20 @@ public class HudiTableManager {
     } catch (TableNotFoundException ex) {
       log.info("Hudi table does not exist, will be created on first sync");
       return Optional.empty();
+    }
+  }
+
+  /**
+   * Returns whether a Hudi table exists at the path, the same check Hudi's own writers make before
+   * loading a meta client. The meta client alone only reports a missing table after retrying the
+   * read of its properties file with one-second sleeps.
+   */
+  public static boolean metaFolderExists(String tableDataPath, Configuration configuration) {
+    try {
+      return FSUtils.isTableExists(
+          tableDataPath, new HoodieHadoopStorage(tableDataPath, configuration));
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to check for Hudi table at " + tableDataPath, e);
     }
   }
 

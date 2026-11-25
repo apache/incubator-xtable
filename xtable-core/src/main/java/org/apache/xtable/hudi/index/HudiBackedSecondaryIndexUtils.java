@@ -46,6 +46,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.hudi.HudiTableManager;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -113,6 +114,9 @@ public final class HudiBackedSecondaryIndexUtils {
   }
 
   static HoodieTableMetaClient getMetaClient(String dataPath, Configuration configuration) {
+    if (!HudiTableManager.metaFolderExists(dataPath, configuration)) {
+      throw new TableNotFoundException(dataPath);
+    }
     HoodieStorage storage = new HoodieHadoopStorage(dataPath, configuration);
     return HoodieTableMetaClient.builder().setStorage(storage).setBasePath(dataPath).build();
   }
