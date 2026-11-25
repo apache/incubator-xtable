@@ -83,8 +83,7 @@ public class HudiFileStatsExtractor {
   private static final int DECIMAL_WRAPPER_SCALE = 15;
 
   private static final ParquetUtils UTILS = new ParquetUtils();
-  private static final String ARRAY_DOT_FIELD = ".array.";
-  private static final String PARQUET_ELMENT_DOT_FIELD = ".list.element.";
+  private static final String PARQUET_LIST_ELEMENT = "list.element";
 
   @NonNull private final HoodieTableMetaClient metaClient;
 
@@ -242,8 +241,11 @@ public class HudiFileStatsExtractor {
             HadoopFSUtils.convertToStoragePath(filePath),
             columnNames,
             indexVersion);
+    // A range whose column name maps to no field is skipped, so an unexpected name costs the stats
+    // of that column and not the publish.
     List<ColumnStat> columnStats =
         columnRanges.stream()
+            .filter(colRange -> nameFieldMap.containsKey(colRange.getColumnName()))
             .map(
                 colRange ->
                     getColumnStatFromColRange(nameFieldMap.get(colRange.getColumnName()), colRange))
@@ -389,11 +391,12 @@ public class HudiFileStatsExtractor {
   }
 
   private String getFieldNameForStats(InternalField field) {
-    String convertedDotPath = HudiSchemaExtractor.convertFromXTablePath(field.getPath());
-    // As of Hudi 1.2.0 the column-stats reader (both parquet footers and the metadata table)
-    // reports array elements using the standard parquet 3-level "list.element" path, derived from
-    // the schema regardless of how the underlying file was written, so we always normalize to it.
-    // (Hudi 1.1 reported the parquet-footer path as ".array"; this distinction no longer exists.)
-    return convertedDotPath.replace(ARRAY_DOT_FIELD, PARQUET_ELMENT_DOT_FIELD);
+    // Hudi's column-stats reader (both parquet footers and the metadata table) names every list
+    // element "<list>.list.element", whether the file uses the two-level (".array") or the
+    // three-level layout and whether the element is a leaf or a struct.
+    return HudiSchemaExtractor.convertFromXTablePath(
+        field
+            .getPath()
+            .replace(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, PARQUET_LIST_ELEMENT));
   }
 }
