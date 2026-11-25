@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -231,6 +232,48 @@ public class TestIcebergSchemaSync {
     schemaSync.sync(SCHEMA, updateFieldRequired(2), mockTransaction);
 
     verify(mockUpdateSchema).requireColumn("date_field");
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  public void testRecordKeyFieldBecomingOptionalReconcilesIdentifierFields() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+
+    // The existing table has group_id (field id 3, required) as an identifier field.
+    Schema current = new Schema(SCHEMA.columns(), Collections.singleton(3));
+    // The source evolves group_id to be nullable, so the extractor produces a schema with the
+    // field optional and no identifier fields (all-or-nothing when any record key is nullable).
+    Schema latest = new Schema(updateFieldRequired(3).columns(), Collections.emptySet());
+
+    schemaSync.sync(current, latest, mockTransaction);
+
+    // The field is made optional AND the stale identifier set is reconciled (cleared) so the
+    // commit does not fail with "Cannot add field group_id as an identifier field: not a
+    // required field".
+    verify(mockUpdateSchema).makeColumnOptional("group_id");
+    verify(mockUpdateSchema).setIdentifierFields(Collections.emptySet());
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  public void testUnchangedIdentifierFieldsAreNotResynced() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+
+    // group_id stays a required identifier field in both schemas; only a new column is added.
+    Schema current = new Schema(SCHEMA.columns(), Collections.singleton(3));
+    Types.NestedField columnToAdd =
+        Types.NestedField.optional(20, "addedColumn", Types.BooleanType.get(), "doc");
+    Schema latest =
+        new Schema(
+            addColumnToDefault(SCHEMA, columnToAdd, null).columns(), Collections.singleton(3));
+
+    schemaSync.sync(current, latest, mockTransaction);
+
+    verify(mockUpdateSchema).addColumn(null, "addedColumn", Types.BooleanType.get(), "doc");
+    verify(mockUpdateSchema, never())
+        .setIdentifierFields(org.mockito.ArgumentMatchers.<String>anyCollection());
     verify(mockUpdateSchema).commit();
   }
 
