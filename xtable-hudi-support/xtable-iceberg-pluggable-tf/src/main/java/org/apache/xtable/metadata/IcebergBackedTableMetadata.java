@@ -23,10 +23,10 @@ import org.apache.hudi.metadata.FileSystemBackedTableMetadata;
 import org.apache.hudi.storage.HoodieStorage;
 
 /**
- * Serves Hudi's table metadata for a table using the Iceberg table format. It deliberately lists
- * the file system for now rather than reading Iceberg manifests, which is why the Hudi metadata
- * table has to stay disabled for such a table: the superclass throws on every index lookup, so an
- * enabled metadata table fails with "Unsupported operation: getColumnsStats".
+ * Serves Hudi's table metadata for a table using the Iceberg table format when the writer has no
+ * Hudi metadata table. It deliberately lists the file system for now rather than reading Iceberg
+ * manifests; the superclass answers no index lookup, so a writer that needs one keeps the metadata
+ * table, which {@link IcebergMetadataFactory} then serves.
  *
  * <p>The type exists to be replaced rather than removed. Iceberg manifests already carry the
  * per-column bounds and file listings this should eventually answer from, which is what RFC-93

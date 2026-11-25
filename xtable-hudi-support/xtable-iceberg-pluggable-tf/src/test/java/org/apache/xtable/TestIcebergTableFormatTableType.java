@@ -31,33 +31,29 @@ import org.apache.hudi.common.table.HoodieTableConfig;
 
 class TestIcebergTableFormatTableType {
   @Test
-  void copyOnWriteTablesAreAccepted() {
-    assertDoesNotThrow(
-        () -> IcebergTableFormat.requireCopyOnWrite(tableConfig(HoodieTableType.COPY_ON_WRITE)));
+  void copyOnWriteTablesAreAcceptedAtEitherFormatVersion() {
+    assertDoesNotThrow(() -> init(HoodieTableType.COPY_ON_WRITE, "2"));
+    assertDoesNotThrow(() -> init(HoodieTableType.COPY_ON_WRITE, "3"));
   }
 
   @Test
-  void mergeOnReadTablesAreRejected() {
-    // Log files never become Iceberg data files, so a deltacommit that writes only log files would
-    // publish an empty snapshot and Iceberg readers would silently miss the updates.
+  void mergeOnReadTablesAreAcceptedAtFormatVersionThree() {
+    assertDoesNotThrow(() -> init(HoodieTableType.MERGE_ON_READ, "3"));
+    // Version 3 is the default.
+    assertDoesNotThrow(() -> init(HoodieTableType.MERGE_ON_READ, null));
+  }
+
+  @Test
+  void mergeOnReadTablesAreRejectedAtFormatVersionTwoWhenTheFormatIsInitialized() {
+    // A merge-on-read table is published with deletion vectors, which format version 2 lacks. Hudi
+    // initializes the format with hoodie.properties on every meta client load, so the table is
+    // refused before any instant exists.
     UnsupportedOperationException exception =
         assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                IcebergTableFormat.requireCopyOnWrite(tableConfig(HoodieTableType.MERGE_ON_READ)));
+            UnsupportedOperationException.class, () -> init(HoodieTableType.MERGE_ON_READ, "2"));
     assertTrue(exception.getMessage().contains("MERGE_ON_READ"), exception.getMessage());
     assertTrue(exception.getMessage().contains("test_table"), exception.getMessage());
-  }
-
-  @Test
-  void mergeOnReadTablesAreRejectedWhenTheFormatIsInitialized() {
-    // Hudi initializes the format with hoodie.properties on every meta client load, so the table is
-    // refused before any instant exists.
-    Properties properties = new Properties();
-    properties.setProperty(HoodieTableConfig.NAME.key(), "test_table");
-    properties.setProperty(HoodieTableConfig.TYPE.key(), HoodieTableType.MERGE_ON_READ.name());
-    assertThrows(
-        UnsupportedOperationException.class, () -> new IcebergTableFormat().init(properties));
+    assertTrue(exception.getMessage().contains("format version 2"), exception.getMessage());
   }
 
   @Test
@@ -65,10 +61,28 @@ class TestIcebergTableFormatTableType {
     assertDoesNotThrow(() -> new IcebergTableFormat().init(new Properties()));
   }
 
-  private static HoodieTableConfig tableConfig(HoodieTableType tableType) {
-    HoodieTableConfig tableConfig = new HoodieTableConfig();
-    tableConfig.setValue(HoodieTableConfig.NAME, "test_table");
-    tableConfig.setValue(HoodieTableConfig.TYPE, tableType.name());
-    return tableConfig;
+  @Test
+  void tableVersionsBelowEightAreRejectedWhenTheFormatIsInitialized() {
+    // The reconstructed timeline is built on the version 2 timeline layout, and on version 6 a
+    // savepoint, which shares its commit's requested time, is never after the last synced instant.
+    Properties properties = new Properties();
+    properties.setProperty(HoodieTableConfig.NAME.key(), "test_table");
+    properties.setProperty(HoodieTableConfig.VERSION.key(), "6");
+    UnsupportedOperationException exception =
+        assertThrows(
+            UnsupportedOperationException.class, () -> new IcebergTableFormat().init(properties));
+    assertTrue(exception.getMessage().contains("version 6"), exception.getMessage());
+    properties.setProperty(HoodieTableConfig.VERSION.key(), "8");
+    assertDoesNotThrow(() -> new IcebergTableFormat().init(properties));
+  }
+
+  private static void init(HoodieTableType tableType, String icebergFormatVersion) {
+    Properties properties = new Properties();
+    properties.setProperty(HoodieTableConfig.NAME.key(), "test_table");
+    properties.setProperty(HoodieTableConfig.TYPE.key(), tableType.name());
+    if (icebergFormatVersion != null) {
+      properties.setProperty(IcebergFormatConfig.FORMAT_VERSION, icebergFormatVersion);
+    }
+    new IcebergTableFormat().init(properties);
   }
 }

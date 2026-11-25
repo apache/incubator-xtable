@@ -111,7 +111,7 @@
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <artifactId>${delta.artifact.prefix}_${scala.binary.version}</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -125,7 +125,7 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Iceberg 1.9.2 needs Avro 1.12, newer than Spark 3.4's -->
+        <!-- Iceberg 1.12 needs Avro 1.12, newer than Spark 3.5's -->
         <dependency>
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>

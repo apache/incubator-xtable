@@ -147,7 +147,7 @@ public class ITConversionController {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 
@@ -1189,6 +1189,13 @@ public class ITConversionController {
       // tmp now has physical name "level"; level has physical name "street".
       table.renameColumn("level", "tmp");
       table.renameColumn("street", "level");
+      // Delta 3 writes parquet ids for map keys and values only under IcebergCompatV2, without
+      // which Iceberg cannot read the maps of files that carry ids. IcebergCompatV2 forbids
+      // renaming a partition column, so it is enabled after the renames.
+      sparkSession.sql(
+          String.format(
+              "ALTER TABLE delta.`%s` SET TBLPROPERTIES ('delta.enableIcebergCompatV2'='true')",
+              table.getBasePath()));
       table.insertRows(10);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
@@ -1506,22 +1513,15 @@ public class ITConversionController {
   }
 
   private static String[] getSelectColumnsArr(List<String> columnsToSelect, String format) {
-    boolean isHudi = format.equals(HUDI);
-    boolean isIceberg = format.equals(ICEBERG);
+    boolean localTimestampsAsTimestamps =
+        format.equals(HUDI) || format.equals(ICEBERG) || format.equals(DELTA);
     return columnsToSelect.stream()
         .map(
             colName -> {
-              if (colName.startsWith("timestamp_local_millis")) {
-                if (isHudi) {
-                  return String.format(
-                      "unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
-                } else if (isIceberg) {
-                  // iceberg is showing up as micros, so we need to divide by 1000 to get millis
-                  return String.format("%s div 1000 AS %s", colName, colName);
-                } else {
-                  return colName;
-                }
-              } else if (isHudi && colName.startsWith("timestamp_local_micros")) {
+              if (localTimestampsAsTimestamps && colName.startsWith("timestamp_local_millis")) {
+                return String.format("unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+              } else if (localTimestampsAsTimestamps
+                  && colName.startsWith("timestamp_local_micros")) {
                 return String.format("unix_micros(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
               } else {
                 return colName;

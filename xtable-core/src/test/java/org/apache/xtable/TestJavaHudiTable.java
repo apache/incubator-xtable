@@ -40,12 +40,12 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.clustering.plan.strategy.JavaSizeBasedClusteringPlanStrategy;
 import org.apache.hudi.client.clustering.run.strategy.JavaSortAndSizeExecutionStrategy;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
+import org.apache.hudi.common.avro.HoodieAvroUtils;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
@@ -148,6 +148,29 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         basePath);
   }
 
+  /**
+   * Same as the archival-config factory, with table-level properties the write config also takes.
+   */
+  public static TestJavaHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      HoodieArchivalConfig archivalConfig,
+      Properties tableProperties) {
+    return new TestJavaHudiTable(
+        tableName,
+        BASIC_SCHEMA,
+        tempDir,
+        partitionConfig,
+        tableType,
+        archivalConfig,
+        false,
+        HoodieTableVersion.SIX,
+        tableProperties,
+        null);
+  }
+
   public static TestJavaHudiTable forStandardSchemaWithFieldIds(
       String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
     return new TestJavaHudiTable(
@@ -237,6 +260,21 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       Schema schema) {
     return new TestJavaHudiTable(
         tableName, schema, tempDir, partitionConfig, tableType, null, false, new Properties());
+  }
+
+  /**
+   * Same as {@link #withSchema(String, Path, String, HoodieTableType, Schema)}, with table-level
+   * properties the write config also takes.
+   */
+  public static TestJavaHudiTable withSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Schema schema,
+      Properties tableProperties) {
+    return new TestJavaHudiTable(
+        tableName, schema, tempDir, partitionConfig, tableType, null, false, tableProperties);
   }
 
   public static TestJavaHudiTable withSchema(

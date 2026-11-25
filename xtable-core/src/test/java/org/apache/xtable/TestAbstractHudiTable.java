@@ -467,6 +467,7 @@ public abstract class TestAbstractHudiTable
             keyGenProperties.getProperty(HoodieMetadataConfig.ENABLE.key(), "true"));
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
+            .fromProperties(keyGenProperties)
             .enable(metadataTableEnabled)
             .withMetadataIndexColumnStats(metadataTableEnabled)
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
@@ -490,7 +491,11 @@ public abstract class TestAbstractHudiTable
         .withCleanConfig(cleanConfig)
         .withArchivalConfig(archivalConfig)
         .withMetadataConfig(metadataConfig)
-        .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
+        .withWriteConcurrencyMode(
+            WriteConcurrencyMode.valueOf(
+                keyGenProperties.getProperty(
+                    HoodieWriteConfig.WRITE_CONCURRENCY_MODE.key(),
+                    WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL.name())))
         .withMarkersType(MarkerType.DIRECT.name())
         .withStorageConfig(storageConfig)
         .withLockConfig(
@@ -650,12 +655,13 @@ public abstract class TestAbstractHudiTable
     if (tableFormat != null) {
       overrides.put(HoodieTableConfig.TABLE_FORMAT.key(), tableFormat);
       // A pluggable format reconstructs the timeline from its own metadata, which needs the v2
-      // timeline layout, and supplies the file listing that the Hudi metadata table would.
+      // timeline layout.
       overrides.put(
           HoodieTableConfig.VERSION.key(), String.valueOf(HoodieTableVersion.EIGHT.versionCode()));
-      // FileSystemBackedTableMetadata, which IcebergBackedTableMetadata extends, throws on every
-      // index lookup, so leaving the metadata table on fails with "Unsupported operation:
-      // getColumnsStats".
+      // The tests roll back their latest commit, which Hudi refuses once the metadata table has
+      // compacted past it, and archive after four commits, which outruns the metadata table's
+      // default compaction. The metadata table is covered by tests that enable it with settings
+      // suited to each case.
       overrides.put(HoodieMetadataConfig.ENABLE.key(), "false");
     }
     return overrides;

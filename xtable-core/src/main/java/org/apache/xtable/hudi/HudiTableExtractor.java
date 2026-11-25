@@ -25,8 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import javax.inject.Singleton;
-
 import lombok.SneakyThrows;
 
 import org.apache.avro.Schema;
@@ -59,7 +57,6 @@ import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 /**
  * Extracts {@link InternalTable} a canonical representation of table at a point in time for Hudi.
  */
-@Singleton
 public class HudiTableExtractor {
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
@@ -68,12 +65,27 @@ public class HudiTableExtractor {
           .setSerializationInclusion(JsonInclude.Include.NON_NULL);
   private final HudiSchemaExtractor schemaExtractor;
   private final SourcePartitionSpecExtractor partitionSpecExtractor;
+  private final boolean includeMetaFields;
 
   public HudiTableExtractor(
       HudiSchemaExtractor schemaExtractor,
       SourcePartitionSpecExtractor sourcePartitionSpecExtractor) {
+    this(schemaExtractor, sourcePartitionSpecExtractor, true);
+  }
+
+  /**
+   * @param includeMetaFields whether the schema of a table that populates Hudi's meta fields, such
+   *     as {@code _hoodie_commit_time}, describes them. The base files store them either way, so a
+   *     target that leaves them out has to resolve the columns of a base file by name or field id,
+   *     not by position.
+   */
+  public HudiTableExtractor(
+      HudiSchemaExtractor schemaExtractor,
+      SourcePartitionSpecExtractor sourcePartitionSpecExtractor,
+      boolean includeMetaFields) {
     this.schemaExtractor = schemaExtractor;
     this.partitionSpecExtractor = sourcePartitionSpecExtractor;
+    this.includeMetaFields = includeMetaFields;
   }
 
   public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
@@ -146,7 +158,7 @@ public class HudiTableExtractor {
       // table describes it with the same schema: meta fields only when the table populates them,
       // and partition columns appended when the writer drops them from the data files.
       HoodieSchema tableSchema =
-          tableConfig.populateMetaFields()
+          tableConfig.populateMetaFields() && includeMetaFields
               ? HoodieSchemaUtils.addMetadataFields(writerSchema, false)
               : HoodieSchemaUtils.removeMetadataFields(writerSchema);
       if (tableConfig.shouldDropPartitionColumns()) {
@@ -170,7 +182,11 @@ public class HudiTableExtractor {
     InternalSchema canonicalSchema;
     Schema avroSchema;
     try {
-      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
+      HoodieSchema tableSchema = tableSchemaResolver.getTableSchema(commit.requestedTime());
+      if (!includeMetaFields) {
+        tableSchema = HoodieSchemaUtils.removeMetadataFields(tableSchema);
+      }
+      avroSchema = tableSchema.toAvroSchema();
       canonicalSchema = schemaExtractor.schema(avroSchema);
     } catch (Exception e) {
       throw new SchemaExtractorException(

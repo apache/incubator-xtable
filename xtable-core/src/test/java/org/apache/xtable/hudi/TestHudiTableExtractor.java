@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -41,6 +43,7 @@ import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
 /**
  * The table description derived from a commit's own metadata has to agree with the one {@link
@@ -71,6 +74,36 @@ class TestHudiTableExtractor {
   }
 
   @Test
+  void metaFieldsCanBeLeftOutOfATableThatPopulatesThem() throws Exception {
+    InternalTable table = describe(newMetaClient("meta_fields_left_out", true, null), null, false);
+    for (String metaField : HoodieRecord.HOODIE_META_COLUMNS_WITH_OPERATION) {
+      assertFalse(hasField(table, metaField), metaField + " must not be described");
+    }
+    assertEquals(
+        Arrays.asList("key", "value"),
+        table.getReadSchema().getFields().stream()
+            .map(InternalField::getName)
+            .collect(Collectors.toList()));
+    assertEquals(
+        "key", table.getReadSchema().getRecordKeyFields().get(0).getName(), "record key field");
+  }
+
+  @Test
+  void droppedPartitionColumnsAreAppendedWithoutMetaFields() throws Exception {
+    InternalTable table =
+        describe(
+            newMetaClient("dropped_partition_column_no_meta_fields", true, "level"),
+            "level:VALUE",
+            false);
+    assertEquals(
+        Arrays.asList("key", "value", "level"),
+        table.getReadSchema().getFields().stream()
+            .map(InternalField::getName)
+            .collect(Collectors.toList()));
+    assertEquals("level", table.getPartitioningFields().get(0).getSourceField().getName());
+  }
+
+  @Test
   void droppedPartitionColumnsAreAppended() throws Exception {
     // The writer schema in the commit metadata lacks the partition column when the writer drops
     // partition columns from the data files, as TableSchemaResolver.appendPartitionColumns handles.
@@ -82,11 +115,20 @@ class TestHudiTableExtractor {
   }
 
   private InternalTable describe(HoodieTableMetaClient metaClient, String partitionSpec) {
+    return describe(metaClient, partitionSpec, true);
+  }
+
+  private InternalTable describe(
+      HoodieTableMetaClient metaClient, String partitionSpec, boolean includeMetaFields) {
+    HudiSchemaExtractor schemaExtractor = new HudiSchemaExtractor();
+    SourcePartitionSpecExtractor partitionSpecExtractor =
+        HudiSourceConfig.fromPartitionFieldSpecConfig(partitionSpec)
+            .loadSourcePartitionSpecExtractor();
+    // The two-argument constructor is the one every other conversion uses, and keeps the fields.
     HudiTableExtractor extractor =
-        new HudiTableExtractor(
-            new HudiSchemaExtractor(),
-            HudiSourceConfig.fromPartitionFieldSpecConfig(partitionSpec)
-                .loadSourcePartitionSpecExtractor());
+        includeMetaFields
+            ? new HudiTableExtractor(schemaExtractor, partitionSpecExtractor)
+            : new HudiTableExtractor(schemaExtractor, partitionSpecExtractor, false);
     HoodieCommitMetadata commitMetadata = new HoodieCommitMetadata();
     commitMetadata.addMetadata(HoodieCommitMetadata.SCHEMA_KEY, WRITER_SCHEMA.toString());
     HoodieInstant commit =

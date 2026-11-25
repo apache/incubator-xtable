@@ -130,7 +130,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, tableDataPath);
     boolean deltaTableExists = deltaLog.tableExists();
     if (!deltaTableExists) {
-      deltaLog.ensureLogDirectoryExist();
+      deltaLog.createLogDirectoriesIfNotExists();
     }
     this.schemaExtractor = schemaExtractor;
     this.partitionExtractor = partitionExtractor;
@@ -226,12 +226,12 @@ public class DeltaConversionTarget implements ConversionTarget {
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
     Snapshot currentSnapshot = deltaLog.currentSnapshot().snapshot();
 
-    Iterator<Tuple2<Object, Seq<Action>>> versionIterator =
+    Iterator<? extends Tuple2<Object, ? extends Seq<Action>>> versionIterator =
         JavaConverters.asJavaIteratorConverter(
-                deltaLog.getChanges(currentSnapshot.version(), false))
+                DeltaSparkShim.getChanges(deltaLog, currentSnapshot.version()))
             .asJava();
     while (versionIterator.hasNext()) {
-      Tuple2<Object, Seq<Action>> currentChange = versionIterator.next();
+      Tuple2<Object, ? extends Seq<Action>> currentChange = versionIterator.next();
       Long targetVersion = currentSnapshot.version();
       List<Action> actions = JavaConverters.seqAsJavaListConverter(currentChange._2()).asJava();
 
@@ -286,7 +286,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     @Getter private StructType latestSchema;
     @Getter private InternalSchema latestSchemaInternal;
     @Setter private TableSyncMetadata metadata;
-    @Setter private Seq<Action> actions;
+    @Setter private scala.collection.immutable.Seq<Action> actions;
 
     private TransactionState(
         DeltaLog deltaLog, String tableName, Instant latestCommitTime, long retentionInHours) {

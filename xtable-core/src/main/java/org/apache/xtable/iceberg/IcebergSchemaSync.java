@@ -107,9 +107,10 @@ public class IcebergSchemaSync {
                       parentPath, latestColumn.name(), latestColumn.type(), latestColumn.doc()));
         }
       } else if (latestColumn == null) {
-        // drop the existing column, use fieldId 0 to perform deletes first
+        // drop the existing column; a negative key performs deletes first, and the column's own
+        // id keeps several deletes from replacing one another
         updates.put(
-            0,
+            -currentColumn.fieldId(),
             () -> updateSchema.deleteColumn(constructFullyQualifiedName(columnName, parentPath)));
       } else {
         updates.putAll(updateColumn(latestColumn, currentColumn, updateSchema, parentPath));

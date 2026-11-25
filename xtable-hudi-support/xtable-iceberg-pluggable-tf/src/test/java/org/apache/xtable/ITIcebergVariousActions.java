@@ -21,9 +21,14 @@ package org.apache.xtable;
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.IcebergTableAssertions.assertIcebergReferencesExactly;
+import static org.apache.xtable.IcebergTableAssertions.assertPublishedAsARewrite;
+import static org.apache.xtable.IcebergTableAssertions.baseFilesWithRows;
+import static org.apache.xtable.IcebergTableAssertions.icebergRowCount;
+import static org.apache.xtable.IcebergTableAssertions.icebergTable;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -61,6 +66,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -68,8 +74,11 @@ import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.storage.StoragePath;
 
+import org.apache.iceberg.DataOperations;
 import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotSummary;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.util.SnapshotUtil;
@@ -117,7 +126,7 @@ public class ITIcebergVariousActions {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 
@@ -516,6 +525,84 @@ public class ITIcebergVariousActions {
     } finally {
       safeClose(hudiClient);
     }
+  }
+
+  /**
+   * A delete of every row of a file group makes Hudi write a base file without rows, which Iceberg
+   * leaves out, so the snapshot only removes the old file and is a delete, as Iceberg's own writer
+   * publishes it. The instants that later write into, roll back to, cluster and clean that file
+   * group still leave Iceberg with exactly the base files that hold rows.
+   */
+  @Test
+  void wholeFileDeleteIsPublishedAsADeleteAndLaterInstantsStillApply() {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            "test_table_" + UUID.randomUUID(),
+            tempDir,
+            jsc,
+            "level:SIMPLE",
+            HoodieTableType.COPY_ON_WRITE)) {
+      Map<String, List<HoodieRecord<HoodieAvroPayload>>> insertsByPartition =
+          table.insertRecords(100, true).stream()
+              .collect(groupingBy(HoodieRecord::getPartitionPath));
+      String partition = insertsByPartition.keySet().stream().sorted().findFirst().get();
+      List<HoodieRecord<HoodieAvroPayload>> deleted = insertsByPartition.get(partition);
+      long rowsLeft = 100 - deleted.size();
+
+      table.deleteRecords(deleted, true);
+      String emptyFileGroup = onlyFileGroupWithoutRows(table);
+      Snapshot delete = icebergTable(table.getBasePath()).currentSnapshot();
+      assertEquals(DataOperations.DELETE, delete.operation());
+      assertNull(delete.summary().get(SnapshotSummary.ADDED_FILES_PROP));
+      assertEquals("1", delete.summary().get(SnapshotSummary.DELETED_FILES_PROP));
+      assertIcebergHoldsTheBaseFilesWithRows(table, rowsLeft);
+
+      // Hudi packs the inserts into the empty file group as a small file, rewriting its base file.
+      table.upsertRecords(deleted, true);
+      String insert =
+          table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
+      assertTrue(
+          table.getAllLatestBaseFilePaths().stream()
+              .anyMatch(path -> emptyFileGroup.equals(fileId(path)) && path.contains(insert)));
+      assertIcebergHoldsTheBaseFilesWithRows(table, 100);
+
+      table.rollback(insert);
+      assertEquals(emptyFileGroup, onlyFileGroupWithoutRows(table));
+      assertIcebergHoldsTheBaseFilesWithRows(table, rowsLeft);
+
+      // Clustering replaces the empty file group along with the others.
+      table.cluster();
+      assertPublishedAsARewrite(table.getBasePath());
+      assertFalse(
+          table.getAllLatestBaseFilePaths().stream()
+              .anyMatch(path -> emptyFileGroup.equals(fileId(path))));
+      assertIcebergHoldsTheBaseFilesWithRows(table, rowsLeft);
+
+      table.upsertRecords(deleted, true);
+      table.clean();
+      assertIcebergHoldsTheBaseFilesWithRows(table, 100);
+    }
+  }
+
+  private static String onlyFileGroupWithoutRows(TestSparkHudiTable table) {
+    List<String> latest = table.getAllLatestBaseFilePaths();
+    Set<String> withRows = new HashSet<>(baseFilesWithRows(table.getMetaClient(), latest));
+    List<String> withoutRows =
+        latest.stream().filter(path -> !withRows.contains(path)).collect(Collectors.toList());
+    assertEquals(1, withoutRows.size(), "base files without rows: " + withoutRows);
+    return fileId(withoutRows.get(0));
+  }
+
+  private static String fileId(String baseFile) {
+    return FSUtils.getFileIdFromFilePath(new StoragePath(baseFile));
+  }
+
+  private static void assertIcebergHoldsTheBaseFilesWithRows(
+      TestSparkHudiTable table, long expectedRows) {
+    assertIcebergReferencesExactly(
+        table.getBasePath(),
+        baseFilesWithRows(table.getMetaClient(), table.getAllLatestBaseFilePaths()));
+    assertEquals(expectedRows, icebergRowCount(table.getBasePath()));
   }
 
   /**

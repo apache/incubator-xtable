@@ -18,7 +18,6 @@
  
 package org.apache.xtable;
 
-import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.IcebergTableAssertions.assertIcebergReferencesExactly;
 import static org.apache.xtable.IcebergTableAssertions.assertNothingPending;
 import static org.apache.xtable.IcebergTableAssertions.icebergRowCount;
@@ -39,16 +38,12 @@ import java.util.stream.Stream;
 
 import lombok.SneakyThrows;
 
-import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.engine.HoodieLocalEngineContext;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.exception.HoodieRestoreException;
-import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 
 /**
  * Operations the Iceberg table format does not support yet have to be refused before they change
@@ -94,73 +89,33 @@ class ITIcebergUnsupportedOperations {
   }
 
   @Test
-  void mergeOnReadTableIsRejectedWhenTheTableIsCreated() {
+  void mergeOnReadTableAtFormatVersionTwoIsRejectedWhenTheTableIsCreated() {
     String tableName = "mor_" + UUID.randomUUID();
-    // Log files never become Iceberg data files, so the format refuses the table as soon as Hudi
-    // loads it, rather than publishing snapshots that silently miss every update.
+    Properties formatVersionTwo = new Properties();
+    formatVersionTwo.setProperty(IcebergFormatConfig.FORMAT_VERSION, "2");
+    // A merge-on-read table is published with deletion vectors, which format version 2 lacks, so
+    // the format refuses the table as soon as Hudi loads it.
     Exception exception =
         assertThrows(
             Exception.class,
             () ->
                 TestJavaHudiTable.forStandardSchema(
-                        tableName, tempDir, null, HoodieTableType.MERGE_ON_READ)
+                        tableName, tempDir, null, HoodieTableType.MERGE_ON_READ, formatVersionTwo)
                     .close());
     Throwable rootCause = rootCause(exception);
     assertTrue(
         rootCause instanceof UnsupportedOperationException
-            && rootCause.getMessage().contains("MERGE_ON_READ"),
-        "merge-on-read must be refused as unsupported: " + exception);
+            && rootCause.getMessage().contains("MERGE_ON_READ")
+            && rootCause.getMessage().contains("format version 2"),
+        "merge-on-read at format version 2 must be refused as unsupported: " + exception);
     Path basePath = tempDir.resolve(tableName + "_v1");
     assertFalse(
         IcebergTableAssertions.icebergTableExists(basePath.toUri().toString()),
-        "no Iceberg table may be created for a merge-on-read table");
+        "no Iceberg table may be created for the refused table");
     assertEquals(
         Collections.emptyList(),
         instantFiles(basePath.resolve(".hoodie").resolve("timeline")),
-        "no Hudi instant may be written for a merge-on-read table");
-  }
-
-  @Test
-  void writerWithTheMetadataTableEnabledIsRefusedAndTheTableRecovers() {
-    String tableName = "mdt_" + UUID.randomUUID();
-    String basePath = tempDir.resolve(tableName).toString();
-    Properties metadataTableEnabled = new Properties();
-    metadataTableEnabled.setProperty(HoodieMetadataConfig.ENABLE.key(), "true");
-    String refusedCommit;
-    // Hudi enables the metadata table by default, so this is a writer that only set the format.
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchemaAtBasePath(
-            tableName, basePath, null, HoodieTableType.COPY_ON_WRITE, metadataTableEnabled)) {
-      refusedCommit = table.startCommit();
-      Exception exception =
-          assertThrows(
-              Exception.class,
-              () ->
-                  table.insertRecordsWithCommitAlreadyStarted(
-                      table.generateRecords(100), refusedCommit, true));
-      Throwable rootCause = rootCause(exception);
-      assertTrue(
-          rootCause instanceof UnsupportedOperationException
-              && rootCause.getMessage().contains(HoodieMetadataConfig.ENABLE.key()),
-          "the metadata table must be refused naming the config: " + exception);
-      assertFalse(
-          IcebergTableAssertions.icebergTableExists(basePath),
-          "the refused commit must not reach Iceberg");
-    }
-
-    // A Spark writer with the metadata table off removes it on its own; the Java writer keeps
-    // writing to one that exists, so remove it the same way here.
-    HoodieTableMetadataUtil.deleteMetadataTable(
-        basePath, new HoodieLocalEngineContext(getStorageConf(new Configuration())));
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchemaAtBasePath(
-            tableName, basePath, null, HoodieTableType.COPY_ON_WRITE, new Properties())) {
-      table.rollback(refusedCommit);
-      table.insertRecords(50, true);
-      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
-      assertEquals(50, icebergRowCount(table.getBasePath()));
-      assertNothingPending(reconstructedTimeline(table.getBasePath()));
-    }
+        "no Hudi instant may be written for the refused table");
   }
 
   @SneakyThrows

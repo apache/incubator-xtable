@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -46,7 +47,6 @@ import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.WriteOperationType;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
@@ -128,6 +128,29 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   }
 
   /**
+   * Same as {@link #forStandardSchema(String, Path, JavaSparkContext, String, HoodieTableType)},
+   * with properties that go into both {@code hoodie.properties} and the write config, as {@link
+   * TestJavaHudiTable} takes them.
+   */
+  public static TestSparkHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      JavaSparkContext jsc,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Properties tableProperties) {
+    return new TestSparkHudiTable(
+        tableName,
+        BASIC_SCHEMA,
+        tempDir,
+        jsc,
+        partitionConfig,
+        tableType,
+        HoodieTableVersion.SIX,
+        tableProperties);
+  }
+
+  /**
    * Create a test table instance with a schema that has more fields than an instance returned by
    * {@link #forStandardSchema(String, Path, JavaSparkContext, String, HoodieTableType)}.
    * Specifically this instance will add a top level field, nested field, field within a list, and
@@ -176,14 +199,39 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       String partitionConfig,
       HoodieTableType hoodieTableType,
       HoodieTableVersion tableVersion) {
+    this(
+        name,
+        schema,
+        tempDir,
+        jsc,
+        partitionConfig,
+        hoodieTableType,
+        tableVersion,
+        new Properties());
+  }
+
+  private TestSparkHudiTable(
+      String name,
+      Schema schema,
+      Path tempDir,
+      JavaSparkContext jsc,
+      String partitionConfig,
+      HoodieTableType hoodieTableType,
+      HoodieTableVersion tableVersion,
+      Properties tableProperties) {
     super(name, schema, tempDir, partitionConfig);
     // Set the table version before initializing the write/meta clients, which read it. The
-    // module-wide format overrides win over the version the factory asked for.
-    this.tableVersion = tableVersionFrom(tableFormatOverrides(), tableVersion);
+    // caller's table properties win over the module-wide format overrides, which win over the
+    // version the factory asked for.
+    this.tableVersion =
+        tableVersionFrom(tableProperties, tableVersionFrom(tableFormatOverrides(), tableVersion));
+    tableProperties.forEach((key, value) -> typedProperties.put(key, value));
     // initialize spark session
     this.jsc = jsc;
     this.writeClient = initSparkWriteClient(schema, typedProperties);
-    this.metaClient = initMetaClient(jsc, hoodieTableType, typedProperties);
+    this.metaClient =
+        getMetaClient(
+            typedProperties, hoodieTableType, jsc.hadoopConfiguration(), true, tableProperties);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
@@ -310,10 +358,5 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
     HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
     return new SparkRDDWriteClient<>(context, writeConfig);
-  }
-
-  private HoodieTableMetaClient initMetaClient(
-      JavaSparkContext jsc, HoodieTableType hoodieTableType, TypedProperties keyGenProperties) {
-    return getMetaClient(keyGenProperties, hoodieTableType, jsc.hadoopConfiguration(), true);
   }
 }

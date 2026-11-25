@@ -19,6 +19,7 @@
 package org.apache.xtable.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -27,8 +28,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
@@ -168,5 +172,50 @@ public class TestIcebergTableManager {
         tableManager.getOrCreateTable(catalogConfig, IDENTIFIER, BASE_PATH, schema, partitionSpec);
     assertEquals(mockTable, actual);
     verify(mockCatalog).initialize(catalogName, OPTIONS);
+  }
+
+  @Test
+  void catalogOperationsWorkWhenTheContextClassLoaderCannotSeeTheCatalog() throws Exception {
+    // A shared ForkJoin pool thread has the system class loader as its context loader, which
+    // cannot see jars added at runtime; a loader that sees only the JDK stands in for it here.
+    String catalogName = "catalogFromAnotherLoader";
+    StubCatalog.registerMock(catalogName, mockCatalog);
+    IcebergCatalogConfig catalogConfig =
+        IcebergCatalogConfig.builder()
+            .catalogImpl(StubCatalog.class.getName())
+            .catalogName(catalogName)
+            .catalogOptions(OPTIONS)
+            .build();
+    // Catalogs load more classes lazily through the context class loader, for example the AWS
+    // catalogs' HTTP client configuration on the first S3 read.
+    when(mockCatalog.tableExists(IDENTIFIER))
+        .thenAnswer(
+            invocation -> {
+              Class.forName(
+                  StubCatalog.class.getName(),
+                  true,
+                  Thread.currentThread().getContextClassLoader());
+              return true;
+            });
+    IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
+
+    AtomicReference<Object> result = new AtomicReference<>();
+    ClassLoader jdkOnlyLoader = new URLClassLoader(new URL[0], null);
+    Thread thread =
+        new Thread(
+            () -> {
+              try {
+                result.set(tableManager.tableExists(catalogConfig, IDENTIFIER, BASE_PATH));
+              } catch (Throwable t) {
+                result.set(t);
+              }
+            });
+    thread.setContextClassLoader(jdkOnlyLoader);
+    thread.start();
+    thread.join();
+
+    assertEquals(Boolean.TRUE, result.get());
+    verify(mockCatalog).initialize(catalogName, OPTIONS);
+    assertTrue(thread.getContextClassLoader() == jdkOnlyLoader);
   }
 }
