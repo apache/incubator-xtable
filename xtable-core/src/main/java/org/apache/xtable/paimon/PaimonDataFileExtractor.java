@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -62,7 +61,7 @@ public class PaimonDataFileExtractor {
   public List<InternalDataFile> toInternalDataFiles(
       FileStoreTable table, Snapshot snapshot, InternalSchema internalSchema) {
     List<InternalDataFile> result = new ArrayList<>();
-    Function<Long, InternalSchema> fileSchemas = fileSchemaLookup(table);
+    Map<Long, InternalSchema> fileSchemas = new HashMap<>();
     Iterator<ManifestEntry> manifestEntryIterator =
         newSnapshotReader(table, snapshot).readFileIterator();
     while (manifestEntryIterator.hasNext()) {
@@ -79,14 +78,15 @@ public class PaimonDataFileExtractor {
    * @param table the Paimon table
    * @param entry the manifest entry representing a data file
    * @param internalSchema the internal schema for partition value extraction
-   * @param fileSchemas looks up a schema by id, used for the schema the data file was written with
+   * @param fileSchemas the schemas read so far by schema id, to which the schema the data file was
+   *     written with is added if it is missing
    * @return InternalDataFile representation
    */
   public InternalDataFile toInternalDataFile(
       FileStoreTable table,
       ManifestEntry entry,
       InternalSchema internalSchema,
-      Function<Long, InternalSchema> fileSchemas) {
+      Map<Long, InternalSchema> fileSchemas) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .partitionSubdirectory(Optional.of(bucketPath(entry)))
@@ -97,7 +97,9 @@ public class PaimonDataFileExtractor {
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
         .columnStats(
             statsExtractor.extractColumnStats(
-                entry.file(), fileSchemas.apply(entry.file().schemaId()), internalSchema))
+                entry.file(),
+                getFileSchema(table, entry.file().schemaId(), internalSchema, fileSchemas),
+                internalSchema))
         .build();
   }
 
@@ -140,7 +142,7 @@ public class PaimonDataFileExtractor {
 
     Set<InternalDataFile> addedFiles = new HashSet<>();
     Set<InternalDataFile> removedFiles = new HashSet<>();
-    Function<Long, InternalSchema> fileSchemas = fileSchemaLookup(table);
+    Map<Long, InternalSchema> fileSchemas = new HashMap<>();
 
     // For primary key tables, only consider top-level files (fully compacted)
     int topLevel = table.coreOptions().numLevels() - 1;
@@ -173,12 +175,20 @@ public class PaimonDataFileExtractor {
     return InternalFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
   }
 
-  /** Returns a lookup of the table's schemas by id that reads each schema once. */
-  private Function<Long, InternalSchema> fileSchemaLookup(FileStoreTable table) {
-    Map<Long, InternalSchema> schemas = new HashMap<>();
-    return schemaId ->
-        schemas.computeIfAbsent(
-            schemaId, id -> schemaExtractor.toInternalSchema(table.schemaManager().schema(id)));
+  private InternalSchema getFileSchema(
+      FileStoreTable table,
+      long schemaId,
+      InternalSchema internalSchema,
+      Map<Long, InternalSchema> fileSchemas) {
+    return fileSchemas.computeIfAbsent(
+        schemaId,
+        id -> {
+          InternalSchema fileSchema =
+              schemaExtractor.toInternalSchema(table.schemaManager().schema(id));
+          // Reuse the instance when the schemas are equal, so that comparing them for each file is
+          // a reference check
+          return fileSchema.equals(internalSchema) ? internalSchema : fileSchema;
+        });
   }
 
   private SnapshotReader newSnapshotReader(FileStoreTable table, Snapshot snapshot) {

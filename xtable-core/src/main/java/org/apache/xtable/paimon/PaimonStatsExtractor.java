@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
@@ -101,9 +102,13 @@ public class PaimonStatsExtractor {
    */
   private static Map<String, InternalField> getFieldsByFileColumnName(
       InternalSchema fileSchema, InternalSchema internalSchema) {
+    if (fileSchema.equals(internalSchema)) {
+      return internalSchema.getFields().stream()
+          .collect(Collectors.toMap(InternalField::getName, Function.identity()));
+    }
     Map<Integer, InternalField> fieldsById =
         internalSchema.getFields().stream()
-            .collect(Collectors.toMap(InternalField::getFieldId, f -> f));
+            .collect(Collectors.toMap(InternalField::getFieldId, Function.identity()));
     Map<String, InternalField> fieldsByFileColumnName = new HashMap<>();
     for (InternalField fileField : fileSchema.getFields()) {
       InternalField field = fieldsById.get(fileField.getFieldId());

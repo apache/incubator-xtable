@@ -627,6 +627,27 @@ public class TestPaimonStatsExtractor {
   }
 
   @Test
+  void testStatsAfterDropAndAddColumnWithSameName() throws Exception {
+    Schema schema =
+        Schema.newBuilder().column("id", DataTypes.INT()).column("a", DataTypes.INT()).build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table =
+        TestPaimonTable.createTable(catalog, "drop_and_add_column_with_same_name", schema);
+    writeWithoutCompaction(table, Arrays.asList(GenericRow.of(1, 10), GenericRow.of(2, 20)));
+    table = alterTable(catalog, table, SchemaChange.dropColumn("a"));
+    table = alterTable(catalog, table, SchemaChange.addColumn("a", DataTypes.INT()));
+    writeWithoutCompaction(table, Collections.singletonList(GenericRow.of(3, 30)));
+
+    Map<Long, List<ColumnStat>> statsByRowCount = getStatsByRowCount(table);
+
+    // Both columns are named a, but the new one has another field id and is null in the old file.
+    assertEquals(Collections.singletonList("id"), getColumnNames(statsByRowCount.get(2L)));
+    List<ColumnStat> newFileStats = statsByRowCount.get(1L);
+    assertEquals(Arrays.asList("id", "a"), getColumnNames(newFileStats));
+    assertEquals(Range.vector(30, 30), getColumnStat(newFileStats, "a").getRange());
+  }
+
+  @Test
   void testStatsAfterRenameAndAddColumn() throws Exception {
     Schema schema =
         Schema.newBuilder().column("id", DataTypes.INT()).column("a", DataTypes.INT()).build();
