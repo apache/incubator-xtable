@@ -18,6 +18,8 @@
  
 package org.apache.xtable.paimon;
 
+import static org.apache.xtable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +38,7 @@ import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -69,16 +72,37 @@ public class PaimonPartitionExtractor {
       return Collections.emptyList();
     }
 
+    String defaultPartitionName = table.coreOptions().partitionDefaultName();
     List<PartitionValue> partitionValues = new ArrayList<>(partValues.size());
     for (Map.Entry<String, String> entry : partValues.entrySet()) {
-      PartitionValue partitionValue =
+      InternalPartitionField partitionField = toPartitionField(entry.getKey(), internalSchema);
+      Object typedValue =
+          convertPartitionValue(
+              entry.getValue(),
+              partitionField.getSourceField().getSchema().getDataType(),
+              defaultPartitionName);
+      partitionValues.add(
           PartitionValue.builder()
-              .partitionField(toPartitionField(entry.getKey(), internalSchema))
-              .range(Range.scalar(entry.getValue()))
-              .build();
-      partitionValues.add(partitionValue);
+              .partitionField(partitionField)
+              .range(Range.scalar(typedValue))
+              .build());
     }
     return partitionValues;
+  }
+
+  /**
+   * Converts a Paimon partition path value (always rendered as a String by the partition computer)
+   * into the typed value the Delta and Iceberg targets expect (for example an epoch-day Integer for
+   * DATE, an Integer for INT, a Long for BIGINT), reusing the same conversion the Delta sources
+   * use. A null partition value is rendered by Paimon as the configured default-partition name, so
+   * that sentinel is mapped back to {@code null}.
+   */
+  static Object convertPartitionValue(
+      String rawValue, InternalType fieldType, String defaultPartitionName) {
+    if (rawValue == null || rawValue.equals(defaultPartitionName)) {
+      return null;
+    }
+    return convertFromDeltaPartitionValue(rawValue, fieldType, PartitionTransformType.VALUE, null);
   }
 
   public Optional<String> toPartitionPath(FileStoreTable table, BinaryRow partition) {
