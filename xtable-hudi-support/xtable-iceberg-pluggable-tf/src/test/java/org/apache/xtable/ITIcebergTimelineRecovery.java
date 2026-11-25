@@ -27,16 +27,20 @@ import static org.apache.xtable.IcebergTableAssertions.reconstructedTimeline;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -49,6 +53,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.storage.StoragePath;
 
 import org.apache.iceberg.Table;
 
@@ -131,6 +136,42 @@ class ITIcebergTimelineRecovery {
       HoodieTimeline after = reconstructedTimeline(table.getBasePath());
       assertEquals(Collections.singletonList(commit2), completedCommitTimes(after));
       assertNothingPending(after);
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(50, icebergRowCount(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void crashedFirstCommitStaysPendingOnceALaterWriteCreatesTheIcebergTable() throws IOException {
+    try (TestJavaHudiTable table = newTable()) {
+      Path tableDirectory = Paths.get(URI.create(table.getBasePath()));
+      Files.createFile(tableDirectory.resolve("metadata"));
+      String commit1 = table.startCommit();
+      assertThrows(
+          Exception.class,
+          () ->
+              table.insertRecordsWithCommitAlreadyStarted(
+                  table.generateRecords(100), commit1, true));
+      Files.delete(tableDirectory.resolve("metadata"));
+
+      // Under lazy failed-write cleaning the next write does not roll the crashed commit back
+      // first; its snapshot is the first one, and the crashed commit predates it on both clocks.
+      // Its markers tell it apart from a commit whose snapshot was expired: a publish that failed
+      // never reached postCommit, which is what deletes them.
+      String commit2 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(50), commit2, true);
+      HoodieTimeline after = reconstructedTimeline(table.getBasePath());
+      assertEquals(Collections.singletonList(commit2), completedCommitTimes(after));
+      assertTrue(
+          after
+              .filterInflightsAndRequested()
+              .getInstantsAsStream()
+              .anyMatch(instant -> commit1.equals(instant.requestedTime())),
+          "the crashed commit must stay pending, not become expired history");
+      assertEquals(50, icebergRowCount(table.getBasePath()));
+
+      table.getWriteClient().rollback(commit1);
+      assertNothingPending(reconstructedTimeline(table.getBasePath()));
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
       assertEquals(50, icebergRowCount(table.getBasePath()));
     }
@@ -221,6 +262,123 @@ class ITIcebergTimelineRecovery {
       assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
       assertEquals(50, icebergRowCount(table.getBasePath()));
       assertNothingPending(reconstructedTimeline(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void expiredCommitThatKeptItsMarkersStaysHistory() throws IOException {
+    try (TestJavaHudiTable table = newTable()) {
+      List<String> commits = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        String commit = table.startCommit();
+        table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(10), commit, true);
+        commits.add(commit);
+      }
+      // The second commit published its snapshot but kept its markers, as when deleting them
+      // failed or the writer stopped before postCommit.
+      table
+          .getMetaClient()
+          .getStorage()
+          .createDirectory(
+              new StoragePath(table.getMetaClient().getMarkerFolderPath(commits.get(1))));
+      icebergTable(table.getBasePath())
+          .expireSnapshots()
+          .expireOlderThan(System.currentTimeMillis())
+          .retainLast(1)
+          .commit();
+
+      HoodieTimeline timeline = reconstructedTimeline(table.getBasePath());
+      assertEquals(commits, completedCommitTimes(timeline));
+      assertNothingPending(timeline);
+
+      // Reported pending, the commit would be rolled back by the next clean, which deletes its
+      // files while Iceberg keeps referencing them.
+      table.insertRecords(10, true);
+      table.getWriteClient().clean();
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(40, icebergRowCount(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void rollbackOfACommitWhoseSnapshotWasExpiredIsRefused() {
+    try (TestJavaHudiTable table = newTable()) {
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(40, true);
+      table.upsertRecords(inserts.subList(0, 10), true);
+      table.upsertRecords(inserts.subList(0, 10), true);
+      String upsertCommit =
+          table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
+      // The clean's snapshot is the one the expiry keeps, so the latest commit loses its own.
+      table.clean();
+      List<String> filesBeforeRollback = table.getAllLatestBaseFilePaths();
+      icebergTable(table.getBasePath())
+          .expireSnapshots()
+          .expireOlderThan(System.currentTimeMillis())
+          .retainLast(1)
+          .commit();
+      HoodieTimeline expired = reconstructedTimeline(table.getBasePath());
+      assertNothingPending(expired);
+      assertTrue(completedCommitTimes(expired).contains(upsertCommit));
+
+      // Hudi still permits rolling back its latest commit, but with the snapshot gone Iceberg no
+      // longer knows which files the commit added or superseded, so the rollback is refused before
+      // Hudi deletes anything and before a rollback instant is left pending.
+      assertThrows(Exception.class, () -> table.rollback(upsertCommit));
+
+      assertEquals(filesBeforeRollback, table.getAllLatestBaseFilePaths());
+      assertIcebergReferencesExactly(table.getBasePath(), filesBeforeRollback);
+      assertEquals(40, icebergRowCount(table.getBasePath()));
+      HoodieTimeline timeline = reconstructedTimeline(table.getBasePath());
+      assertNothingPending(timeline);
+      assertTrue(timeline.getRollbackTimeline().empty(), "no rollback instant may be left behind");
+      table.insertRecords(10, true);
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(50, icebergRowCount(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void clusteringWhosePublishFailedIsRolledBackByTheNextWriter() throws IOException {
+    try (TestJavaHudiTable table = newTable()) {
+      table.insertRecords(100, true);
+      table.insertRecords(100, true);
+      List<String> filesBeforeClustering = table.getAllLatestBaseFilePaths();
+      // A read-only Iceberg metadata directory fails the publish after Hudi has completed the
+      // clustering, so the completed replacecommit has no snapshot.
+      Path metadataDirectory = Paths.get(URI.create(table.getBasePath())).resolve("metadata");
+      Set<PosixFilePermission> writable = Files.getPosixFilePermissions(metadataDirectory);
+      Files.setPosixFilePermissions(
+          metadataDirectory, PosixFilePermissions.fromString("r-xr-xr-x"));
+      assumeTrue(!Files.isWritable(metadataDirectory), "needs a user the permissions bind");
+      try {
+        assertThrows(Exception.class, table::cluster);
+      } finally {
+        Files.setPosixFilePermissions(metadataDirectory, writable);
+      }
+
+      // The pending instant has to be reported with the clustering action, since the only
+      // requested file on disk is the clustering plan, which Hudi reads on every write and on
+      // every file system view build.
+      HoodieTimeline before = reconstructedTimeline(table.getBasePath());
+      assertEquals(
+          1,
+          before.filterPendingClusteringTimeline().countInstants(),
+          before.getInstants().toString());
+      String clustering =
+          before.filterPendingClusteringTimeline().firstInstant().get().requestedTime();
+      assertEquals(200, icebergRowCount(table.getBasePath()));
+
+      table.insertRecords(10, true);
+      table.getWriteClient().rollback(clustering);
+
+      // As for a native table, the rollback deletes the clustered files and leaves the clustering
+      // plan pending for the next clustering run; the replaced file groups are live again in both.
+      HoodieTimeline after = reconstructedTimeline(table.getBasePath());
+      assertEquals(1, after.filterPendingClusteringTimeline().countInstants());
+      assertEquals(1, after.filterInflightsAndRequested().countInstants());
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertTrue(table.getAllLatestBaseFilePaths().containsAll(filesBeforeClustering));
+      assertEquals(210, icebergRowCount(table.getBasePath()));
     }
   }
 }

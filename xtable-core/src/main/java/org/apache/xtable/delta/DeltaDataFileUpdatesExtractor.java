@@ -34,8 +34,9 @@ import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
 
+import scala.Option;
 import scala.collection.JavaConverters;
-import scala.collection.Seq;
+import scala.collection.immutable.Seq;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -108,7 +109,7 @@ public class DeltaDataFileUpdatesExtractor {
     List<Action> allActions =
         Stream.concat(addActions, removeFileActions.stream())
             .collect(CustomCollectors.toList(totalActions));
-    return JavaConverters.asScalaBuffer(allActions).toSeq();
+    return JavaConverters.asScalaBuffer(allActions).toList();
   }
 
   private Stream<AddFile> createAddFileAction(
@@ -122,7 +123,10 @@ public class DeltaDataFileUpdatesExtractor {
             true,
             getColumnStats(schema, dataFile.getRecordCount(), dataFile.getColumnStats()),
             null,
-            null));
+            null,
+            Option.empty(),
+            Option.empty(),
+            Option.empty()));
   }
 
   private String getColumnStats(

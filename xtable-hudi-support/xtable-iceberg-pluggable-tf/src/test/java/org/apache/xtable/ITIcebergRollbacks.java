@@ -92,9 +92,11 @@ class ITIcebergRollbacks {
     String basePath = tempDir.resolve(tableName).toString();
     List<String> filesAfterInsert;
     String upsertCommit;
+    Properties metadataTableDisabled = new Properties();
+    metadataTableDisabled.setProperty(HoodieMetadataConfig.ENABLE.key(), "false");
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchemaAtBasePath(
-            tableName, basePath, null, HoodieTableType.COPY_ON_WRITE, new Properties())) {
+            tableName, basePath, null, HoodieTableType.COPY_ON_WRITE, metadataTableDisabled)) {
       List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(100, true);
       filesAfterInsert = table.getAllLatestBaseFilePaths();
       table.upsertRecords(inserts.subList(0, 20), true);
@@ -102,8 +104,7 @@ class ITIcebergRollbacks {
           table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
     }
     // Hudi's Spark rollback procedures build their own write config, which leaves the metadata
-    // table at its default, so the rollback runs with a metadata table. It must still be recorded:
-    // Hudi has deleted the files by the time the hook runs.
+    // table at its default, so a rollback can be the first operation that builds one.
     Properties metadataTableEnabled = new Properties();
     metadataTableEnabled.setProperty(HoodieMetadataConfig.ENABLE.key(), "true");
     try (TestJavaHudiTable table =
@@ -118,6 +119,37 @@ class ITIcebergRollbacks {
           "the rollback must have built a metadata table");
       assertIcebergReferencesExactly(table.getBasePath(), filesAfterInsert);
       assertEquals(100, icebergRowCount(table.getBasePath()));
+    }
+  }
+
+  @Test
+  void rollbackInAPartitionWhoseValueHasASpaceRemovesTheRolledBackFiles() {
+    String tableName = "rollback_" + UUID.randomUUID();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchemaAtBasePath(
+            tableName,
+            tempDir.resolve(tableName).toString(),
+            "level:SIMPLE",
+            HoodieTableType.COPY_ON_WRITE,
+            new Properties())) {
+      // Rollback metadata spells the deleted paths of a base path without a scheme as plain
+      // strings; a space or a percent sign in a partition value must not be percent-encoded on the
+      // way to Iceberg, which holds the files under the unencoded spelling and ignores a delete it
+      // cannot match.
+      List<HoodieRecord<HoodieAvroPayload>> inserts = table.insertRecords(50, "us west", true);
+      table.insertRecords(50, "50%off", true);
+      List<String> filesAfterInsert = table.getAllLatestBaseFilePaths();
+      table.upsertRecords(inserts.subList(0, 10), true);
+      String upsertCommit =
+          table.getMetaClient().reloadActiveTimeline().lastInstant().get().requestedTime();
+
+      table.rollback(upsertCommit);
+
+      assertIcebergReferencesExactly(table.getBasePath(), filesAfterInsert);
+      assertEquals(100, icebergRowCount(table.getBasePath()));
+      table.insertRecords(20, "us west", true);
+      assertIcebergReferencesExactly(table.getBasePath(), table.getAllLatestBaseFilePaths());
+      assertEquals(120, icebergRowCount(table.getBasePath()));
     }
   }
 

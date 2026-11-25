@@ -148,6 +148,20 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
+  void dropsEveryColumnRemovedInOneSync() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+
+    Schema withoutFirstTwoColumns =
+        new Schema(SCHEMA.columns().subList(2, SCHEMA.columns().size()));
+    schemaSync.sync(SCHEMA, withoutFirstTwoColumns, mockTransaction);
+
+    verify(mockUpdateSchema).deleteColumn("timestamp_field");
+    verify(mockUpdateSchema).deleteColumn("date_field");
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
   public void testAddNestedColumn() {
     String columnName = "addedColumn";
     String doc = "doc";

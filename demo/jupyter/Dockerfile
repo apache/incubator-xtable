@@ -30,7 +30,7 @@
 FROM almondsh/almond:0.14.1@sha256:0407359be58529eaa8e35bcf4586c3a890123be64005600b381de88fdc3c5de7
 
 # Install a JDK 11 for the Scala kernels; the base image only ships Java 8.
-RUN mamba create -y -q -n jdk11 -c conda-forge openjdk=11 && mamba clean -afy
+RUN mamba create -y -q -n jdk17 -c conda-forge openjdk=17 && mamba clean -afy
 
 # Pre-fetch the notebook dependencies into the coursier cache. The versions
 # come from demo/jars/versions.properties, generated from the root pom by
@@ -60,5 +60,5 @@ paths = sorted(glob.glob('/home/jovyan/.local/share/jupyter/kernels/scala*/kerne
 assert paths, 'no scala kernels found under /home/jovyan/.local/share/jupyter/kernels'; \
 kernels = [(p, json.load(open(p))) for p in paths]; \
 assert all(k['argv'][0] == 'java' for _, k in kernels), 'kernel argv[0] is not java: %r' % [k['argv'][0] for _, k in kernels]; \
-[(k['argv'].__setitem__(0, '/opt/conda/envs/jdk11/bin/java'), k['argv'].insert(1, '-Xmx4g'), k['argv'].extend(['--predef', '/usr/local/share/xtable/predef.sc']), k.setdefault('env', {}).__setitem__('JAVA_HOME', '/opt/conda/envs/jdk11'), json.dump(k, open(p, 'w'), indent=2)) for p, k in kernels]; \
+[(k['argv'].__setitem__(0, '/opt/conda/envs/jdk17/bin/java'), k['argv'].insert(1, '-Xmx4g'), k['argv'].extend(['--predef', '/usr/local/share/xtable/predef.sc']), k.setdefault('env', {}).__setitem__('JAVA_HOME', '/opt/conda/envs/jdk17'), json.dump(k, open(p, 'w'), indent=2)) for p, k in kernels]; \
 print('patched kernels:', [p for p, _ in kernels])"

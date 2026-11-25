@@ -111,7 +111,7 @@
         <!-- Delta dependencies -->
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <artifactId>${delta.artifact.prefix}_${scala.binary.version}</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -139,7 +139,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.paimon</groupId>
-            <artifactId>paimon-spark-${spark.version.prefix}</artifactId>
+            <artifactId>paimon-spark-${paimon.spark.version.prefix}</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -225,6 +225,25 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-delta-shim-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/main/${delta.shim.dir}/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <executions>
@@ -241,4 +260,26 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- These tests call Delta and Scala APIs that changed in Delta 4 and Scala 2.13: the getSnapshotAt
+             overload their mocks verify, GeneratedColumn and JavaConversions -->
+        <profile>
+            <id>spark4.1</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <testExcludes>
+                                <testExclude>org/apache/xtable/delta/ITDeltaConversionSource.java</testExclude>
+                                <testExclude>org/apache/xtable/delta/TestDeltaSync.java</testExclude>
+                            </testExcludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

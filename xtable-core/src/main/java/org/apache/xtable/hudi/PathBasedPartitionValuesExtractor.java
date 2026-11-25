@@ -22,18 +22,33 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.Value;
 
+import org.apache.hudi.common.util.PartitionPathEncodeUtils;
+
 import org.apache.xtable.exception.PartitionValuesExtractorException;
 import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -42,6 +57,16 @@ import org.apache.xtable.model.stat.Range;
 @AllArgsConstructor
 public class PathBasedPartitionValuesExtractor {
   private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
+  private static final Pattern INTEGRAL_VALUE = Pattern.compile("-?\\d+");
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      new DateTimeFormatterBuilder()
+          .append(DateTimeFormatter.ISO_LOCAL_DATE)
+          .appendPattern("[' ']['T']")
+          .append(DateTimeFormatter.ISO_LOCAL_TIME)
+          .optionalStart()
+          .appendOffsetId()
+          .optionalEnd()
+          .toFormatter();
   @NonNull protected final Map<String, String> pathToPartitionFieldFormat;
 
   public List<PartitionValue> extractPartitionValues(
@@ -95,8 +120,7 @@ public class PathBasedPartitionValuesExtractor {
         // this case is possible if user is directly relying on directly _hoodie_partition_path due
         // to custom partitioning logic
         boolean isSlashDelimited = totalNumberOfPartitions > 1;
-        return parseValue(
-            remainingPath, field.getSourceField().getSchema().getDataType(), isSlashDelimited);
+        return parseValue(remainingPath, field.getSourceField().getSchema(), isSlashDelimited);
       default:
         throw new IllegalArgumentException(
             "Unexpected partition type: " + field.getTransformType());
@@ -119,7 +143,7 @@ public class PathBasedPartitionValuesExtractor {
   }
 
   protected static PartialResult parseValue(
-      String remainingPath, InternalType sourceFieldType, boolean isSlashDelimited) {
+      String remainingPath, InternalSchema sourceFieldSchema, boolean isSlashDelimited) {
     if (remainingPath.isEmpty()) {
       throw new PartitionValuesExtractorException("Missing partition value");
     }
@@ -134,19 +158,24 @@ public class PathBasedPartitionValuesExtractor {
     String unParsedPath =
         remainingPath.substring(Math.min(endCharIndex + 1, remainingPath.length()));
     Object parsedValue;
+    InternalType sourceFieldType = sourceFieldSchema.getDataType();
     switch (sourceFieldType) {
       case STRING:
       case ENUM:
         parsedValue = valueAsString;
         break;
       case INT:
-      case DATE:
         parsedValue = Integer.parseInt(valueAsString);
         break;
+      case DATE:
+        parsedValue = parseDateValue(valueAsString);
+        break;
       case LONG:
+        parsedValue = Long.parseLong(valueAsString);
+        break;
       case TIMESTAMP:
       case TIMESTAMP_NTZ:
-        parsedValue = Long.parseLong(valueAsString);
+        parsedValue = parseTimestampValue(valueAsString, sourceFieldSchema);
         break;
       case DOUBLE:
         parsedValue = Double.parseDouble(valueAsString);
@@ -170,6 +199,60 @@ public class PathBasedPartitionValuesExtractor {
             "Unexpected source field type in partition parser: " + sourceFieldType);
     }
     return new PartialResult(parsedValue, unParsedPath);
+  }
+
+  /** Days since epoch, from either a number of days or an ISO date such as 2024-02-29. */
+  private static int parseDateValue(String value) {
+    if (INTEGRAL_VALUE.matcher(value).matches()) {
+      return Integer.parseInt(value);
+    }
+    try {
+      return (int) LocalDate.parse(value).toEpochDay();
+    } catch (DateTimeParseException ex) {
+      throw new PartitionValuesExtractorException("Unable to parse date from path: " + value, ex);
+    }
+  }
+
+  /**
+   * Time since epoch in the field's timestamp precision, from either a number in that precision or
+   * a date and time such as 2024-02-29 10:30:00, which may be path escaped and carry an offset.
+   */
+  private static long parseTimestampValue(String value, InternalSchema fieldSchema) {
+    if (INTEGRAL_VALUE.matcher(value).matches()) {
+      return Long.parseLong(value);
+    }
+    String unescaped = PartitionPathEncodeUtils.unescapePathName(value);
+    Instant instant;
+    try {
+      TemporalAccessor parsed =
+          TIMESTAMP_FORMATTER.parseBest(unescaped, OffsetDateTime::from, LocalDateTime::from);
+      if (parsed instanceof OffsetDateTime) {
+        instant = ((OffsetDateTime) parsed).toInstant();
+      } else {
+        // Hudi's SQL key generator writes a timestamp as wall-clock time in the writer JVM's
+        // default time zone, while a timestamp without time zone has no zone to apply.
+        ZoneId zone =
+            fieldSchema.getDataType() == InternalType.TIMESTAMP_NTZ
+                ? ZoneOffset.UTC
+                : ZoneId.systemDefault();
+        instant = ((LocalDateTime) parsed).atZone(zone).toInstant();
+      }
+    } catch (DateTimeParseException ex) {
+      throw new PartitionValuesExtractorException(
+          "Unable to parse timestamp from path: " + value, ex);
+    }
+    Object precision =
+        fieldSchema.getMetadata() == null
+            ? null
+            : fieldSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION);
+    if (precision == InternalSchema.MetadataValue.MILLIS) {
+      return instant.toEpochMilli();
+    }
+    if (precision == InternalSchema.MetadataValue.NANOS) {
+      return TimeUnit.SECONDS.toNanos(instant.getEpochSecond()) + instant.getNano();
+    }
+    return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
+        + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
   }
 
   @Value

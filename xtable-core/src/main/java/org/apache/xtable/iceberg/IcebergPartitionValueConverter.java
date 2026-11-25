@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,10 @@ import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.StructLike;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.UnboundTerm;
+import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Types;
 
@@ -246,6 +251,47 @@ public class IcebergPartitionValueConverter {
       }
     }
     return partitionKey;
+  }
+
+  /**
+   * A row filter that matches exactly the rows of the given partitions of the spec, which a scan
+   * projects onto the partition summaries of each manifest to skip the manifests of other
+   * partitions. Without a partitioned spec or partitions it matches everything.
+   */
+  public Expression partitionFilter(
+      PartitionSpec spec, Schema schema, Collection<List<PartitionValue>> partitions) {
+    if (!spec.isPartitioned() || partitions.isEmpty()) {
+      return Expressions.alwaysTrue();
+    }
+    Expression filter = Expressions.alwaysFalse();
+    for (List<PartitionValue> partitionValues : partitions) {
+      StructLike partition = toIceberg(spec, schema, partitionValues);
+      if (partition == null) {
+        return Expressions.alwaysTrue();
+      }
+      Expression partitionMatch = Expressions.alwaysTrue();
+      for (int i = 0; i < spec.fields().size(); i++) {
+        PartitionField field = spec.fields().get(i);
+        if (field.transform().isVoid()) {
+          continue;
+        }
+        UnboundTerm<Object> term = partitionTerm(schema.findColumnName(field.sourceId()), field);
+        Object value = partition.get(i, Object.class);
+        partitionMatch =
+            Expressions.and(
+                partitionMatch,
+                value == null ? Expressions.isNull(term) : Expressions.equal(term, value));
+      }
+      filter = Expressions.or(filter, partitionMatch);
+    }
+    return filter;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static UnboundTerm<Object> partitionTerm(String sourceColumn, PartitionField field) {
+    return field.transform().isIdentity()
+        ? Expressions.ref(sourceColumn)
+        : Expressions.transform(sourceColumn, (Transform<?, Object>) field.transform());
   }
 
   private static Long millisToMicros(Long millis) {

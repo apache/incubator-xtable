@@ -52,5 +52,6 @@ class TestHudiTableFormatOverrides {
         overrides.getProperty(HoodieTableConfig.VERSION.key()),
         "a pluggable format needs the v2 timeline layout, which table version 6 does not have");
     assertEquals("false", overrides.getProperty(HoodieMetadataConfig.ENABLE.key()));
+    assertEquals(3, overrides.size());
   }
 }

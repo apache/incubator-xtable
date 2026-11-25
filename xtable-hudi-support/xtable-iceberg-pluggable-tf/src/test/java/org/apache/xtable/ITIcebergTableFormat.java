@@ -87,6 +87,12 @@ import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.model.sync.SyncMode;
 
 public class ITIcebergTableFormat {
+  /**
+   * The record key column of every source table. The Iceberg schema leaves out Hudi's meta columns,
+   * so the rows cannot be ordered by {@code _hoodie_record_key} on both sides.
+   */
+  private static final String RECORD_KEY_COLUMN = "key";
+
   @TempDir public static Path tempDir;
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
@@ -113,7 +119,7 @@ public class ITIcebergTableFormat {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.stop();
     }
   }
 
@@ -409,7 +415,7 @@ public class ITIcebergTableFormat {
         options.put("as.of.instant", DATE_FORMAT.format(time));
         break;
       case ICEBERG:
-        options.put("as-of-timestamp", String.valueOf(time.toEpochMilli()));
+        options.put("timestampAsOf", DATE_FORMAT.format(time));
         break;
       default:
         throw new IllegalArgumentException("Unknown table format: " + tableFormat);
@@ -478,7 +484,7 @@ public class ITIcebergTableFormat {
             .options(sourceOptions)
             .format(sourceFormat.toLowerCase())
             .load(sourceTable.getBasePath())
-            .orderBy(sourceTable.getOrderByColumn())
+            .orderBy(RECORD_KEY_COLUMN)
             .filter(filterCondition);
     Map<String, Dataset<Row>> targetRowsByFormat =
         targetFormats.stream()
@@ -502,7 +508,7 @@ public class ITIcebergTableFormat {
                           .options(finalTargetOptions)
                           .format(targetFormat.toLowerCase())
                           .load(sourceTable.getDataPath())
-                          .orderBy(sourceTable.getOrderByColumn())
+                          .orderBy(RECORD_KEY_COLUMN)
                           .filter(filterCondition);
                     }));
 
@@ -608,17 +614,9 @@ public class ITIcebergTableFormat {
     return columnsToSelect.stream()
         .map(
             colName -> {
-              if (colName.startsWith("timestamp_local_millis")) {
-                if (isHudi) {
-                  return String.format(
-                      "unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
-                } else if (isIceberg) {
-                  // iceberg is showing up as micros, so we need to divide by 1000 to get millis
-                  return String.format("%s div 1000 AS %s", colName, colName);
-                } else {
-                  return colName;
-                }
-              } else if (isHudi && colName.startsWith("timestamp_local_micros")) {
+              if ((isHudi || isIceberg) && colName.startsWith("timestamp_local_millis")) {
+                return String.format("unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+              } else if ((isHudi || isIceberg) && colName.startsWith("timestamp_local_micros")) {
                 return String.format("unix_micros(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
               } else {
                 return colName;

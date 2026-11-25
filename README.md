@@ -32,7 +32,7 @@ of a few interfaces, which we believe will facilitate the expansion of supported
 future.
 
 # Building the project and running tests.
-1. Use Java 11 for building the project. If you are using another Java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple Java versions locally.
+1. Use Java 17 for building the project. If you are using another Java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple Java versions locally.
 2. Build the project using `./mvnw clean package`. Use `./mvnw clean package -DskipTests` to skip tests while building.
 3. Use `./mvnw clean test` or `./mvnw test` to run all unit tests. If you need to run only a specific test you can do this
    by something like `./mvnw test -Dtest=TestDeltaSync -pl xtable-core`.
@@ -143,7 +143,7 @@ docker run \
 
 # Contributing
 ## Setup
-For setting up the repo on IntelliJ, open the project and change the Java version to Java 11 in File->ProjectStructure
+For setting up the repo on IntelliJ, open the project and change the Java version to Java 17 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
 Found a bug or have a cool idea to contribute? Open a GitHub [issue](https://github.com/apache/incubator-xtable/issues) to get started. For more contribution guidelines and ways to stay involved, visit our [community](https://xtable.apache.org/community/sync) page.

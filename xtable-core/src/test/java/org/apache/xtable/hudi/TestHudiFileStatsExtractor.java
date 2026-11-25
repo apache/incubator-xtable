@@ -21,6 +21,7 @@ package org.apache.xtable.hudi;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -63,6 +64,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
@@ -86,6 +88,7 @@ import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
+import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -239,6 +242,70 @@ public class TestHudiFileStatsExtractor {
             .addStatsToFiles(null, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
     validateOutput(output, false);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void columnStatsSkipColumnsWithoutAField(boolean writeOldListStructure, @TempDir Path tempDir)
+      throws IOException {
+    Schema avroSchema =
+        new Schema.Parser()
+            .parse(
+                "{\"type\":\"record\",\"name\":\"Row\",\"fields\":["
+                    + "{\"name\":\"id\",\"type\":\"int\"},"
+                    + "{\"name\":\"s\",\"type\":{\"type\":\"record\",\"name\":\"S\",\"fields\":["
+                    + "{\"name\":\"c1\",\"type\":\"int\"},"
+                    + "{\"name\":\"a\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},"
+                    + "{\"name\":\"m\",\"type\":{\"type\":\"map\",\"values\":\"string\"}}]}}]}");
+    Schema structSchema = avroSchema.getField("s").schema();
+    GenericData.Record struct = new GenericData.Record(structSchema);
+    struct.put("c1", -1);
+    struct.put("a", Arrays.asList(1, 2));
+    struct.put("m", Collections.singletonMap("k", "v"));
+    GenericData.Record record = new GenericData.Record(avroSchema);
+    record.put("id", 1);
+    record.put("s", struct);
+    Path file = tempDir.resolve("nested.parquet");
+    Configuration writerConf = new Configuration(hadoopConf);
+    writerConf.setBoolean("parquet.avro.write-old-list-structure", writeOldListStructure);
+    try (ParquetWriter<GenericRecord> writer =
+        AvroParquetWriter.<GenericRecord>builder(
+                HadoopOutputFile.fromPath(new org.apache.hadoop.fs.Path(file.toUri()), writerConf))
+            .withSchema(avroSchema)
+            .withConf(writerConf)
+            .build()) {
+      writer.write(record);
+    }
+    InternalDataFile inputFile =
+        InternalDataFile.builder()
+            .physicalPath(file.toString())
+            .columnStats(Collections.emptyList())
+            .fileFormat(FileFormat.APACHE_PARQUET)
+            .lastModified(1234L)
+            .fileSizeBytes(4321L)
+            .recordCount(0)
+            .build();
+
+    List<InternalDataFile> output =
+        new HudiFileStatsExtractor(createMockMetaClient(tempDir))
+            .addStatsToFiles(
+                null,
+                Stream.of(inputFile),
+                AvroSchemaConverter.getInstance().toInternalSchema(avroSchema))
+            .collect(Collectors.toList());
+
+    assertEquals(1, output.size());
+    assertEquals(1, output.get(0).getRecordCount());
+    Map<String, ColumnStat> statsByPath =
+        output.get(0).getColumnStats().stream()
+            .collect(Collectors.toMap(stat -> stat.getField().getPath(), stat -> stat));
+    assertEquals(1, statsByPath.get("id").getRange().getMinValue());
+    assertEquals(-1, statsByPath.get("s.c1").getRange().getMinValue());
+    // The element of the list of primitives maps to its field in either list layout.
+    ColumnStat element = statsByPath.get("s.a._one_field_element");
+    assertNotNull(element, "no stats for the list element: " + statsByPath.keySet());
+    assertEquals(1, element.getRange().getMinValue());
+    assertEquals(2, element.getRange().getMaxValue());
   }
 
   @Test

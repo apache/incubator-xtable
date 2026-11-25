@@ -21,12 +21,15 @@ package org.apache.xtable.iceberg;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -34,27 +37,34 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.iceberg.ExpireSnapshots;
+import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.MetadataColumns;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.TableUtil;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CleanableFailure;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.MappedFields;
 import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
+import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
@@ -63,6 +73,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 @Log4j2
 public class IcebergConversionTarget implements ConversionTarget {
   private static final String METADATA_DIR_PATH = "/metadata/";
+  private static final String DELETION_VECTOR_FILE_EXTENSION = ".puffin";
   private IcebergSchemaExtractor schemaExtractor;
   private IcebergSchemaSync schemaSync;
   private IcebergPartitionSpecExtractor partitionSpecExtractor;
@@ -78,6 +89,22 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Table table;
   private InternalTable internalTableState;
   private TableSyncMetadata tableSyncMetadata;
+  /** Null when the next files diff carries no deletion vectors and is applied as an overwrite. */
+  private Map<String, ? extends Collection<Long>> stagedDeletedPositions;
+
+  private Collection<List<PartitionValue>> stagedPartitionsOfDataFiles;
+
+  private boolean stagedPositionsReplaceDeletionVectors;
+
+  /** Deletion vector files the staged row delta wrote, which only its commit makes referenced. */
+  private Set<String> uncommittedDeletionVectorFiles = Collections.emptySet();
+
+  private boolean stagedDeleteOperation;
+
+  /** Null when every data file the next files diff references has to be in the table. */
+  private Predicate<String> stagedDataFilesWithoutLiveRows;
+
+  private boolean stagedRewrite;
 
   public IcebergConversionTarget() {}
 
@@ -185,12 +212,41 @@ public class IcebergConversionTarget implements ConversionTarget {
     NameMapping mapping = MappingUtil.create(schema);
     MappedFields updatedMappedFields =
         updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName());
+    setNameMapping(withRowLineage(NameMapping.of(updatedMappedFields), schema));
+  }
+
+  private void setNameMapping(NameMapping mapping) {
     transaction
         .updateProperties()
-        .set(
-            TableProperties.DEFAULT_NAME_MAPPING,
-            NameMappingParser.toJson(NameMapping.of(updatedMappedFields)))
+        .set(TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(mapping))
         .commit();
+  }
+
+  /**
+   * Adds the row lineage columns of a format version 3 table to the name mapping under their
+   * reserved field ids, so that a data file without field ids that stores them, as a rewrite of a
+   * data file does, is read with the stored values rather than with values derived from the file's
+   * first row id and sequence number. Iceberg applies a name mapping only to a file without any
+   * field ids.
+   *
+   * @return the given mapping when it needs no change
+   */
+  private NameMapping withRowLineage(NameMapping mapping, Schema schema) {
+    if (TableUtil.formatVersion(table) < 3) {
+      return mapping;
+    }
+    List<MappedField> fields = new ArrayList<>(mapping.asMappedFields().fields());
+    for (Types.NestedField column :
+        Arrays.asList(MetadataColumns.ROW_ID, MetadataColumns.LAST_UPDATED_SEQUENCE_NUMBER)) {
+      if (mapping.find(column.fieldId()) == null
+          && mapping.find(column.name()) == null
+          && schema.findField(column.name()) == null) {
+        fields.add(MappedField.of(column.fieldId(), column.name()));
+      }
+    }
+    return fields.size() == mapping.asMappedFields().fields().size()
+        ? mapping
+        : NameMapping.of(fields);
   }
 
   private MappedFields updateNameMapping(
@@ -216,7 +272,10 @@ public class IcebergConversionTarget implements ConversionTarget {
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
     if (!transaction.table().properties().containsKey(TableProperties.DEFAULT_NAME_MAPPING)) {
-      createAndSetNameMapping(latestSchema);
+      // The table's own schema has the field ids the data files are read by. latestSchema numbers
+      // the columns of a source without field ids in order, which differs from the table's ids
+      // once a column was dropped or added. The schema update below maintains the mapping.
+      createAndSetNameMapping(transaction.table().schema());
     }
     if (!transaction.table().schema().sameSchema(latestSchema)) {
       boolean hasFieldIds =
@@ -236,6 +295,13 @@ public class IcebergConversionTarget implements ConversionTarget {
       } else {
         schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
       }
+    }
+    NameMapping mapping =
+        NameMappingParser.fromJson(
+            transaction.table().properties().get(TableProperties.DEFAULT_NAME_MAPPING));
+    NameMapping mappingWithRowLineage = withRowLineage(mapping, transaction.table().schema());
+    if (mappingWithRowLineage != mapping) {
+      setNameMapping(mappingWithRowLineage);
     }
   }
 
@@ -280,11 +346,93 @@ public class IcebergConversionTarget implements ConversionTarget {
         tableSyncMetadata);
   }
 
+  /**
+   * Stages row positions deleted from data files for the next {@link #syncFilesForDiff}, which then
+   * commits the diff and the positions as one row delta, see {@link
+   * IcebergDataFileUpdatesSync#applyRowDelta}. An empty map still selects the row delta, for a diff
+   * on a table that carries deletion vectors.
+   *
+   * @param partitionsOfDataFiles the partitions holding the data files the positions are deleted
+   *     from, to which the lookup of their current deletion vectors is limited
+   */
+  public void stageDeletionVectors(
+      Map<String, ? extends Collection<Long>> deletedPositionsByDataFile,
+      Collection<List<PartitionValue>> partitionsOfDataFiles,
+      boolean replaceDeletionVectors) {
+    this.stagedDeletedPositions = deletedPositionsByDataFile;
+    this.stagedPartitionsOfDataFiles = partitionsOfDataFiles;
+    this.stagedPositionsReplaceDeletionVectors = replaceDeletionVectors;
+  }
+
+  /**
+   * Marks the next {@link #syncFilesForDiff} as the diff of a source commit that deletes rows, so
+   * that it is published as an Iceberg delete even when it changes no files.
+   */
+  public void stageDeleteOperation() {
+    this.stagedDeleteOperation = true;
+  }
+
+  /**
+   * Tells the next {@link #syncFilesForDiff} which data files the source holds no live rows of. A
+   * row delta removes a data file whose rows a delete removes in full, so a later diff of the
+   * source can still reference it; the diff leaves such a file out when the table does not hold it,
+   * see {@link IcebergDataFileUpdatesSync#applyRowDelta} and {@link
+   * IcebergDataFileUpdatesSync#applyRewrite}.
+   *
+   * @param withoutLiveRows whether the source holds no live rows of the data file at a path
+   */
+  public void stageDataFilesWithoutLiveRows(Predicate<String> withoutLiveRows) {
+    this.stagedDataFilesWithoutLiveRows = withoutLiveRows;
+  }
+
+  /**
+   * Marks the next {@link #syncFilesForDiff} as the diff of a source commit that rewrites data
+   * files and keeps every row, as a compaction or a clustering does, so that it is published as an
+   * Iceberg replace, see {@link IcebergDataFileUpdatesSync#applyRewrite}. A diff that Iceberg
+   * cannot express as a rewrite is published as any other.
+   */
+  public void stageRewrite() {
+    this.stagedRewrite = true;
+  }
+
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
+    if (stagedRewrite) {
+      Set<String> deletionVectorFiles =
+          dataFileUpdatesExtractor.applyRewrite(
+              table,
+              transaction,
+              internalFilesDiff,
+              stagedDeletedPositions == null ? Collections.emptyMap() : stagedDeletedPositions,
+              stagedDataFilesWithoutLiveRows,
+              transaction.table().schema(),
+              transaction.table().spec(),
+              tableSyncMetadata);
+      if (deletionVectorFiles != null) {
+        uncommittedDeletionVectorFiles = deletionVectorFiles;
+        return;
+      }
+    }
+    if (stagedDeletedPositions != null) {
+      uncommittedDeletionVectorFiles =
+          dataFileUpdatesExtractor.applyRowDelta(
+              table,
+              transaction,
+              internalFilesDiff,
+              stagedDeletedPositions,
+              stagedPartitionsOfDataFiles,
+              stagedPositionsReplaceDeletionVectors,
+              stagedDeleteOperation,
+              stagedDataFilesWithoutLiveRows,
+              transaction.table().schema(),
+              transaction.table().spec(),
+              tableSyncMetadata);
+      return;
+    }
     dataFileUpdatesExtractor.applyDiff(
         transaction,
         internalFilesDiff,
+        stagedDeleteOperation,
         transaction.table().schema(),
         transaction.table().spec(),
         tableSyncMetadata);
@@ -292,20 +440,56 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void completeSync() {
-    if (!metadataRetention.isNegative()) {
-      transaction
-          .expireSnapshots()
-          .expireOlderThan(Instant.now().minus(metadataRetention).toEpochMilli())
-          .deleteWith(this::safeDelete)
-          .cleanExpiredFiles(true)
-          .commit();
+    try {
+      if (!metadataRetention.isNegative()) {
+        transaction
+            .expireSnapshots()
+            .expireOlderThan(Instant.now().minus(metadataRetention).toEpochMilli())
+            .deleteWith(this::safeDelete)
+            .cleanExpiredFiles(true)
+            .commit();
+      }
+      transaction.commitTransaction();
+    } catch (RuntimeException e) {
+      deleteUncommittedDeletionVectorFiles(e);
+      throw e;
     }
-    transaction.commitTransaction();
     resetTransactionState();
   }
 
+  /**
+   * Deletes the deletion vector files of a sync whose commit failed, since no snapshot references
+   * them. They are kept when the commit may have landed, as Iceberg decides for its own metadata
+   * files: when the outcome is unknown, or when the catalog requires strict cleanup and the failure
+   * does not mark the commit as failed.
+   */
+  private void deleteUncommittedDeletionVectorFiles(RuntimeException commitFailure) {
+    if (uncommittedDeletionVectorFiles.isEmpty()) {
+      return;
+    }
+    boolean mayHaveCommitted =
+        commitFailure instanceof CommitStateUnknownException
+            || (((HasTableOperations) table).operations().requireStrictCleanup()
+                && !(commitFailure instanceof CleanableFailure));
+    if (mayHaveCommitted) {
+      log.warn(
+          "Keeping deletion vector files {} of table {}, since its commit may have landed",
+          uncommittedDeletionVectorFiles,
+          tableIdentifier);
+    } else {
+      IcebergDataFileUpdatesSync.deleteUncommittedFiles(table.io(), uncommittedDeletionVectorFiles);
+    }
+    uncommittedDeletionVectorFiles = Collections.emptySet();
+  }
+
+  /**
+   * Data files belong to the source table and are never deleted here. Deletion vector files are
+   * written by this target next to them, so they are deleted once no retained snapshot references
+   * them.
+   */
   private void safeDelete(String file) {
-    if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH)) {
+    if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH)
+        || file.endsWith(DELETION_VECTOR_FILE_EXTENSION)) {
       table.io().deleteFile(file);
     }
   }
@@ -376,6 +560,12 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction = null;
     internalTableState = null;
     tableSyncMetadata = null;
+    stagedDeletedPositions = null;
+    stagedPartitionsOfDataFiles = null;
+    uncommittedDeletionVectorFiles = Collections.emptySet();
+    stagedDeleteOperation = false;
+    stagedDataFilesWithoutLiveRows = null;
+    stagedRewrite = false;
   }
 
   private void rollbackCorruptCommits() {

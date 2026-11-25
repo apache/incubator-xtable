@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi.extensions;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -31,10 +32,11 @@ import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 
+import org.apache.iceberg.MetadataColumns;
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.MappedFields;
 import org.apache.iceberg.mapping.NameMapping;
-import org.apache.iceberg.parquet.ParquetSchemaUtil;
+import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.hudi.idtracking.IdTracker;
 import org.apache.xtable.hudi.idtracking.models.IdMapping;
@@ -86,14 +88,29 @@ public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
         .map(
             idTracking -> {
               List<IdMapping> idMappings = idTracking.getIdMappings();
-              NameMapping nameMapping =
-                  NameMapping.of(
-                      idMappings.stream()
-                          .map(HoodieAvroWriteSupportWithFieldIds::toMappedField)
-                          .collect(Collectors.toList()));
-              return ParquetSchemaUtil.applyNameMapping(messageType, nameMapping);
+              List<MappedField> mappedFields =
+                  idMappings.stream()
+                      .map(HoodieAvroWriteSupportWithFieldIds::toMappedField)
+                      .collect(Collectors.toList());
+              addRowLineageFields(mappedFields);
+              return ParquetFieldIds.apply(messageType, NameMapping.of(mappedFields));
             })
         .orElse(messageType);
+  }
+
+  /**
+   * Iceberg reads a Parquet file that has field ids by field id only, without the table's name
+   * mapping, so the row lineage columns that Hudi stores in a rewritten base file of an Iceberg
+   * format version 3 table need their reserved field ids as well. A column of the table with the
+   * same name keeps its own id.
+   */
+  static void addRowLineageFields(List<MappedField> mappedFields) {
+    for (Types.NestedField column :
+        Arrays.asList(MetadataColumns.ROW_ID, MetadataColumns.LAST_UPDATED_SEQUENCE_NUMBER)) {
+      if (mappedFields.stream().noneMatch(field -> field.names().contains(column.name()))) {
+        mappedFields.add(MappedField.of(column.fieldId(), column.name()));
+      }
+    }
   }
 
   private static MappedField toMappedField(IdMapping idMapping) {

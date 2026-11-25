@@ -20,6 +20,8 @@ package org.apache.xtable;
 
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.Properties;
@@ -48,8 +50,20 @@ class TestIcebergTableFormatDiscovery {
   }
 
   @Test
-  void resolvesIcebergFormatOnTableVersionSix() throws Exception {
-    assertResolvedFormat(HoodieTableVersion.SIX, "table_v6");
+  void refusesTableVersionSix() {
+    // The format is resolved, and refuses the table as soon as Hudi loads it: the reconstructed
+    // timeline needs the version 2 timeline layout.
+    Exception exception =
+        assertThrows(
+            Exception.class, () -> assertResolvedFormat(HoodieTableVersion.SIX, "table_v6"));
+    Throwable rootCause = exception;
+    while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+      rootCause = rootCause.getCause();
+    }
+    assertTrue(
+        rootCause instanceof UnsupportedOperationException
+            && rootCause.getMessage().contains("version 6"),
+        "table version 6 must be refused: " + exception);
   }
 
   @Test

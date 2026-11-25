@@ -32,8 +32,8 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.catalog.TableIdentifier;
 
+import org.apache.xtable.IcebergFormatConfig;
 import org.apache.xtable.iceberg.IcebergConversionTarget;
 import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.InternalTable;
@@ -57,12 +57,11 @@ public class IcebergTimelineArchiver {
   }
 
   public void archiveInstants(InternalTable internalTable, List<HoodieInstant> archivedInstants) {
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(metaClient.getTableConfig().getTableName());
-    if (!tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
+    IcebergFormatConfig formatConfig = IcebergFormatConfig.of(metaClient);
+    if (!formatConfig.tableExists(tableManager, metaClient)) {
       return;
     }
-    Table table = tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
+    Table table = formatConfig.getTable(tableManager, metaClient);
     Set<String> archivedInstantKeys =
         archivedInstants.stream()
             .map(IcebergActiveTimeline::instantKey)

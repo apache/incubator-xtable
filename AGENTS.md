@@ -41,7 +41,7 @@ When changing code, prefer to work in the narrowest module that owns the behavio
 
 ## Common Validation
 
-Use Java 11 for local Maven work.
+Use Java 17 for local Maven work.
 
 Common commands:
 
