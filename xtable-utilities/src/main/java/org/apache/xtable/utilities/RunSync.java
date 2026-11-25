@@ -63,6 +63,8 @@ import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.reflection.ReflectionUtils;
 
 /**
@@ -79,6 +81,7 @@ public class RunSync {
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
   private static final String CONTINUOUS_MODE = "m";
   private static final String CONTINUOUS_MODE_INTERVAL = "t";
+  private static final String FAIL_ON_ERROR_OPTION = "failOnError";
   private static final String HELP_OPTION = "h";
 
   private static final Options OPTIONS =
@@ -116,6 +119,11 @@ public class RunSync {
               "continuousModeInterval",
               true,
               "The interval in seconds to schedule the loop. Requires --continuousMode to be set. Defaults to 5 seconds.")
+          .addOption(
+              FAIL_ON_ERROR_OPTION,
+              "failOnError",
+              false,
+              "Fail the process if any table sync fails")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   static SourceTable sourceTableBuilder(
@@ -183,7 +191,8 @@ public class RunSync {
       List<String> tableFormatList,
       CatalogConfig catalogConfig,
       Configuration hadoopConf,
-      ConversionSourceProvider conversionSourceProvider) {
+      ConversionSourceProvider conversionSourceProvider,
+      boolean failOnError) {
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
@@ -206,9 +215,16 @@ public class RunSync {
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       try {
-        conversionController.sync(conversionConfig, conversionSourceProvider);
+        Map<String, SyncResult> syncResults =
+            conversionController.sync(conversionConfig, conversionSourceProvider);
+        if (failOnError && hasSyncFailures(syncResults)) {
+          throw new RuntimeException("Sync completed with failures. See logs for details.");
+        }
       } catch (Exception e) {
         log.error("Error running sync for {}", table.getTableBasePath(), e);
+        if (failOnError) {
+          throw e;
+        }
       }
     }
   }
@@ -277,15 +293,20 @@ public class RunSync {
       return;
     }
 
+    boolean failOnError = cmd.hasOption(FAIL_ON_ERROR_OPTION);
+
     if (cmd.hasOption(CONTINUOUS_MODE)) {
       ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
       long intervalInSeconds = Long.parseLong(cmd.getOptionValue(CONTINUOUS_MODE_INTERVAL, "5"));
       executorService.scheduleAtFixedRate(
           () -> {
             try {
-              runSync(cmd);
-            } catch (IOException ex) {
+              runSync(cmd, failOnError);
+            } catch (IOException | RuntimeException ex) {
               log.error("Sync operation failed", ex);
+              if (failOnError) {
+                throw new RuntimeException(ex);
+              }
             }
           },
           0,
@@ -302,11 +323,11 @@ public class RunSync {
       }
       executorService.shutdownNow();
     } else {
-      runSync(cmd);
+      runSync(cmd, failOnError);
     }
   }
 
-  private static void runSync(CommandLine cmd) throws IOException {
+  private static void runSync(CommandLine cmd, boolean failOnError) throws IOException {
     String datasetConfigpath = getValueFromConfig(cmd, DATASET_CONFIG_OPTION);
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
@@ -318,7 +339,28 @@ public class RunSync {
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = datasetConfig.getTargetFormats();
     syncTableMetdata(
-        datasetConfig, tableFormatList, catalogConfig, hadoopConf, conversionSourceProvider);
+        datasetConfig,
+        tableFormatList,
+        catalogConfig,
+        hadoopConf,
+        conversionSourceProvider,
+        failOnError);
+  }
+
+  private static boolean hasSyncFailures(Map<String, SyncResult> syncResults) {
+    return syncResults.values().stream().anyMatch(RunSync::syncResultHasFailure);
+  }
+
+  private static boolean syncResultHasFailure(SyncResult syncResult) {
+    if (syncResult == null) {
+      return false;
+    }
+    SyncResult.SyncStatus tableStatus = syncResult.getTableFormatSyncStatus();
+    if (tableStatus != null && tableStatus.getStatusCode() == SyncStatusCode.ERROR) {
+      return true;
+    }
+    return syncResult.getCatalogSyncStatusList().stream()
+        .anyMatch(status -> status.getStatusCode() == SyncStatusCode.ERROR);
   }
 
   static byte[] getCustomConfigurations(String Configpath) throws IOException {
