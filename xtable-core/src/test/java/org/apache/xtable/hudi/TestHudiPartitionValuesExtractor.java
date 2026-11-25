@@ -19,11 +19,15 @@
 package org.apache.xtable.hudi;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -567,6 +571,95 @@ public class TestHudiPartitionValuesExtractor {
         new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(partitionFields, partitionPath);
     Assertions.assertEquals(expected, actual);
+  }
+
+  private static InternalSchema timestampSchema(
+      InternalType type, InternalSchema.MetadataValue precision) {
+    return InternalSchema.builder()
+        .name("timestamp")
+        .dataType(type)
+        .metadata(
+            Collections.singletonMap(InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precision))
+        .build();
+  }
+
+  private static long epochMicros(String instant) {
+    Instant parsed = Instant.parse(instant);
+    return TimeUnit.SECONDS.toMicros(parsed.getEpochSecond())
+        + TimeUnit.NANOSECONDS.toMicros(parsed.getNano());
+  }
+
+  static Stream<Arguments> dateAndTimestampValues() {
+    InternalSchema date = InternalSchema.builder().name("date").dataType(InternalType.DATE).build();
+    InternalSchema micros =
+        timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MICROS);
+    InternalSchema millis =
+        timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MILLIS);
+    InternalSchema ntzMicros =
+        timestampSchema(InternalType.TIMESTAMP_NTZ, InternalSchema.MetadataValue.MICROS);
+    long localMicros =
+        TimeUnit.SECONDS.toMicros(
+            LocalDateTime.parse("2024-02-29T10:30:00")
+                .atZone(ZoneId.systemDefault())
+                .toEpochSecond());
+    return Stream.of(
+        Arguments.of(date, "p=2024-02-29", (int) LocalDate.parse("2024-02-29").toEpochDay()),
+        Arguments.of(date, "p=1969-12-31", -1),
+        Arguments.of(date, "p=19782", 19782),
+        Arguments.of(date, "p=-1", -1),
+        // Hudi's SQL writer escapes the colons of a timestamp in the path
+        Arguments.of(micros, "p=2024-02-29 10%3A30%3A00", localMicros),
+        Arguments.of(
+            micros, "p=2024-02-29 10:30:00.123456Z", epochMicros("2024-02-29T10:30:00.123456Z")),
+        Arguments.of(micros, "p=2024-02-29T10:30:00+01:00", epochMicros("2024-02-29T09:30:00Z")),
+        Arguments.of(micros, "p=1709202600123456", 1709202600123456L),
+        Arguments.of(
+            millis,
+            "p=2024-02-29T10:30:00.123Z",
+            Instant.parse("2024-02-29T10:30:00.123Z").toEpochMilli()),
+        Arguments.of(millis, "p=1709202600123", 1709202600123L),
+        Arguments.of(ntzMicros, "p=2024-02-29 10:30:00", epochMicros("2024-02-29T10:30:00Z")),
+        Arguments.of(
+            InternalSchema.builder().name("timestamp").dataType(InternalType.TIMESTAMP).build(),
+            "p=1969-12-31T23:59:59.999999Z",
+            -1L));
+  }
+
+  @ParameterizedTest
+  @MethodSource("dateAndTimestampValues")
+  void datesAndTimestampsParseFromNumbersAndStrings(
+      InternalSchema schema, String partitionPath, Object expectedValue) {
+    InternalPartitionField column = createSimplePartitionField("p", null, schema);
+    List<PartitionValue> actual =
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
+            .extractPartitionValues(Collections.singletonList(column), partitionPath);
+    Assertions.assertEquals(
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(column)
+                .range(Range.scalar(expectedValue))
+                .build()),
+        actual);
+  }
+
+  @Test
+  void invalidDateAndTimestampValuesFail() {
+    PathBasedPartitionValuesExtractor extractor =
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap());
+    InternalPartitionField date =
+        createSimplePartitionField(
+            "p", null, InternalSchema.builder().name("date").dataType(InternalType.DATE).build());
+    InternalPartitionField timestamp =
+        createSimplePartitionField(
+            "p",
+            null,
+            timestampSchema(InternalType.TIMESTAMP, InternalSchema.MetadataValue.MICROS));
+    Assertions.assertThrows(
+        PartitionValuesExtractorException.class,
+        () -> extractor.extractPartitionValues(Collections.singletonList(date), "2024-02-30"));
+    Assertions.assertThrows(
+        PartitionValuesExtractorException.class,
+        () -> extractor.extractPartitionValues(Collections.singletonList(timestamp), "2024-02-29"));
   }
 
   private static InternalPartitionField createSimplePartitionField(

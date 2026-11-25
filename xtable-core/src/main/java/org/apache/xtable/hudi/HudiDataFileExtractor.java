@@ -69,10 +69,16 @@ import org.apache.hudi.storage.StoragePathInfo;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.exception.PartitionValuesExtractorException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.exception.ParseException;
+import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -166,9 +172,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
     Stream<InternalDataFile> filesAddedWithoutStats = allInfo.getAdded().stream();
     List<InternalDataFile> filesAdded =
-        fileStatsExtractor
-            .addStatsToFiles(tableMetadata, filesAddedWithoutStats, table.getReadSchema())
-            .collect(Collectors.toList());
+        withStats(filesAddedWithoutStats, table.getReadSchema()).collect(Collectors.toList());
     List<InternalDataFile> filesRemoved = allInfo.getRemoved();
 
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
@@ -223,8 +227,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
               }
             });
     List<InternalDataFile> filesAdded =
-        fileStatsExtractor
-            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+        withStats(filesAddedWithoutStats.stream(), table.getReadSchema())
             .collect(Collectors.toList());
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
   }
@@ -293,8 +296,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       filesAddedWithoutStats.add(buildFileWithoutStats(partitionValues, baseFile)));
         });
     List<InternalDataFile> filesAdded =
-        fileStatsExtractor
-            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+        withStats(filesAddedWithoutStats.stream(), table.getReadSchema())
             .collect(Collectors.toList());
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
   }
@@ -425,8 +427,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       .collect(Collectors.toList()));
             });
     List<InternalDataFile> filesAdded =
-        fileStatsExtractor
-            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+        withStats(filesAddedWithoutStats.stream(), table.getReadSchema())
             .collect(Collectors.toList());
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
   }
@@ -724,8 +725,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       .getLatestBaseFiles(partitionPath)
                       .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile));
                 });
-    Stream<InternalDataFile> files =
-        fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
+    Stream<InternalDataFile> files = withStats(filesWithoutStats, table.getReadSchema());
     return PartitionFileGroup.fromFiles(files);
   }
 
@@ -748,6 +748,93 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private static class AddedAndRemovedFiles {
     List<InternalDataFile> added;
     List<InternalDataFile> removed;
+  }
+
+  private Stream<InternalDataFile> withStats(
+      Stream<InternalDataFile> files, InternalSchema schema) {
+    return fileStatsExtractor
+        .addStatsToFiles(tableMetadata, files, schema)
+        .map(HudiDataFileExtractor::requireTimestampPartitionValuesMatchStats);
+  }
+
+  /**
+   * A partition value parsed from the path is the value of every row of the file only when the path
+   * holds the value itself. Hudi's SQL key generator writes a TIMESTAMP partition path truncated to
+   * whole seconds, so there the path is a one-second bucket: rows whose values differ below the
+   * second share a path and a file group. A target that fills an identity partition column from the
+   * partition value, as Iceberg and Delta readers do, would read every row of the file as the
+   * truncated value, and prune filters on the column by it.
+   *
+   * <p>No single partition value is right for a file holding several values, and a value taken from
+   * the column stats would differ from the one the file is later removed under, which is parsed
+   * from the path again. So the path value is kept, and a file whose column stats show any other
+   * value for a timestamp partition column is refused.
+   *
+   * <p>A file without stats for the column is kept, since nothing shows it holds another value.
+   *
+   * @throws PartitionValuesExtractorException when the column stats of a timestamp partition column
+   *     of the file show a value other than its partition value
+   */
+  static InternalDataFile requireTimestampPartitionValuesMatchStats(InternalDataFile file) {
+    for (PartitionValue partitionValue : file.getPartitionValues()) {
+      InternalPartitionField partitionField = partitionValue.getPartitionField();
+      InternalField sourceField = partitionField.getSourceField();
+      InternalType type = sourceField.getSchema().getDataType();
+      Object value = partitionValue.getRange().getMinValue();
+      if (partitionField.getTransformType() != PartitionTransformType.VALUE
+          || (type != InternalType.TIMESTAMP && type != InternalType.TIMESTAMP_NTZ)
+          || value == null) {
+        continue;
+      }
+      Optional<ColumnStat> stat =
+          file.getColumnStats().stream()
+              .filter(
+                  s -> s.getField() != null && sourceField.getPath().equals(s.getField().getPath()))
+              .findFirst();
+      Object min = stat.map(s -> s.getRange().getMinValue()).orElse(null);
+      Object max = stat.map(s -> s.getRange().getMaxValue()).orElse(null);
+      if (min == null && max == null) {
+        // The column is outside the indexed columns, or the file stores no stats for it.
+        continue;
+      }
+      if (!value.equals(min) || !value.equals(max)) {
+        throw new PartitionValuesExtractorException(
+            String.format(
+                "Data file %s holds values of TIMESTAMP partition column %s from %s to %s, but its"
+                    + " partition path records %s. Hudi writes a timestamp partition path"
+                    + " truncated to whole seconds, so values with fractional seconds, or"
+                    + " several values in one file, cannot be published as a partition value."
+                    + " Partition by a column holding whole seconds or a coarser value instead",
+                file.getPhysicalPath(),
+                sourceField.getPath(),
+                render(min, sourceField),
+                render(max, sourceField),
+                render(value, sourceField)));
+      }
+    }
+    return file;
+  }
+
+  private static String render(Object timestamp, InternalField field) {
+    if (!(timestamp instanceof Long)) {
+      return String.valueOf(timestamp);
+    }
+    long value = (Long) timestamp;
+    Object precision =
+        field.getSchema().getMetadata() == null
+            ? null
+            : field.getSchema().getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION);
+    java.time.Instant instant =
+        precision == InternalSchema.MetadataValue.MILLIS
+            ? java.time.Instant.ofEpochMilli(value)
+            : precision == InternalSchema.MetadataValue.NANOS
+                ? java.time.Instant.ofEpochSecond(0, value)
+                : java.time.Instant.ofEpochSecond(
+                    Math.floorDiv(value, 1_000_000L), Math.floorMod(value, 1_000_000L) * 1_000L);
+    String rendered = instant.toString();
+    return field.getSchema().getDataType() == InternalType.TIMESTAMP_NTZ
+        ? rendered.substring(0, rendered.length() - 1)
+        : rendered;
   }
 
   /**
