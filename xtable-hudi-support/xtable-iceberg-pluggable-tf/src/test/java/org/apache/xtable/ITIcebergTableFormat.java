@@ -608,17 +608,9 @@ public class ITIcebergTableFormat {
     return columnsToSelect.stream()
         .map(
             colName -> {
-              if (colName.startsWith("timestamp_local_millis")) {
-                if (isHudi) {
-                  return String.format(
-                      "unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
-                } else if (isIceberg) {
-                  // iceberg is showing up as micros, so we need to divide by 1000 to get millis
-                  return String.format("%s div 1000 AS %s", colName, colName);
-                } else {
-                  return colName;
-                }
-              } else if (isHudi && colName.startsWith("timestamp_local_micros")) {
+              if ((isHudi || isIceberg) && colName.startsWith("timestamp_local_millis")) {
+                return String.format("unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+              } else if ((isHudi || isIceberg) && colName.startsWith("timestamp_local_micros")) {
                 return String.format("unix_micros(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
               } else {
                 return colName;

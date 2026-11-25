@@ -23,12 +23,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 
+import org.apache.iceberg.types.Types;
+
 import org.apache.xtable.avro.AvroSchemaConverter;
+import org.apache.xtable.iceberg.IcebergSchemaExtractor;
+import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 
 public class TestHudiSchemaExtractor {
 
@@ -41,5 +47,41 @@ public class TestHudiSchemaExtractor {
     InternalSchema canonicalSchema = new HudiSchemaExtractor(mockConverter).schema(schema);
     assertEquals(mockOutput, canonicalSchema);
     verify(mockConverter).toInternalSchema(schema);
+  }
+
+  @Test
+  public void testLocalTimestampsBecomeIcebergTimestampsWithoutZone() {
+    Schema micros =
+        LogicalTypes.localTimestampMicros().addToSchema(Schema.create(Schema.Type.LONG));
+    Schema millis =
+        LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG));
+    Schema hudiSchema =
+        SchemaBuilder.record("ntz")
+            .fields()
+            .name("ntz_micros")
+            .type()
+            .optional()
+            .type(micros)
+            .name("ntz_millis")
+            .type(millis)
+            .noDefault()
+            .endRecord();
+
+    InternalSchema internalSchema = new HudiSchemaExtractor().schema(hudiSchema);
+    InternalField microsField = internalSchema.getFields().get(0);
+    InternalField millisField = internalSchema.getFields().get(1);
+    assertEquals(InternalType.TIMESTAMP_NTZ, microsField.getSchema().getDataType());
+    assertEquals(
+        InternalSchema.MetadataValue.MICROS,
+        microsField.getSchema().getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION));
+    assertEquals(InternalType.TIMESTAMP_NTZ, millisField.getSchema().getDataType());
+    assertEquals(
+        InternalSchema.MetadataValue.MILLIS,
+        millisField.getSchema().getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION));
+
+    org.apache.iceberg.Schema icebergSchema =
+        IcebergSchemaExtractor.getInstance().toIceberg(internalSchema);
+    assertEquals(Types.TimestampType.withoutZone(), icebergSchema.findType("ntz_micros"));
+    assertEquals(Types.TimestampType.withoutZone(), icebergSchema.findType("ntz_millis"));
   }
 }
