@@ -57,6 +57,15 @@ public class IcebergSchemaSync {
           .sorted(Map.Entry.comparingByKey())
           // execute updates in order
           .forEach(entry -> entry.getValue().get());
+      // Iceberg requires identifier fields to be required. When a record key column
+      // transitions required -> optional (or the record key set otherwise changes), the stale
+      // identifier set on the existing table must be reconciled to the latest schema (which may
+      // clear it, matching IcebergSchemaExtractor's all-or-nothing behavior for nullable keys).
+      // Without this, makeColumnOptional on an existing identifier field fails at commit with
+      // "Cannot add field <name> as an identifier field: not a required field".
+      if (!current.identifierFieldIds().equals(latest.identifierFieldIds())) {
+        updateSchema.setIdentifierFields(latest.identifierFieldNames());
+      }
       updateSchema.commit();
     }
   }
