@@ -1,0 +1,54 @@
+---
+title: "Release 0.5.0-incubating"
+sidebar_position: -5
+---
+
+## [Release 0.5.0-incubating](https://github.com/apache/incubator-xtable/releases/tag/0.5.0-incubating) ([docs](https://xtable.apache.org/docs/how-to))
+
+This is the fifth official Apache release for Apache XTable (Incubating), an incubating project under the Apache Software Foundation.
+Apache XTable™ (Incubating) facilitates omni-directional interoperability across data processing systems and query engines by allowing users to convert between open table formats without the need to rewrite any data files.
+Apache XTable™ (Incubating) converts between Apache Hudi, Apache Iceberg and Delta Lake, and can also read Apache Paimon and Apache Parquet tables as sources.
+
+## ✨ What's Changed
+
+### 🚀 Apache Hudi 1.x
+
+XTable now builds against **Apache Hudi 1.2.1**, up from 0.14.0.
+
+* The Hudi source and target support **Hudi table version 9**.
+* The Hudi target builds the **column stats index** for existing Hudi tables.
+* A new `xtable-iceberg-pluggable-tf` module plugs into Hudi's pluggable table format, so Hudi writers commit Iceberg metadata alongside each Hudi commit.
+
+### 🔍 Secondary index for XTable source tables
+
+* The Hudi target can build a Hudi **record index and secondary index** over the files it registers, for any source format XTable reads.
+* **Spark SQL extensions**, shipped in `xtable-spark-runtime`, let point lookups on Iceberg tables in Spark use that index without changing the query.
+
+### 🔧 Conversion improvements and bug fixes
+
+* **Delta**: resolve partition values by physical name when column mapping is enabled, carry nested field ids into the converted schema, keep absolute paths for data files outside the table base path, handle absolute paths in the log file listing, skip incremental sync when there are no new commits, and reuse the snapshot across an incremental backlog.
+* **Hudi**: emit removes when a CLEAN deletes the previous file version before an incremental sync, fall back to Parquet footer statistics when the metadata table returns degenerate value counts, batch-load partitions before listing files, and fix Guava compatibility in partition path validation.
+* **Parquet**: populate record counts for source files, resolve the file system from the base path, mark only non-required groups as nullable, and support source partitioning in the Spark runtime.
+* **AWS Glue**: build the Delta table `StorageDescriptor` so it works with Glue Catalog Federation.
+
+### 📦 Packaging and licensing
+
+* The license issues listed as known issues in 0.4.0 are fixed: the bundled jars carry complete license metadata for every shaded dependency, with one LICENSE file per jar, and the build now checks it ([#700](https://github.com/apache/incubator-xtable/issues/700), [#701](https://github.com/apache/incubator-xtable/issues/701), [#865](https://github.com/apache/incubator-xtable/issues/865)).
+* The `xtable-utilities` bundled jar shrank from 1.1 GB to 423 MB, and now includes Iceberg's `GlueCatalog` and `S3FileIO`.
+* Dropped HBase, Groovy, Ivy, YARN server and other unused Hive dependencies from the `xtable-hive-metastore` bundle.
+* The source release now includes `xtable-utilities` and the standard incubator DISCLAIMER.
+
+### 🧰 Build and infrastructure
+
+* Upgraded the ASF parent POM from 33 to 39.
+* XTable now compiles on JDK 21 and later.
+* Tests run in UTC.
+* Added a security policy and a threat model.
+
+### Known issues
+
+* The README recommends Java 11, but building `xtable-service` needs Java 17. The Spark tests in `xtable-core` need Java 11, or `--add-opens` flags on Java 17.
+
+## 📥 Download
+
+See the [Downloads](/releases/downloads) page for the source release, its signature and its checksum.

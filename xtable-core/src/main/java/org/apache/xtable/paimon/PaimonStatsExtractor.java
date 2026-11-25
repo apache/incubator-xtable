@@ -147,7 +147,10 @@ public class PaimonStatsExtractor {
       InternalType type = field.getSchema().getDataType();
       Object min = getValue(minValues, i, type, field.getSchema());
       Object max = getValue(maxValues, i, type, field.getSchema());
-      long nullCount = (nullCounts != null && i < nullCounts.size()) ? nullCounts.getLong(i) : 0L;
+      Long nullCount =
+          nullCounts != null && i < nullCounts.size() && !nullCounts.isNullAt(i)
+              ? nullCounts.getLong(i)
+              : null;
 
       columnStats.add(
           ColumnStat.builder()

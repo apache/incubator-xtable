@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -122,17 +123,15 @@ public class ITDeltaKernelConversionSource {
       ColumnStat.builder()
           .field(COL2_INT_FIELD)
           .range(Range.vector(2, 2))
-          .numNulls(0)
+          .numNulls(0L)
           .numValues(1)
-          .totalSize(0)
           .build();
   private static final ColumnStat COL1_COLUMN_STAT =
       ColumnStat.builder()
           .field(COL1_INT_FIELD)
           .range(Range.vector(1, 1))
-          .numNulls(0)
+          .numNulls(0L)
           .numValues(1)
-          .totalSize(0)
           .build();
 
   private DeltaKernelConversionSourceProvider conversionSourceProvider;
@@ -152,6 +151,9 @@ public class ITDeltaKernelConversionSource {
             .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
             .config("spark.sql.shuffle.partitions", "1")
             .config("spark.default.parallelism", "1")
+            .config("spark.databricks.delta.snapshotPartitions", "1")
+            .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
+            .config("spark.ui.enabled", "false")
             .config("spark.serializer", KryoSerializer.class.getName())
             .getOrCreate();
   }
@@ -358,6 +360,50 @@ public class ITDeltaKernelConversionSource {
         snapshot.getPartitionedDataFiles().get(0));
   }
 
+  @Test
+  void getCurrentSnapshotColumnMappingStatsTest() {
+    // Column mapping enabled after data exists keeps a as the physical name of a. After renaming a
+    // to a_old and re-adding a, a_old has physical name a and the new a has a col-<uuid> name.
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    sparkSession.sql(
+        "CREATE TABLE `" + tableName + "` (id INT, a INT) USING DELTA LOCATION '" + basePath + "'");
+    sparkSession.sql("INSERT INTO TABLE `" + tableName + "` VALUES (1, 10), (2, 20)");
+    sparkSession.sql(
+        "ALTER TABLE `"
+            + tableName
+            + "` SET TBLPROPERTIES ('delta.minReaderVersion'='2',"
+            + " 'delta.minWriterVersion'='5', 'delta.columnMapping.mode'='name')");
+    sparkSession.sql("ALTER TABLE `" + tableName + "` RENAME COLUMN a TO a_old");
+    sparkSession.sql("ALTER TABLE `" + tableName + "` ADD COLUMNS (a INT)");
+    sparkSession.sql("INSERT INTO TABLE `" + tableName + "` VALUES (3, 30, 300)");
+    DeltaKernelConversionSource conversionSource = getConversionSource(tableName, basePath);
+
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+
+    List<InternalField> fields = snapshot.getTable().getReadSchema().getFields();
+    assertEquals(
+        Arrays.asList("id", "a_old", "a"),
+        fields.stream().map(InternalField::getName).collect(Collectors.toList()));
+    InternalField id = fields.get(0);
+    InternalField aOld = fields.get(1);
+    InternalField a = fields.get(2);
+    assertEquals("a", aOld.getStorageName());
+    assertTrue(a.getStorageName().startsWith("col-"));
+    Map<Long, List<ColumnStat>> columnStatsByRecordCount = columnStatsByRecordCount(snapshot);
+    assertEquals(2, columnStatsByRecordCount.size());
+    // The file written before a was re-added has no stats for the new a.
+    assertEquals(
+        Arrays.asList(columnStat(id, 1, 2, 0, 2), columnStat(aOld, 10, 20, 0, 2)),
+        columnStatsByRecordCount.get(2L));
+    assertEquals(
+        Arrays.asList(
+            columnStat(id, 3, 3, 0, 1),
+            columnStat(aOld, 30, 30, 0, 1),
+            columnStat(a, 300, 300, 0, 1)),
+        columnStatsByRecordCount.get(1L));
+  }
+
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
   public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
@@ -435,6 +481,69 @@ public class ITDeltaKernelConversionSource {
                 .build());
 
     assertTrue(commitsBacklog.getCommitsToProcess().isEmpty());
+  }
+
+  @Test
+  void testNestedColumnStats() {
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` (id INT, nested STRUCT<name: STRING, score: INT>) USING DELTA LOCATION '"
+            + basePath
+            + "'");
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (1, named_struct('name', 'a', 'score', 10)),"
+            + " (2, named_struct('name', 'b', 'score', NULL))");
+    Engine engine = DefaultEngine.create(new Configuration());
+    long timestamp1 =
+        Table.forPath(engine, basePath.toString()).getLatestSnapshot(engine).getTimestamp(engine);
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (3, named_struct('name', 'c', 'score', 30)),"
+            + " (4, named_struct('name', NULL, 'score', 40)),"
+            + " (5, named_struct('name', 'd', 'score', 50))");
+    DeltaKernelConversionSource conversionSource = getConversionSource(tableName, basePath);
+
+    // The snapshot read goes through DeltaKernelDataFileExtractor.
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+    Map<String, InternalField> fieldsByPath =
+        snapshot.getTable().getReadSchema().getAllFields().stream()
+            .collect(Collectors.toMap(InternalField::getPath, field -> field));
+    InternalField id = fieldsByPath.get("id");
+    InternalField name = fieldsByPath.get("nested.name");
+    InternalField score = fieldsByPath.get("nested.score");
+    List<ColumnStat> secondFileStats =
+        Arrays.asList(
+            columnStat(id, 3, 5, 0, 3),
+            columnStat(name, "c", "d", 1, 3),
+            columnStat(score, 30, 50, 0, 3));
+    Map<Long, List<ColumnStat>> columnStatsByRecordCount = columnStatsByRecordCount(snapshot);
+    assertEquals(2, columnStatsByRecordCount.size());
+    assertEquals(
+        Arrays.asList(
+            columnStat(id, 1, 2, 0, 2),
+            columnStat(name, "a", "b", 0, 2),
+            columnStat(score, 10, 10, 1, 2)),
+        columnStatsByRecordCount.get(2L));
+    assertEquals(secondFileStats, columnStatsByRecordCount.get(3L));
+
+    // The incremental read goes through DeltaKernelConversionSource#getTableChangeForCommit.
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(
+            InstantsForIncrementalSync.builder()
+                .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+                .build());
+    assertEquals(1, commitsBacklog.getCommitsToProcess().size());
+    TableChange tableChange =
+        conversionSource.getTableChangeForCommit(commitsBacklog.getCommitsToProcess().get(0));
+    Set<InternalDataFile> addedFiles = tableChange.getFilesDiff().dataFilesAdded();
+    assertEquals(1, addedFiles.size());
+    assertEquals(secondFileStats, addedFiles.iterator().next().getColumnStats());
   }
 
   @Test
@@ -747,6 +856,34 @@ public class ITDeltaKernelConversionSource {
 
   private static Stream<Arguments> testWithPartitionToggle() {
     return Stream.of(Arguments.of(false), Arguments.of(true));
+  }
+
+  private DeltaKernelConversionSource getConversionSource(String tableName, Path basePath) {
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    return conversionSourceProvider.getConversionSourceInstance(tableConfig);
+  }
+
+  /** Returns the column stats of each data file in the snapshot, keyed by its record count. */
+  private static Map<Long, List<ColumnStat>> columnStatsByRecordCount(InternalSnapshot snapshot) {
+    return snapshot.getPartitionedDataFiles().stream()
+        .flatMap(group -> group.getDataFiles().stream())
+        .collect(
+            Collectors.toMap(InternalDataFile::getRecordCount, InternalDataFile::getColumnStats));
+  }
+
+  private static ColumnStat columnStat(
+      InternalField field, Object min, Object max, long numNulls, long numValues) {
+    return ColumnStat.builder()
+        .field(field)
+        .range(Range.vector(min, max))
+        .numNulls(numNulls)
+        .numValues(numValues)
+        .build();
   }
 
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)

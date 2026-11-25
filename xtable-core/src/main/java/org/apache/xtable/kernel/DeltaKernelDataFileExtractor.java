@@ -93,7 +93,7 @@ public class DeltaKernelDataFileExtractor {
       this.includeColumnStats = includeColumnStats;
       this.table = table;
       this.tableBasePath = table.getPath(engine); // Cache base path once
-      this.fields = schema.getFields();
+      this.fields = schema.getAllFields();
       String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
       this.fileFormat = actionsConverter.convertToFileFormat(provider);
 

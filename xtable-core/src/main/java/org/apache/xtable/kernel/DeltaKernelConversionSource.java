@@ -135,7 +135,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
                 tableBasePath, // Use cached base path
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
-                tableAtVersion.getReadSchema().getFields(),
+                tableAtVersion.getReadSchema().getAllFields(),
                 true,
                 DeltaKernelPartitionExtractor.getInstance(),
                 DeltaKernelStatsExtractor.getInstance(),

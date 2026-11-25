@@ -52,6 +52,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.schema.SchemaUtils;
 
 /**
  * Shared utility for Delta stats conversion between XTable internal format and Delta format. Used
@@ -136,13 +137,14 @@ public class DeltaStatsUtils {
       Map<String, Object> fieldPathToMaxValue = flattenStatMap(deltaStats.getMaxValues());
       Map<String, Object> fieldPathToMinValue = flattenStatMap(deltaStats.getMinValues());
       Map<String, Object> fieldPathToNullCount = flattenStatMap(deltaStats.getNullCount());
+      Map<String, String> physicalPaths = getPhysicalPaths(fields);
 
       List<ColumnStat> columnStats =
           fields.stream()
-              .filter(field -> fieldPathToMaxValue.containsKey(field.getPath()))
+              .filter(field -> fieldPathToMaxValue.containsKey(physicalPaths.get(field.getPath())))
               .map(
                   field -> {
-                    String fieldPath = field.getPath();
+                    String fieldPath = physicalPaths.get(field.getPath());
                     Object minRaw = fieldPathToMinValue.get(fieldPath);
                     Object maxRaw = fieldPathToMaxValue.get(fieldPath);
                     Object nullCountRaw = fieldPathToNullCount.get(fieldPath);
@@ -157,8 +159,8 @@ public class DeltaStatsUtils {
                             ? DeltaValueConverter.convertFromDeltaColumnStatValue(
                                 maxRaw, field.getSchema())
                             : null;
-                    long nullCount =
-                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : 0;
+                    Long nullCount =
+                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : null;
 
                     Range range = Range.vector(minValue, maxValue);
                     return ColumnStat.builder()
@@ -177,6 +179,23 @@ public class DeltaStatsUtils {
     } catch (IOException ex) {
       throw new ParseException("Unable to parse stats json", ex);
     }
+  }
+
+  /**
+   * Maps each field's path to the path its stats are keyed by. With column mapping, Delta keys the
+   * stats by physical name, so a path segment is the field's storage name when one is set. There is
+   * no fallback to the logical name, which can be another column's physical name after renames.
+   * Parents must come before their children, as in {@link InternalSchema#getAllFields()}.
+   */
+  private static Map<String, String> getPhysicalPaths(List<InternalField> fields) {
+    Map<String, String> physicalPaths = new HashMap<>();
+    for (InternalField field : fields) {
+      String name = field.getStorageName() != null ? field.getStorageName() : field.getName();
+      physicalPaths.put(
+          field.getPath(),
+          SchemaUtils.getFullyQualifiedPath(physicalPaths.get(field.getParentPath()), name));
+    }
+    return physicalPaths;
   }
 
   private static Set<String> getPathsFromStructSchemaForMinAndMaxStats(InternalSchema schema) {
@@ -217,11 +236,14 @@ public class DeltaStatsUtils {
   private static Map<String, Object> getNullCount(List<ColumnStat> validColumnStats) {
     // TODO: Additional work needed to track nulls maps & arrays.
     Map<String, Object> jsonObject = new HashMap<>();
-    validColumnStats.forEach(
-        columnStat -> {
-          String[] pathParts = columnStat.getField().getPathParts();
-          insertValueAtPath(jsonObject, pathParts, columnStat.getNumNulls());
-        });
+    // Leave out unknown null counts. Delta treats a missing null count as unknown.
+    validColumnStats.stream()
+        .filter(columnStat -> columnStat.getNumNulls() != null)
+        .forEach(
+            columnStat -> {
+              String[] pathParts = columnStat.getField().getPathParts();
+              insertValueAtPath(jsonObject, pathParts, columnStat.getNumNulls());
+            });
     return jsonObject;
   }
 

@@ -18,15 +18,21 @@ process or a separate cluster to keep a table interoperable across formats.
 ## Getting the jar
 
 The jar is published to Maven Central as
-`org.apache.xtable:xtable-spark-runtime_2.12:0.4.0-incubating`. Download it once:
+`org.apache.xtable:xtable-spark-runtime_2.12:0.5.0-incubating`. Download it once:
 
 ```shell md title="shell"
-curl -O https://repo1.maven.org/maven2/org/apache/xtable/xtable-spark-runtime_2.12/0.4.0-incubating/xtable-spark-runtime_2.12-0.4.0-incubating.jar
+curl -O https://repo1.maven.org/maven2/org/apache/xtable/xtable-spark-runtime_2.12/0.5.0-incubating/xtable-spark-runtime_2.12-0.5.0-incubating.jar
 ```
 
 Every engine dependency is `provided`, so the jar is about 4 MB and reuses the Hudi, Iceberg and
 Delta libraries your cluster already has. See the [Downloads](/releases/downloads) page for the
 full list of releases.
+
+From 0.5.0, the jar is built against Hudi 1.2.x, so a sync with a Hudi source or target needs the
+Hudi 1.2.x Spark bundle on the classpath. Hudi 1.2.x reads tables written by Hudi 0.14.x, 0.15.x
+and 1.0.x without upgrading them. Use the 0.4.0 jar on a cluster that has to stay on Hudi 0.14.x.
+The 0.4.0 jar does not work with Hudi 0.15.x or later: a sync with a Hudi source fails with
+`NoSuchMethodError` ([#941](https://github.com/apache/incubator-xtable/issues/941)).
 
 ## Adding the sync to a Spark job
 
@@ -37,7 +43,7 @@ Add the jar to the `spark-submit` you already use, alongside your application ja
 
 ```shell md title="shell"
 $SPARK_HOME/bin/spark-submit \
-  --jars xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  --jars xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --class com.example.OrdersJob \
   orders-job.jar
 ```
@@ -133,7 +139,7 @@ bundle. Pass the jar as the application jar rather than with `--jars`:
 $SPARK_HOME/bin/spark-submit \
   --class org.apache.xtable.spark.XTableSparkSync \
   --master 'local[*]' \
-  xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --basepath /path/to/hudi_table \
   --sourceformat HUDI \
   --targets ICEBERG,DELTA
@@ -167,7 +173,7 @@ datasets:
 ```shell md title="shell"
 $SPARK_HOME/bin/spark-submit \
   --class org.apache.xtable.spark.XTableSparkSync \
-  xtable-spark-runtime_2.12-0.4.0-incubating.jar \
+  xtable-spark-runtime_2.12-0.5.0-incubating.jar \
   --datasetconfig my_config.yaml
 ```
 
@@ -185,9 +191,23 @@ A table entry can also set `targetProperties`, keyed by target format, for examp
 | `--datapath` | Path to the data files, when it differs from the base path. |
 | `--tablename` | Table name. Defaults to the last segment of the base path. |
 | `--namespace` | Dot-separated table namespace. |
-| `--partitionspec` | Hudi source partition field spec, for example `level:VALUE`. |
+| `--partitionspec` | Partition field spec of a Hudi or Parquet source, for example `level:VALUE`. |
 | `--usedeltakernel` | Force Delta Kernel for a Delta source or target. |
 | `--help` | Print the usage text. |
+
+## Hudi targets
+
+A sync to a Hudi target writes the Hudi commit with Hudi's Java client by default, and the Hudi
+Spark bundle doesn't include it. When the sync has a Hudi target, do one of these:
+
+- Add `org.apache.hudi:hudi-java-client:1.2.1` to the classpath, next to the Hudi Spark bundle.
+- Use Hudi's Spark client, which the bundle includes, by setting
+  `xtable.hudi.target.execution.engine: spark` in the `targetProperties` of each table in
+  `--datasetconfig`, or in the `targetProperties` of the `TableSyncSpec`.
+
+Without either, the sync fails with
+`NoClassDefFoundError: org/apache/hudi/client/common/HoodieJavaEngineContext`. See
+[Hudi](/docs/features-and-limitations#hudi) for the other Hudi target properties.
 
 ## Supported formats
 
@@ -215,6 +235,31 @@ and the jar chooses the right one automatically:
 Delta Standalone doesn't run on Spark 3.5, so on 3.5 and newer a Delta source or target is routed
 through Delta Kernel with no flag needed. If you want Kernel on Spark 3.4 as well, pass
 `--usedeltakernel`, or set `.useDeltaKernel(true)` on the `TableSyncSpec`.
+
+Delta Kernel is not part of the Delta Spark jars. When the sync uses Kernel, add
+`io.delta:delta-kernel-api:4.0.0` and `io.delta:delta-kernel-defaults:4.0.0` to the classpath, or
+the sync fails with `NoClassDefFoundError: io/delta/kernel/engine/Engine`.
+
+## Running on AWS Glue
+
+From 0.5.0, the jar is built against Hudi 1.2.x, and a sync job with a Hudi source or target uses
+Hudi 1.2.x. AWS Glue 5.1 includes Hudi 1.0.2, and Glue documents how to
+[use a different Hudi version](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-hudi.html)
+in a job. For the sync job:
+
+- Pass the XTable jar and `hudi-spark3.5-bundle_2.12` 1.2.x with `--extra-jars`.
+- Set `--user-jars-first` to `true`.
+- Leave `hudi` out of `--datalake-formats`, so that Glue does not add its own Hudi jars.
+
+```text md title="Glue job parameters"
+--extra-jars       s3://<bucket>/jars/xtable-spark-runtime_2.12-0.5.0-incubating.jar,s3://<bucket>/jars/hudi-spark3.5-bundle_2.12-1.2.1.jar
+--user-jars-first  true
+--conf             spark.serializer=org.apache.spark.serializer.KryoSerializer
+```
+
+The sync also needs the Iceberg or Delta libraries for its targets, as it does on any other Spark
+cluster, and a sync to a Hudi target needs the setup in [Hudi targets](#hudi-targets). Your other Glue jobs can keep writing the table with the Hudi version they already use,
+because Hudi 1.2.x reads tables written by Hudi 0.15.x and 1.0.x without upgrading them.
 
 ## Next steps
 
