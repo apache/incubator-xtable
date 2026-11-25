@@ -24,6 +24,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,9 +37,13 @@ import org.mockito.Mockito;
 
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -210,6 +216,44 @@ public class TestIcebergSchemaSync {
         () -> schemaSync.sync(SCHEMA, addFieldsInMapKey(), mockTransaction));
 
     verify(mockUpdateSchema, never()).commit();
+  }
+
+  @Test
+  public void testIdentifierFieldsRemovedWhenKeyBecomesOptional() {
+    Schema current =
+        new Schema(
+            Arrays.asList(
+                Types.NestedField.required(1, "id", Types.IntegerType.get()),
+                Types.NestedField.optional(2, "name", Types.StringType.get())),
+            Collections.singleton(1));
+    Schema latest =
+        new Schema(
+            Arrays.asList(
+                Types.NestedField.optional(1, "id", Types.IntegerType.get()),
+                Types.NestedField.optional(2, "name", Types.StringType.get())));
+    InMemoryCatalog catalog = new InMemoryCatalog();
+    catalog.initialize("test", Collections.emptyMap());
+    Namespace namespace = Namespace.of("db");
+    catalog.createNamespace(namespace);
+    Table table = catalog.createTable(TableIdentifier.of(namespace, "tbl"), current);
+
+    Transaction transaction = table.newTransaction();
+    schemaSync.sync(table.schema(), latest, transaction);
+    transaction.commitTransaction();
+
+    Schema result = catalog.loadTable(TableIdentifier.of(namespace, "tbl")).schema();
+    Assertions.assertTrue(result.identifierFieldNames().isEmpty());
+    Assertions.assertTrue(result.findField("id").isOptional());
+  }
+
+  @Test
+  public void testIdentifierFieldsNotTouchedWhenUnchanged() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+
+    schemaSync.sync(SCHEMA, updateFieldRequired(1), mockTransaction);
+
+    verify(mockUpdateSchema, never()).setIdentifierFields(Mockito.anyCollection());
   }
 
   @Test

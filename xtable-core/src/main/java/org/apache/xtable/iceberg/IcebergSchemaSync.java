@@ -57,6 +57,10 @@ public class IcebergSchemaSync {
           .sorted(Map.Entry.comparingByKey())
           // execute updates in order
           .forEach(entry -> entry.getValue().get());
+      // a field that becomes optional can no longer be an identifier field, so keep them in sync
+      if (!current.identifierFieldNames().equals(latest.identifierFieldNames())) {
+        updateSchema.setIdentifierFields(latest.identifierFieldNames());
+      }
       updateSchema.commit();
     }
   }
