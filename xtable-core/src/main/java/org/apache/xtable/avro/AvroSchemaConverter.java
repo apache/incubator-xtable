@@ -160,15 +160,13 @@ public class AvroSchemaConverter {
           metadata.put(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
         } else if (logicalType instanceof LogicalTypes.LocalTimestampMillis) {
-          // TODO: https://github.com/apache/incubator-xtable/issues/672
-          // Hudi 0.x writes INT64 in parquet, TimestampNTZType support added in 1.x
-          newDataType = InternalType.LONG;
+          // Hudi 1.x writes these as Parquet TIMESTAMP(isAdjustedToUTC=false), so readers that
+          // follow the file's annotation, like Iceberg's, need a timestamp type, not a long.
+          newDataType = InternalType.TIMESTAMP_NTZ;
           metadata.put(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
         } else if (logicalType instanceof LogicalTypes.LocalTimestampMicros) {
-          // TODO: https://github.com/apache/incubator-xtable/issues/672
-          // Hudi 0.x writes INT64 in parquet, TimestampNTZType support added in 1.x
-          newDataType = InternalType.LONG;
+          newDataType = InternalType.TIMESTAMP_NTZ;
           metadata.put(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
         } else {
