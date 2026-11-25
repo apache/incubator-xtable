@@ -20,10 +20,12 @@ package org.apache.xtable.paimon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -121,6 +123,36 @@ public class TestPaimonPartitionExtractor {
     PartitionValue partitionValue = result.get(0);
     assertEquals("level", partitionValue.getPartitionField().getSourceField().getName());
     assertEquals(Range.scalar("INFO"), partitionValue.getRange());
+  }
+
+  @Test
+  void testConvertPartitionValueProducesTypedValues() {
+    String defaultName = "__DEFAULT_PARTITION__";
+
+    assertEquals(
+        Integer.valueOf((int) LocalDate.parse("2019-10-12").toEpochDay()),
+        PaimonPartitionExtractor.convertPartitionValue(
+            "2019-10-12", InternalType.DATE, defaultName));
+    assertEquals(
+        Integer.valueOf(42),
+        PaimonPartitionExtractor.convertPartitionValue("42", InternalType.INT, defaultName));
+    assertEquals(
+        Long.valueOf(10_000_000_000L),
+        PaimonPartitionExtractor.convertPartitionValue(
+            "10000000000", InternalType.LONG, defaultName));
+    assertEquals(
+        "USA",
+        PaimonPartitionExtractor.convertPartitionValue("USA", InternalType.STRING, defaultName));
+  }
+
+  @Test
+  void testConvertPartitionValueMapsNullAndDefaultPartitionToNull() {
+    String defaultName = "__DEFAULT_PARTITION__";
+
+    assertNull(
+        PaimonPartitionExtractor.convertPartitionValue(
+            defaultName, InternalType.DATE, defaultName));
+    assertNull(PaimonPartitionExtractor.convertPartitionValue(null, InternalType.INT, defaultName));
   }
 
   @Test
