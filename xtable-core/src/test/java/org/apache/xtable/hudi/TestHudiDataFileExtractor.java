@@ -20,6 +20,8 @@ package org.apache.xtable.hudi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -43,6 +45,15 @@ import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.storage.StoragePath;
 import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
+import org.apache.xtable.exception.PartitionValuesExtractorException;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 
 class TestHudiDataFileExtractor {
@@ -166,5 +177,86 @@ class TestHudiDataFileExtractor {
     when(tableConfig.isMetadataTableAvailable()).thenReturn(false);
     when(metaClient.getBasePath()).thenReturn(new StoragePath(basePathStr));
     return new HudiDataFileExtractor(metaClient, null, null);
+  }
+
+  private static final long TEN_THIRTY_MICROS = 1709202600_000000L;
+
+  private static InternalDataFile timestampPartitionedFile(
+      InternalType type, Long partitionValue, Range stats) {
+    InternalField field =
+        InternalField.builder()
+            .name("ts")
+            .schema(
+                InternalSchema.builder()
+                    .name("ts")
+                    .dataType(type)
+                    .metadata(
+                        Collections.singletonMap(
+                            InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                            InternalSchema.MetadataValue.MICROS))
+                    .build())
+            .build();
+    InternalPartitionField partitionField =
+        InternalPartitionField.builder()
+            .sourceField(field)
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    return InternalDataFile.builder()
+        .physicalPath("file:/table/ts=2024-02-29 10%3A30%3A00/f.parquet")
+        .partitionValues(
+            Collections.singletonList(
+                PartitionValue.builder()
+                    .partitionField(partitionField)
+                    .range(Range.scalar(partitionValue))
+                    .build()))
+        .columnStats(
+            stats == null
+                ? Collections.emptyList()
+                : Collections.singletonList(ColumnStat.builder().field(field).range(stats).build()))
+        .build();
+  }
+
+  @Test
+  void timestampPartitionValueMatchingTheFilesOnlyValueIsKept() {
+    InternalDataFile file =
+        timestampPartitionedFile(
+            InternalType.TIMESTAMP, TEN_THIRTY_MICROS, Range.scalar(TEN_THIRTY_MICROS));
+    assertSame(file, HudiDataFileExtractor.requireTimestampPartitionValuesMatchStats(file));
+    InternalDataFile ntz =
+        timestampPartitionedFile(
+            InternalType.TIMESTAMP_NTZ, TEN_THIRTY_MICROS, Range.scalar(TEN_THIRTY_MICROS));
+    assertSame(ntz, HudiDataFileExtractor.requireTimestampPartitionValuesMatchStats(ntz));
+    InternalDataFile nullPartition =
+        timestampPartitionedFile(InternalType.TIMESTAMP, null, Range.scalar(null));
+    assertSame(
+        nullPartition,
+        HudiDataFileExtractor.requireTimestampPartitionValuesMatchStats(nullPartition));
+    // A column outside the indexed columns has no stats, and nothing shows another value.
+    InternalDataFile noStats =
+        timestampPartitionedFile(InternalType.TIMESTAMP, TEN_THIRTY_MICROS, null);
+    assertSame(noStats, HudiDataFileExtractor.requireTimestampPartitionValuesMatchStats(noStats));
+  }
+
+  @Test
+  void timestampPartitionValueTruncatedBelowTheSecondIsRefused() {
+    // One value with fractional seconds: the path holds it truncated to the second.
+    InternalDataFile single =
+        timestampPartitionedFile(
+            InternalType.TIMESTAMP, TEN_THIRTY_MICROS, Range.scalar(TEN_THIRTY_MICROS + 123456));
+    PartitionValuesExtractorException e =
+        assertThrows(
+            PartitionValuesExtractorException.class,
+            () -> HudiDataFileExtractor.requireTimestampPartitionValuesMatchStats(single));
+    assertTrue(e.getMessage().contains("2024-02-29T10:30:00.123456Z"), e.getMessage());
+    assertTrue(e.getMessage().contains("fractional seconds"), e.getMessage());
+    // Two values of the same second share the path and the file group.
+    InternalDataFile shared =
+        timestampPartitionedFile(
+            InternalType.TIMESTAMP,
+            TEN_THIRTY_MICROS,
+            Range.vector(TEN_THIRTY_MICROS + 123456, TEN_THIRTY_MICROS + 654321));
+    assertThrows(
+        PartitionValuesExtractorException.class,
+        () -> HudiDataFileExtractor.requireTimestampPartitionValuesMatchStats(shared));
   }
 }
