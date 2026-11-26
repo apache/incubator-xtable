@@ -23,21 +23,29 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
+import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -221,6 +229,41 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).makeColumnOptional("timestamp_field");
     verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  public void testRecordKeyBecomesOptional(@TempDir Path tempDir) {
+    Schema current =
+        new Schema(
+            Arrays.asList(
+                Types.NestedField.required(1, "id", Types.IntegerType.get()),
+                Types.NestedField.optional(2, "name", Types.StringType.get())),
+            Collections.singleton(1));
+    Schema latest =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.IntegerType.get()),
+            Types.NestedField.optional(2, "name", Types.StringType.get()));
+    Table table =
+        new HadoopTables(new Configuration())
+            .create(current, PartitionSpec.unpartitioned(), tempDir.toString());
+
+    Transaction transaction = table.newTransaction();
+    schemaSync.sync(table.schema(), latest, transaction);
+    transaction.commitTransaction();
+
+    table.refresh();
+    Assertions.assertTrue(table.schema().findField("id").isOptional());
+    Assertions.assertTrue(table.schema().identifierFieldIds().isEmpty());
+  }
+
+  @Test
+  public void testIdentifierFieldsUnchanged() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+
+    schemaSync.sync(SCHEMA, updateFieldRequired(1), mockTransaction);
+
+    verify(mockUpdateSchema, never()).setIdentifierFields(Mockito.anyCollection());
   }
 
   @Test

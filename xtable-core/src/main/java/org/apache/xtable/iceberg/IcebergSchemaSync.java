@@ -51,6 +51,11 @@ public class IcebergSchemaSync {
     if (!current.sameSchema(latest)) {
       // Schema change
       UpdateSchema updateSchema = transaction.updateSchema();
+      if (!current.identifierFieldNames().equals(latest.identifierFieldNames())) {
+        // Identifier fields must be required, so they are updated in the same change as the
+        // columns, for example when a record key column becomes optional.
+        updateSchema.setIdentifierFields(latest.identifierFieldNames());
+      }
       Map<Integer, Supplier<UpdateSchema>> fieldIdToUpdate =
           addUpdates(current.asStruct(), latest.asStruct(), updateSchema, null);
       fieldIdToUpdate.entrySet().stream()
