@@ -27,18 +27,25 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericArray;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.Timestamp;
+import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.schema.Schema;
+import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.table.FileStoreTable;
+import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.DataTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -547,6 +554,245 @@ public class TestPaimonStatsExtractor {
     assertEquals(3, idStat.getNumValues());
   }
 
+  @Test
+  void testStatsOfTinyIntAndSmallIntColumns() {
+    Schema schema =
+        Schema.newBuilder()
+            .column("id", DataTypes.INT())
+            .column("t", DataTypes.TINYINT())
+            .column("s", DataTypes.SMALLINT())
+            .build();
+    FileStoreTable table = TestPaimonTable.createTable(createCatalog(), "tinyint_smallint", schema);
+    String file =
+        writeDataFile(
+            table,
+            Arrays.asList(
+                GenericRow.of(1, (byte) -5, (short) -300), GenericRow.of(2, (byte) 7, (short) 9)));
+
+    // The stats store t as a byte and s as a short, so reading them as an int gets negative values
+    // wrong.
+    List<ColumnStat> stats = getStatsByFileName(table).get(file);
+    assertEquals(Range.vector(-5, 7), getColumnStat(stats, "t").getRange());
+    assertEquals(Range.vector(-300, 9), getColumnStat(stats, "s").getRange());
+  }
+
+  @Test
+  void testStatsAfterAddColumn() {
+    Schema schema =
+        Schema.newBuilder().column("id", DataTypes.INT()).column("a", DataTypes.INT()).build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table = TestPaimonTable.createTable(catalog, "add_column", schema);
+    String oldFile =
+        writeDataFile(table, Arrays.asList(GenericRow.of(1, 10), GenericRow.of(2, 20)));
+    table =
+        TestPaimonTable.alterTable(catalog, table, SchemaChange.addColumn("b", DataTypes.INT()));
+    String newFile = writeDataFile(table, Collections.singletonList(GenericRow.of(3, 30, 300)));
+
+    Map<String, List<ColumnStat>> statsByFileName = getStatsByFileName(table);
+
+    // The file written before b was added has no stats for b.
+    List<ColumnStat> oldFileStats = statsByFileName.get(oldFile);
+    assertEquals(Arrays.asList("id", "a"), getColumnNames(oldFileStats));
+    assertEquals(Range.vector(1, 2), getColumnStat(oldFileStats, "id").getRange());
+    assertEquals(Range.vector(10, 20), getColumnStat(oldFileStats, "a").getRange());
+    List<ColumnStat> newFileStats = statsByFileName.get(newFile);
+    assertEquals(Arrays.asList("id", "a", "b"), getColumnNames(newFileStats));
+    assertEquals(Range.vector(300, 300), getColumnStat(newFileStats, "b").getRange());
+  }
+
+  @Test
+  void testStatsAfterAddColumnPrimaryKeyTable() {
+    Schema schema =
+        Schema.newBuilder()
+            .primaryKey("id")
+            .column("id", DataTypes.INT())
+            .column("a", DataTypes.INT())
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .option("full-compaction.delta-commits", "1")
+            .build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table = TestPaimonTable.createTable(catalog, "pk_add_column", schema);
+    TestPaimonTable.writeRows(table, Arrays.asList(GenericRow.of(1, 10), GenericRow.of(2, 20)));
+    table =
+        TestPaimonTable.alterTable(catalog, table, SchemaChange.addColumn("b", DataTypes.INT()));
+
+    // The compacted file keeps the schema it was written with until it is rewritten.
+    Map<String, List<ColumnStat>> statsByFileName = getStatsByFileName(table);
+    assertEquals(1, statsByFileName.size());
+    List<ColumnStat> stats = statsByFileName.values().iterator().next();
+    assertEquals(Arrays.asList("id", "a"), getColumnNames(stats));
+    assertEquals(Range.vector(10, 20), getColumnStat(stats, "a").getRange());
+  }
+
+  @Test
+  void testStatsAfterDropAndAddColumn() {
+    Schema schema =
+        Schema.newBuilder()
+            .column("id", DataTypes.INT())
+            .column("a", DataTypes.INT())
+            .column("b", DataTypes.INT())
+            .build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table = TestPaimonTable.createTable(catalog, "drop_and_add_column", schema);
+    String oldFile =
+        writeDataFile(table, Arrays.asList(GenericRow.of(1, 10, 100), GenericRow.of(2, 20, 200)));
+    table = TestPaimonTable.alterTable(catalog, table, SchemaChange.dropColumn("b"));
+    table =
+        TestPaimonTable.alterTable(catalog, table, SchemaChange.addColumn("c", DataTypes.INT()));
+    String newFile = writeDataFile(table, Collections.singletonList(GenericRow.of(3, 30, 3000)));
+
+    Map<String, List<ColumnStat>> statsByFileName = getStatsByFileName(table);
+
+    // The stats of the dropped column b must not be reported for c, which is null in this file.
+    assertEquals(Arrays.asList("id", "a"), getColumnNames(statsByFileName.get(oldFile)));
+    List<ColumnStat> newFileStats = statsByFileName.get(newFile);
+    assertEquals(Arrays.asList("id", "a", "c"), getColumnNames(newFileStats));
+    assertEquals(Range.vector(3000, 3000), getColumnStat(newFileStats, "c").getRange());
+  }
+
+  @Test
+  void testStatsAfterDropAndAddColumnWithSameName() {
+    Schema schema =
+        Schema.newBuilder().column("id", DataTypes.INT()).column("a", DataTypes.INT()).build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table =
+        TestPaimonTable.createTable(catalog, "drop_and_add_column_with_same_name", schema);
+    String oldFile =
+        writeDataFile(table, Arrays.asList(GenericRow.of(1, 10), GenericRow.of(2, 20)));
+    table = TestPaimonTable.alterTable(catalog, table, SchemaChange.dropColumn("a"));
+    table =
+        TestPaimonTable.alterTable(catalog, table, SchemaChange.addColumn("a", DataTypes.INT()));
+    String newFile = writeDataFile(table, Collections.singletonList(GenericRow.of(3, 30)));
+
+    Map<String, List<ColumnStat>> statsByFileName = getStatsByFileName(table);
+
+    // Both columns are named a, but the new one has another field id and is null in the old file.
+    assertEquals(Collections.singletonList("id"), getColumnNames(statsByFileName.get(oldFile)));
+    List<ColumnStat> newFileStats = statsByFileName.get(newFile);
+    assertEquals(Arrays.asList("id", "a"), getColumnNames(newFileStats));
+    assertEquals(Range.vector(30, 30), getColumnStat(newFileStats, "a").getRange());
+  }
+
+  @Test
+  void testStatsAfterRenameAndAddColumn() {
+    Schema schema =
+        Schema.newBuilder().column("id", DataTypes.INT()).column("a", DataTypes.INT()).build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table = TestPaimonTable.createTable(catalog, "rename_column", schema);
+    String oldFile =
+        writeDataFile(table, Arrays.asList(GenericRow.of(1, 10), GenericRow.of(2, 20)));
+    table = TestPaimonTable.alterTable(catalog, table, SchemaChange.renameColumn("a", "a_old"));
+    table =
+        TestPaimonTable.alterTable(catalog, table, SchemaChange.addColumn("a", DataTypes.INT()));
+    String newFile = writeDataFile(table, Collections.singletonList(GenericRow.of(3, 30, 300)));
+
+    Map<String, List<ColumnStat>> statsByFileName = getStatsByFileName(table);
+
+    // Stats follow the field id, so the renamed column keeps its stats in the old file.
+    List<ColumnStat> oldFileStats = statsByFileName.get(oldFile);
+    assertEquals(Arrays.asList("id", "a_old"), getColumnNames(oldFileStats));
+    assertEquals(Range.vector(10, 20), getColumnStat(oldFileStats, "a_old").getRange());
+    List<ColumnStat> newFileStats = statsByFileName.get(newFile);
+    assertEquals(Arrays.asList("id", "a_old", "a"), getColumnNames(newFileStats));
+    assertEquals(Range.vector(30, 30), getColumnStat(newFileStats, "a_old").getRange());
+    assertEquals(Range.vector(300, 300), getColumnStat(newFileStats, "a").getRange());
+  }
+
+  @Test
+  void testStatsAfterColumnTypeWidening() {
+    Schema schema =
+        Schema.newBuilder()
+            .column("id", DataTypes.INT())
+            .column("t", DataTypes.TINYINT())
+            .column("s", DataTypes.SMALLINT())
+            .column("i", DataTypes.INT())
+            .column("f", DataTypes.FLOAT())
+            .column("d", DataTypes.DECIMAL(5, 2))
+            .column("d_scale", DataTypes.DECIMAL(5, 2))
+            .column("ts", DataTypes.TIMESTAMP(3))
+            .build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table = TestPaimonTable.createTable(catalog, "type_widening", schema);
+    String oldFile =
+        writeDataFile(
+            table,
+            Arrays.asList(
+                GenericRow.of(
+                    1,
+                    (byte) -5,
+                    (short) -300,
+                    -7,
+                    -1.5f,
+                    toDecimal("-1.50", 5, 2),
+                    toDecimal("-1.50", 5, 2),
+                    Timestamp.fromEpochMillis(1000L)),
+                GenericRow.of(
+                    2,
+                    (byte) 7,
+                    (short) 9,
+                    8,
+                    2.5f,
+                    toDecimal("123.45", 5, 2),
+                    toDecimal("123.45", 5, 2),
+                    Timestamp.fromEpochMillis(2000L))));
+    table = updateColumnType(catalog, table, "t", DataTypes.INT());
+    table = updateColumnType(catalog, table, "s", DataTypes.BIGINT());
+    table = updateColumnType(catalog, table, "i", DataTypes.BIGINT());
+    table = updateColumnType(catalog, table, "f", DataTypes.DOUBLE());
+    table = updateColumnType(catalog, table, "d", DataTypes.DECIMAL(10, 2));
+    table = updateColumnType(catalog, table, "d_scale", DataTypes.DECIMAL(20, 4));
+    table = updateColumnType(catalog, table, "ts", DataTypes.TIMESTAMP(6));
+
+    // The old file stores each column in its old type, and the new type holds every value of it.
+    List<ColumnStat> stats = getStatsByFileName(table).get(oldFile);
+    assertEquals(
+        Arrays.asList("id", "t", "s", "i", "f", "d", "d_scale", "ts"), getColumnNames(stats));
+    assertEquals(Range.vector(-5, 7), getColumnStat(stats, "t").getRange());
+    assertEquals(Range.vector(-300L, 9L), getColumnStat(stats, "s").getRange());
+    assertEquals(Range.vector(-7L, 8L), getColumnStat(stats, "i").getRange());
+    assertEquals(Range.vector(-1.5d, 2.5d), getColumnStat(stats, "f").getRange());
+    assertEquals(
+        Range.vector(new BigDecimal("-1.50"), new BigDecimal("123.45")),
+        getColumnStat(stats, "d").getRange());
+    assertEquals(
+        Range.vector(new BigDecimal("-1.5000"), new BigDecimal("123.4500")),
+        getColumnStat(stats, "d_scale").getRange());
+    assertEquals(Range.vector(1_000_000L, 2_000_000L), getColumnStat(stats, "ts").getRange());
+  }
+
+  @Test
+  void testStatsAfterColumnTypeNarrowing() {
+    Schema schema =
+        Schema.newBuilder()
+            .column("id", DataTypes.INT())
+            .column("l", DataTypes.BIGINT())
+            .column("db", DataTypes.DOUBLE())
+            .column("d", DataTypes.DECIMAL(10, 2))
+            .column("d_scale", DataTypes.DECIMAL(10, 2))
+            .column("s", DataTypes.INT())
+            .build();
+    Catalog catalog = createCatalog();
+    FileStoreTable table = TestPaimonTable.createTable(catalog, "type_narrowing", schema);
+    String oldFile =
+        writeDataFile(
+            table,
+            Arrays.asList(
+                GenericRow.of(1, 10L, 1.5d, toDecimal("1.25", 10, 2), toDecimal("1.25", 10, 2), 9),
+                GenericRow.of(
+                    2, 20L, 2.5d, toDecimal("2.25", 10, 2), toDecimal("2.25", 10, 2), 10)));
+    table = updateColumnType(catalog, table, "l", DataTypes.INT());
+    table = updateColumnType(catalog, table, "db", DataTypes.FLOAT());
+    table = updateColumnType(catalog, table, "d", DataTypes.DECIMAL(5, 2));
+    table = updateColumnType(catalog, table, "d_scale", DataTypes.DECIMAL(10, 1));
+    table = updateColumnType(catalog, table, "s", DataTypes.STRING());
+
+    // The new types cannot hold every value of the old ones, and strings order 9 and 10 the other
+    // way, so the old file's stats for these columns are left out.
+    assertEquals(
+        Collections.singletonList("id"), getColumnNames(getStatsByFileName(table).get(oldFile)));
+  }
+
   private void createUnpartitionedTable() {
     testTable =
         (TestPaimonTable)
@@ -559,6 +805,43 @@ public class TestPaimonStatsExtractor {
         (TestPaimonTable)
             TestPaimonTable.createTable("test_table", "level", tempDir, new Configuration(), false);
     paimonTable = testTable.getPaimonTable();
+  }
+
+  private Catalog createCatalog() {
+    return TestPaimonTable.createFilesystemCatalog(tempDir.toString(), new Configuration());
+  }
+
+  private static FileStoreTable updateColumnType(
+      Catalog catalog, FileStoreTable table, String columnName, DataType newType) {
+    return TestPaimonTable.alterTable(
+        catalog, table, SchemaChange.updateColumnType(columnName, newType));
+  }
+
+  private static Decimal toDecimal(String value, int precision, int scale) {
+    return Decimal.fromBigDecimal(new BigDecimal(value), precision, scale);
+  }
+
+  /** Writes the rows as one data file and returns its name. */
+  private static String writeDataFile(FileStoreTable table, List<GenericRow> rows) {
+    List<DataFileMeta> files = TestPaimonTable.writeRowsWithoutCompaction(table, rows);
+    assertEquals(1, files.size());
+    return files.get(0).fileName();
+  }
+
+  /** Extracts the column stats of the data files in the latest snapshot, by file name. */
+  private Map<String, List<ColumnStat>> getStatsByFileName(FileStoreTable table) {
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(table.schema());
+    return extractor
+        .toInternalDataFiles(table, table.snapshotManager().latestSnapshot(), internalSchema)
+        .stream()
+        .collect(
+            Collectors.toMap(
+                file -> new org.apache.paimon.fs.Path(file.getPhysicalPath()).getName(),
+                InternalDataFile::getColumnStats));
+  }
+
+  private static List<String> getColumnNames(List<ColumnStat> stats) {
+    return stats.stream().map(stat -> stat.getField().getName()).collect(Collectors.toList());
   }
 
   private ColumnStat getColumnStat(List<ColumnStat> stats, String columnName) {

@@ -19,9 +19,11 @@
 package org.apache.xtable.paimon;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -39,6 +41,7 @@ import org.apache.paimon.table.source.snapshot.SnapshotReader;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
+import org.apache.xtable.paimon.PaimonStatsExtractor.StatsLayout;
 
 @Log4j2
 public class PaimonDataFileExtractor {
@@ -57,10 +60,12 @@ public class PaimonDataFileExtractor {
   public List<InternalDataFile> toInternalDataFiles(
       FileStoreTable table, Snapshot snapshot, InternalSchema internalSchema) {
     List<InternalDataFile> result = new ArrayList<>();
+    Map<Long, StatsLayout> statsLayouts = new HashMap<>();
     Iterator<ManifestEntry> manifestEntryIterator =
         newSnapshotReader(table, snapshot).readFileIterator();
     while (manifestEntryIterator.hasNext()) {
-      result.add(toInternalDataFile(table, manifestEntryIterator.next(), internalSchema));
+      result.add(
+          toInternalDataFile(table, manifestEntryIterator.next(), internalSchema, statsLayouts));
     }
     return result;
   }
@@ -72,10 +77,15 @@ public class PaimonDataFileExtractor {
    * @param table the Paimon table
    * @param entry the manifest entry representing a data file
    * @param internalSchema the internal schema for partition value extraction
+   * @param statsLayouts the stats layouts built so far by schema id, to which the layout of the
+   *     schema the data file was written with is added if it is missing
    * @return InternalDataFile representation
    */
   public InternalDataFile toInternalDataFile(
-      FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
+      FileStoreTable table,
+      ManifestEntry entry,
+      InternalSchema internalSchema,
+      Map<Long, StatsLayout> statsLayouts) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .partitionSubdirectory(Optional.of(bucketPath(entry)))
@@ -84,7 +94,10 @@ public class PaimonDataFileExtractor {
         .recordCount(entry.file().rowCount())
         .partitionValues(
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
-        .columnStats(statsExtractor.extractColumnStats(entry.file(), internalSchema))
+        .columnStats(
+            statsExtractor.extractColumnStats(
+                entry.file(),
+                getStatsLayout(table, entry.file().schemaId(), internalSchema, statsLayouts)))
         .build();
   }
 
@@ -127,6 +140,7 @@ public class PaimonDataFileExtractor {
 
     Set<InternalDataFile> addedFiles = new HashSet<>();
     Set<InternalDataFile> removedFiles = new HashSet<>();
+    Map<Long, StatsLayout> statsLayouts = new HashMap<>();
 
     // For primary key tables, only consider top-level files (fully compacted)
     int topLevel = table.coreOptions().numLevels() - 1;
@@ -141,7 +155,7 @@ public class PaimonDataFileExtractor {
           continue;
         }
 
-        InternalDataFile dataFile = toInternalDataFile(table, entry, internalSchema);
+        InternalDataFile dataFile = toInternalDataFile(table, entry, internalSchema, statsLayouts);
         if (entry.kind() == FileKind.ADD) {
           addedFiles.add(dataFile);
         } else if (entry.kind() == FileKind.DELETE) {
@@ -157,6 +171,16 @@ public class PaimonDataFileExtractor {
         removedFiles.size());
 
     return InternalFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+  }
+
+  private StatsLayout getStatsLayout(
+      FileStoreTable table,
+      long schemaId,
+      InternalSchema internalSchema,
+      Map<Long, StatsLayout> statsLayouts) {
+    return statsLayouts.computeIfAbsent(
+        schemaId,
+        id -> statsExtractor.getStatsLayout(table.schemaManager().schema(id), internalSchema));
   }
 
   private SnapshotReader newSnapshotReader(FileStoreTable table, Snapshot snapshot) {
