@@ -41,6 +41,7 @@ import org.apache.paimon.table.source.snapshot.SnapshotReader;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
+import org.apache.xtable.paimon.PaimonStatsExtractor.StatsLayout;
 
 @Log4j2
 public class PaimonDataFileExtractor {
@@ -49,8 +50,6 @@ public class PaimonDataFileExtractor {
       PaimonPartitionExtractor.getInstance();
 
   private final PaimonStatsExtractor statsExtractor = PaimonStatsExtractor.getInstance();
-
-  private final PaimonSchemaExtractor schemaExtractor = PaimonSchemaExtractor.getInstance();
 
   private static final PaimonDataFileExtractor INSTANCE = new PaimonDataFileExtractor();
 
@@ -61,12 +60,12 @@ public class PaimonDataFileExtractor {
   public List<InternalDataFile> toInternalDataFiles(
       FileStoreTable table, Snapshot snapshot, InternalSchema internalSchema) {
     List<InternalDataFile> result = new ArrayList<>();
-    Map<Long, InternalSchema> fileSchemas = new HashMap<>();
+    Map<Long, StatsLayout> statsLayouts = new HashMap<>();
     Iterator<ManifestEntry> manifestEntryIterator =
         newSnapshotReader(table, snapshot).readFileIterator();
     while (manifestEntryIterator.hasNext()) {
       result.add(
-          toInternalDataFile(table, manifestEntryIterator.next(), internalSchema, fileSchemas));
+          toInternalDataFile(table, manifestEntryIterator.next(), internalSchema, statsLayouts));
     }
     return result;
   }
@@ -78,15 +77,15 @@ public class PaimonDataFileExtractor {
    * @param table the Paimon table
    * @param entry the manifest entry representing a data file
    * @param internalSchema the internal schema for partition value extraction
-   * @param fileSchemas the schemas read so far by schema id, to which the schema the data file was
-   *     written with is added if it is missing
+   * @param statsLayouts the stats layouts built so far by schema id, to which the layout of the
+   *     schema the data file was written with is added if it is missing
    * @return InternalDataFile representation
    */
   public InternalDataFile toInternalDataFile(
       FileStoreTable table,
       ManifestEntry entry,
       InternalSchema internalSchema,
-      Map<Long, InternalSchema> fileSchemas) {
+      Map<Long, StatsLayout> statsLayouts) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .partitionSubdirectory(Optional.of(bucketPath(entry)))
@@ -98,8 +97,7 @@ public class PaimonDataFileExtractor {
         .columnStats(
             statsExtractor.extractColumnStats(
                 entry.file(),
-                getFileSchema(table, entry.file().schemaId(), internalSchema, fileSchemas),
-                internalSchema))
+                getStatsLayout(table, entry.file().schemaId(), internalSchema, statsLayouts)))
         .build();
   }
 
@@ -142,7 +140,7 @@ public class PaimonDataFileExtractor {
 
     Set<InternalDataFile> addedFiles = new HashSet<>();
     Set<InternalDataFile> removedFiles = new HashSet<>();
-    Map<Long, InternalSchema> fileSchemas = new HashMap<>();
+    Map<Long, StatsLayout> statsLayouts = new HashMap<>();
 
     // For primary key tables, only consider top-level files (fully compacted)
     int topLevel = table.coreOptions().numLevels() - 1;
@@ -157,7 +155,7 @@ public class PaimonDataFileExtractor {
           continue;
         }
 
-        InternalDataFile dataFile = toInternalDataFile(table, entry, internalSchema, fileSchemas);
+        InternalDataFile dataFile = toInternalDataFile(table, entry, internalSchema, statsLayouts);
         if (entry.kind() == FileKind.ADD) {
           addedFiles.add(dataFile);
         } else if (entry.kind() == FileKind.DELETE) {
@@ -175,20 +173,14 @@ public class PaimonDataFileExtractor {
     return InternalFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
   }
 
-  private InternalSchema getFileSchema(
+  private StatsLayout getStatsLayout(
       FileStoreTable table,
       long schemaId,
       InternalSchema internalSchema,
-      Map<Long, InternalSchema> fileSchemas) {
-    return fileSchemas.computeIfAbsent(
+      Map<Long, StatsLayout> statsLayouts) {
+    return statsLayouts.computeIfAbsent(
         schemaId,
-        id -> {
-          InternalSchema fileSchema =
-              schemaExtractor.toInternalSchema(table.schemaManager().schema(id));
-          // Reuse the instance when the schemas are equal, so that comparing them for each file is
-          // a reference check
-          return fileSchema.equals(internalSchema) ? internalSchema : fileSchema;
-        });
+        id -> statsExtractor.getStatsLayout(table.schemaManager().schema(id), internalSchema));
   }
 
   private SnapshotReader newSnapshotReader(FileStoreTable table, Snapshot snapshot) {

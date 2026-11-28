@@ -34,14 +34,17 @@ import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.Timestamp;
+import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.BucketEntry;
 import org.apache.paimon.schema.Schema;
+import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.sink.BatchTableCommit;
 import org.apache.paimon.table.sink.BatchTableWrite;
 import org.apache.paimon.table.sink.BatchWriteBuilder;
 import org.apache.paimon.table.sink.CommitMessage;
+import org.apache.paimon.table.sink.CommitMessageImpl;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 import org.apache.paimon.types.BooleanType;
 import org.apache.paimon.types.DataField;
@@ -110,6 +113,17 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
       return (FileStoreTable) catalog.getTable(identifier);
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public static FileStoreTable alterTable(
+      Catalog catalog, FileStoreTable table, SchemaChange change) {
+    try {
+      Identifier identifier = Identifier.create("test_db", table.name());
+      catalog.alterTable(identifier, change, false);
+      return (FileStoreTable) catalog.getTable(identifier);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to alter Paimon table", e);
     }
   }
 
@@ -256,10 +270,37 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
     }
   }
 
+  /**
+   * Writes the rows without compacting the table, so data files written before a schema change keep
+   * the schema they were written with.
+   *
+   * @return the data files the write added
+   */
+  public static List<DataFileMeta> writeRowsWithoutCompaction(
+      FileStoreTable table, List<GenericRow> rows) {
+    BatchWriteBuilder batchWriteBuilder = table.newBatchWriteBuilder();
+    try (BatchTableWrite writer = batchWriteBuilder.newWrite()) {
+      for (GenericRow row : rows) {
+        writer.write(row);
+      }
+      List<CommitMessage> messages = writer.prepareCommit();
+      commit(batchWriteBuilder, messages);
+      return messages.stream()
+          .flatMap(message -> ((CommitMessageImpl) message).newFilesIncrement().newFiles().stream())
+          .collect(Collectors.toList());
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to write rows into Paimon table", e);
+    }
+  }
+
   private static void commitWrites(BatchWriteBuilder batchWriteBuilder, BatchTableWrite writer)
       throws Exception {
+    commit(batchWriteBuilder, writer.prepareCommit());
+  }
+
+  private static void commit(BatchWriteBuilder batchWriteBuilder, List<CommitMessage> messages)
+      throws Exception {
     BatchTableCommit commit = batchWriteBuilder.newCommit();
-    List<CommitMessage> messages = writer.prepareCommit();
     try {
       commit.commit(messages);
     } catch (Exception e) {
