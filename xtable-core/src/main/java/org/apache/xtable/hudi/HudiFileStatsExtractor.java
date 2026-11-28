@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -146,24 +147,24 @@ public class HudiFileStatsExtractor {
       return Stream.empty();
     }
     List<Pair<String, String>> filePaths = new ArrayList<>(filePathsToDataFile.keySet());
+    // One lookup for all columns: each lookup scans the column stats partition's file slices.
     Map<Pair<String, String>, List<Pair<InternalField, HoodieMetadataColumnStats>>> stats =
-        nameFieldMap.entrySet().parallelStream()
-            .flatMap(
-                fieldNameToField -> {
-                  String fieldName = fieldNameToField.getKey();
-                  InternalField field = fieldNameToField.getValue();
-                  return metadataTable.getColumnStats(filePaths, fieldName).entrySet().stream()
-                      .map(
-                          filePairToStats ->
-                              Pair.of(
-                                  filePairToStats.getKey(),
-                                  Pair.of(field, filePairToStats.getValue())));
-                })
+        metadataTable
+            .getColumnStats(filePaths, new ArrayList<>(nameFieldMap.keySet()))
+            .entrySet()
+            .stream()
             .collect(
-                Collectors.groupingBy(
+                Collectors.toMap(
                     Map.Entry::getKey,
-                    Collectors.mapping(
-                        Map.Entry::getValue, CustomCollectors.toList(nameFieldMap.size()))));
+                    fileToStats ->
+                        fileToStats.getValue().stream()
+                            .map(
+                                stat -> {
+                                  InternalField field = nameFieldMap.get(stat.getColumnName());
+                                  return field == null ? null : Pair.of(field, stat);
+                                })
+                            .filter(Objects::nonNull)
+                            .collect(CustomCollectors.toList(fileToStats.getValue().size()))));
     List<InternalDataFile> withStats = new ArrayList<>();
     List<InternalDataFile> filesWithoutStats = new ArrayList<>();
     for (Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile :
