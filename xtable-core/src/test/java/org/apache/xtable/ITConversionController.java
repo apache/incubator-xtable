@@ -369,6 +369,16 @@ public class ITConversionController {
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 130);
       checkDatasetEquivalenceWithFilter(
           HUDI, table, targetTableFormats, table.getFilterQuery(), Collections.emptyMap());
+      // Delta readers skip files by the min and max stats in the Delta log, so a filter on a
+      // timestamp-millis column drops rows if the target writes its stats in the wrong unit.
+      checkDatasetEquivalenceWithFilter(
+          HUDI,
+          table,
+          targetTableFormats,
+          String.format(
+              "timestamp_millis_nullable_field >= timestamp_millis(%d)",
+              Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli()),
+          Collections.emptyMap());
     }
 
     try (GenericTable tableWithUpdatedSchema =
