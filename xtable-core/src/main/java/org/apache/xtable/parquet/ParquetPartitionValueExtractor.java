@@ -20,6 +20,7 @@ package org.apache.xtable.parquet;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,9 +29,13 @@ import java.util.TimeZone;
 
 import lombok.NonNull;
 
+import org.apache.hudi.common.util.PartitionPathEncodeUtils;
+
 import org.apache.xtable.exception.PartitionValuesExtractorException;
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 
@@ -52,14 +57,24 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
     String currentDateValue = "";
-    List<String> parsedDateValues = new ArrayList<>();
     if (partitionColumns.size() == 0) {
       return Collections.emptyList();
     }
-    int totalNumberOfPartitions = partitionColumns.get(0).getPartitionFieldNames().size();
-    List<PartitionValue> result = new ArrayList<>(totalNumberOfPartitions);
+    List<PartitionValue> result = new ArrayList<>(partitionColumns.size());
     String remainingPartitionPath = partitionPath;
     for (InternalPartitionField partitionField : partitionColumns) {
+      if (partitionField.getTransformType() == PartitionTransformType.VALUE) {
+        PartialResult valueAndRemainingPath =
+            parseIdentityValue(partitionField, remainingPartitionPath);
+        result.add(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(valueAndRemainingPath.getValue()))
+                .build());
+        remainingPartitionPath = valueAndRemainingPath.getRemainingPath();
+        continue;
+      }
+      List<String> parsedDateValues = new ArrayList<>();
       int index = 0;
       for (String partitionFieldName : partitionField.getPartitionFieldNames()) {
         if (remainingPartitionPath.startsWith(partitionFieldName + "=")) {
@@ -91,6 +106,38 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
       }
     }
     return result;
+  }
+
+  /**
+   * Parses one Hive style directory, e.g. {@code region=us-west}, as the value of an identity
+   * partition. Directory names are unescaped the way Hive and Spark escape them.
+   */
+  private PartialResult parseIdentityValue(InternalPartitionField field, String remainingPath) {
+    String fieldName = field.getSourceField().getPath();
+    if (remainingPath.startsWith(fieldName + "=")) {
+      remainingPath = remainingPath.substring(fieldName.length() + 1);
+    }
+    int slashIndex = remainingPath.indexOf('/');
+    String rawValue = slashIndex == -1 ? remainingPath : remainingPath.substring(0, slashIndex);
+    String unparsedPath = slashIndex == -1 ? "" : remainingPath.substring(slashIndex + 1);
+    if (rawValue.equals(HIVE_DEFAULT_PARTITION)) {
+      return new PartialResult(null, unparsedPath);
+    }
+    String value = PartitionPathEncodeUtils.unescapePathName(rawValue);
+    InternalType dataType = field.getSourceField().getSchema().getDataType();
+    try {
+      if (dataType == InternalType.DATE) {
+        // Hive style paths hold dates as yyyy-MM-dd; the internal value is days since epoch.
+        return new PartialResult((int) LocalDate.parse(value).toEpochDay(), unparsedPath);
+      }
+      return new PartialResult(parseValue(value, dataType, false).getValue(), unparsedPath);
+    } catch (RuntimeException e) {
+      throw new PartitionValuesExtractorException(
+          String.format(
+              "Unable to parse partition value '%s' for field %s of type %s",
+              value, fieldName, dataType),
+          e);
+    }
   }
 
   protected String parsePartitionDateValue(
