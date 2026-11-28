@@ -449,6 +449,21 @@ public class ITConversionController {
           targetTableFormats,
           table.getFilterQuery(),
           Collections.emptyMap());
+      // Iceberg's row-group filter misreads Hudi's millis Parquet stats as micros:
+      // https://github.com/apache/iceberg/issues/18173
+      List<String> timestampFilterTargets =
+          targetTableFormats.stream()
+              .filter(format -> !(sourceTableFormat.equals(HUDI) && format.equals(ICEBERG)))
+              .collect(Collectors.toList());
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat,
+          table,
+          timestampFilterTargets,
+          String.format(
+              "%s >= timestamp_millis(%d)",
+              table.getTimestampColumn(),
+              Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli()),
+          Collections.emptyMap());
     }
 
     try (GenericTable tableWithUpdatedSchema =

@@ -72,6 +72,8 @@ public interface GenericTable<T, Q> extends AutoCloseable {
 
   String getFilterQuery();
 
+  String getTimestampColumn();
+
   static GenericTable getInstance(
       String tableName,
       Path tempDir,

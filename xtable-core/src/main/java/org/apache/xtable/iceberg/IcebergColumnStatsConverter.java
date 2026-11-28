@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import lombok.AccessLevel;
@@ -36,6 +37,7 @@ import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 
@@ -74,11 +76,15 @@ public class IcebergColumnStatsConverter {
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
             lowerBounds.put(
-                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
+                fieldId,
+                Conversions.toByteBuffer(
+                    fieldType, toIcebergValue(columnStats.getRange().getMinValue(), field)));
           }
           if (columnStats.getRange().getMaxValue() != null) {
             upperBounds.put(
-                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMaxValue()));
+                fieldId,
+                Conversions.toByteBuffer(
+                    fieldType, toIcebergValue(columnStats.getRange().getMaxValue(), field)));
           }
         });
     return new Metrics(
@@ -125,6 +131,17 @@ public class IcebergColumnStatsConverter {
                   .build();
             })
         .collect(CustomCollectors.toList(fields.size()));
+  }
+
+  // Iceberg timestamps are micros, but timestamp stats may be millis.
+  private static Object toIcebergValue(Object value, InternalField field) {
+    Map<InternalSchema.MetadataKey, Object> metadata = field.getSchema().getMetadata();
+    if (metadata != null
+        && metadata.get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+            == InternalSchema.MetadataValue.MILLIS) {
+      return TimeUnit.MILLISECONDS.toMicros(((Number) value).longValue());
+    }
+    return value;
   }
 
   private static <T> T getOrNull(Map<Integer, T> stats, Integer fieldId) {

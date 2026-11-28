@@ -196,6 +196,11 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
     return "id % 2 = 0";
   }
 
+  @Override
+  public String getTimestampColumn() {
+    return "timestamp_field";
+  }
+
   public void runCompaction() {
     deltaTable.optimize().executeCompaction();
   }

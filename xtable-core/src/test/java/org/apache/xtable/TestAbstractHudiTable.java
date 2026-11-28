@@ -910,6 +910,11 @@ public abstract class TestAbstractHudiTable
   }
 
   @Override
+  public String getTimestampColumn() {
+    return "timestamp_millis_nullable_field";
+  }
+
+  @Override
   public String getOrderByColumn() {
     return "_hoodie_record_key";
   }
