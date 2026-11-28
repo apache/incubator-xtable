@@ -338,6 +338,70 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
   }
 
   @Test
+  public void testRemoveActionsAreDataChangesWithCurrentDeletionTimestamp() throws IOException {
+    // A sync that removes a file can delete rows, so Delta streaming readers must see the remove as
+    // a data change. VACUUM keeps a removed file until the retention period after its deletion
+    // timestamp has passed, so the timestamp must be the time of the sync in millis.
+    Path tablePath = tempDir.resolve("delta_table_with_one_file");
+    Files.createDirectories(tablePath.resolve("_delta_log"));
+    Path existingFile = tablePath.resolve("file1.parquet");
+    Files.createFile(existingFile);
+    String commitJson =
+        "{\"protocol\":{\"minReaderVersion\":1,\"minWriterVersion\":2}}\n"
+            + "{\"metaData\":{\"id\":\"test-id\",\"format\":{\"provider\":\"parquet\",\"options\":{}},\"schemaString\":\""
+            + physicalSchema.toJson().replace("\"", "\\\"")
+            + "\",\"partitionColumns\":[],\"configuration\":{},\"createdTime\":"
+            + System.currentTimeMillis()
+            + "}}\n"
+            + "{\"add\":{\"path\":\"file1.parquet\",\"partitionValues\":{},\"size\":1024,\"modificationTime\":"
+            + Instant.now().toEpochMilli()
+            + ",\"dataChange\":true,\"stats\":\"{}\"}}\n";
+    Files.write(
+        tablePath.resolve("_delta_log").resolve("00000000000000000000.json"),
+        commitJson.getBytes(StandardCharsets.UTF_8));
+    Table table = Table.forPath(engine, tablePath.toString());
+    DeltaKernelDataFileUpdatesExtractor syncExtractor =
+        DeltaKernelDataFileUpdatesExtractor.builder()
+            .engine(engine)
+            .basePath(tablePath.toString())
+            .includeColumnStats(false)
+            .build();
+    InternalDataFile removedFile =
+        InternalDataFile.builder()
+            .physicalPath(new org.apache.hadoop.fs.Path(existingFile.toUri()).toString())
+            .fileSizeBytes(1024L)
+            .lastModified(Instant.now().toEpochMilli())
+            .recordCount(100L)
+            .partitionValues(Collections.emptyList())
+            .columnStats(Collections.emptyList())
+            .build();
+
+    long syncStartMillis = System.currentTimeMillis();
+    List<RowBackedAction> snapshotActions =
+        JavaConverters.seqAsJavaList(
+            syncExtractor.applySnapshot(table, Collections.emptyList(), testSchema, null));
+    List<RowBackedAction> diffActions =
+        JavaConverters.seqAsJavaList(
+            syncExtractor.applyDiff(
+                InternalFilesDiff.builder().fileRemoved(removedFile).build(),
+                testSchema,
+                tablePath.toString(),
+                physicalSchema));
+    long syncEndMillis = System.currentTimeMillis();
+
+    for (List<RowBackedAction> actions : Arrays.asList(snapshotActions, diffActions)) {
+      assertEquals(1, actions.size());
+      RemoveFile removeFile = (RemoveFile) actions.get(0);
+      assertTrue(removeFile.getPath().endsWith("file1.parquet"), removeFile.getPath());
+      assertTrue(removeFile.getDataChange(), "Remove should be a data change");
+      long deletionTimestamp = removeFile.getDeletionTimestamp().get();
+      assertTrue(
+          deletionTimestamp >= syncStartMillis && deletionTimestamp <= syncEndMillis,
+          "Deletion timestamp should be the sync time, was " + deletionTimestamp);
+    }
+  }
+
+  @Test
   public void testDifferentialSyncWithExistingData() throws IOException {
     // This test simulates a real differential sync scenario:
     // 1. Delta table has existing files: file1.parquet, file2.parquet

@@ -116,8 +116,7 @@ public class DeltaKernelDataFileUpdatesExtractor {
           // Convert InternalDataFile back to AddFile to create RemoveFile action
           AddFile addFile =
               createAddFileAction(internalFile, tableSchema, basePath, snapshot.getSchema());
-          RemoveFile removeFile =
-              new RemoveFile(addFile.toRemoveFileRow(false, Optional.of(snapshot.getVersion())));
+          RemoveFile removeFile = toRemoveFile(addFile);
           // Use optimized path construction with Engine (reuses existing engine, no new
           // Configuration)
           String fullPath =
@@ -157,7 +156,7 @@ public class DeltaKernelDataFileUpdatesExtractor {
     List<RowBackedAction> removeActions =
         internalFilesDiff.dataFilesRemoved().stream()
             .map(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath, physicalSchema))
-            .map(addFile -> new RemoveFile(addFile.toRemoveFileRow(false, Optional.empty())))
+            .map(DeltaKernelDataFileUpdatesExtractor::toRemoveFile)
             .collect(CustomCollectors.toList(internalFilesDiff.dataFilesRemoved().size()));
     return applyDiff(
         internalFilesDiff.dataFilesAdded(),
@@ -183,6 +182,15 @@ public class DeltaKernelDataFileUpdatesExtractor {
         Stream.concat(addActions, removeFileActions.stream())
             .collect(CustomCollectors.toList(totalActions));
     return JavaConverters.asScalaBuffer(allActions).toSeq();
+  }
+
+  /**
+   * Removes the file as a data change, as the Delta Standalone target does, since the removed rows
+   * are not always in the added files. Kernel sets the deletion timestamp to the current time,
+   * which VACUUM uses to keep the file for the retention period.
+   */
+  private static RemoveFile toRemoveFile(AddFile addFile) {
+    return new RemoveFile(addFile.toRemoveFileRow(true, Optional.empty()));
   }
 
   private AddFile createAddFileAction(
