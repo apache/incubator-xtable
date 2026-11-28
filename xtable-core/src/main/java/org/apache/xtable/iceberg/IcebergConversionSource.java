@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -37,6 +39,9 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileContent;
+import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -51,6 +56,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -78,6 +84,12 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
 
   @Getter(lazy = true, value = AccessLevel.PACKAGE)
   private final FileIO tableOps = initTableOps();
+
+  @Getter(lazy = true, value = AccessLevel.PRIVATE)
+  private final IcebergConversionSourceConfig sourceConfig =
+      IcebergConversionSourceConfig.fromProperties(sourceTableConfig.getAdditionalProperties());
+
+  private final AtomicBoolean deleteFileWarningLogged = new AtomicBoolean();
 
   @Builder.Default
   private final IcebergPartitionValueConverter partitionConverter =
@@ -177,6 +189,13 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       List<InternalDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
+        // The scan already joins each data file with the delete files that apply to it, so this
+        // check reads nothing extra.
+        if (!fileScanTask.deletes().isEmpty()) {
+          onDeleteFilesFound(
+              currentSnapshot,
+              String.format("delete files apply to data file %s", file.location()));
+        }
         InternalDataFile irDataFile = fromIceberg(file, partitionSpec, irTable);
         irFiles.add(irDataFile);
       }
@@ -206,6 +225,17 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     Table iceTable = getSourceTable();
     PartitionSpec partitionSpec = iceTable.spec();
     InternalTable irTable = getTable(snapshot);
+
+    // Only the delete manifests written by this snapshot are read, so commits that add no delete
+    // files cost nothing extra.
+    Iterator<DeleteFile> addedDeleteFiles = snapshot.addedDeleteFiles(fileIO).iterator();
+    if (addedDeleteFiles.hasNext()) {
+      DeleteFile deleteFile = addedDeleteFiles.next();
+      onDeleteFilesFound(
+          snapshot,
+          String.format(
+              "the commit adds %s %s", describeDeleteFile(deleteFile), deleteFile.location()));
+    }
 
     Set<InternalDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
@@ -288,6 +318,46 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       currentSnapshot = parentSnapshot;
     }
     return currentSnapshot != null;
+  }
+
+  /**
+   * XTable converts only data files, so a target synced from a snapshot with position deletes,
+   * equality deletes or deletion vectors would still return the deleted rows. Fails the sync unless
+   * {@link IcebergConversionSourceConfig#ALLOW_UNSUPPORTED_DELETE_FILES} is set. With the override,
+   * one warning is logged per source instance and the delete files are ignored.
+   */
+  private void onDeleteFilesFound(Snapshot snapshot, String detail) {
+    String message =
+        String.format(
+            "Iceberg row-level delete files are not supported by XTable conversion targets. In"
+                + " snapshot %d of table %s, %s.",
+            snapshot.snapshotId(), getSourceTable().name(), detail);
+    if (!getSourceConfig().isAllowUnsupportedDeleteFiles()) {
+      throw new NotSupportedException(
+          message
+              + " To ignore delete files and continue with target tables that can contain rows"
+              + " deleted from the source, set "
+              + IcebergConversionSourceConfig.ALLOW_UNSUPPORTED_DELETE_FILES
+              + "=true.");
+    }
+    if (deleteFileWarningLogged.compareAndSet(false, true)) {
+      log.warn(
+          "{} Continuing because {} is enabled. Target tables can contain rows that were deleted"
+              + " from the source.",
+          message,
+          IcebergConversionSourceConfig.ALLOW_UNSUPPORTED_DELETE_FILES);
+    } else {
+      log.debug(message);
+    }
+  }
+
+  private static String describeDeleteFile(DeleteFile deleteFile) {
+    if (deleteFile.content() == FileContent.EQUALITY_DELETES) {
+      return "an equality delete file";
+    }
+    return deleteFile.format() == FileFormat.PUFFIN
+        ? "a deletion vector"
+        : "a position delete file";
   }
 
   @Override

@@ -42,10 +42,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.OverwriteFiles;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.RewriteFiles;
+import org.apache.iceberg.RowDelta;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
@@ -53,9 +56,12 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.deletes.PositionDelete;
+import org.apache.iceberg.deletes.PositionDeleteWriter;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.io.CloseableIterable;
@@ -210,6 +216,77 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     Map<StructLike, List<Record>> recordsByPartition =
         groupRecordsForWritingByPartition(recordsToRetain);
     writeAllFilesByOverWriting(recordsByPartition);
+  }
+
+  /**
+   * Deletes the records by committing position delete files, as merge-on-read writers do, instead
+   * of rewriting the data files.
+   */
+  @SneakyThrows
+  public void deleteRowsWithPositionDeletes(List<Record> recordsToDelete) {
+    Set<String> idsToDelete =
+        recordsToDelete.stream()
+            .map(r -> r.getField(DEFAULT_RECORD_KEY_FIELD).toString())
+            .collect(Collectors.toSet());
+    RowDelta rowDelta = icebergTable.newRowDelta();
+    for (DataFile dataFile : getCurrentFilesInTable()) {
+      List<Record> recordsInFile = readRecordsFromFile(dataFile);
+      List<Long> positionsToDelete = new ArrayList<>();
+      for (int position = 0; position < recordsInFile.size(); position++) {
+        if (idsToDelete.contains(
+            recordsInFile.get(position).getField(DEFAULT_RECORD_KEY_FIELD).toString())) {
+          positionsToDelete.add((long) position);
+        }
+      }
+      if (!positionsToDelete.isEmpty()) {
+        rowDelta.addDeletes(writePositionDeleteFile(dataFile, positionsToDelete));
+      }
+    }
+    rowDelta.commit();
+  }
+
+  /**
+   * Rewrites every data file with its deletes applied and removes the delete files, as compaction
+   * with Spark's {@code rewrite_data_files} procedure does.
+   */
+  @SneakyThrows
+  public void rewriteDataFilesWithDeletesApplied() {
+    List<Record> liveRecords = new ArrayList<>();
+    try (CloseableIterable<Record> records = IcebergGenerics.read(icebergTable).build()) {
+      records.forEach(record -> liveRecords.add(record.copy()));
+    }
+    RewriteFiles rewrite =
+        icebergTable.newRewrite().validateFromSnapshot(icebergTable.currentSnapshot().snapshotId());
+    Map<String, DeleteFile> deleteFiles = new HashMap<>();
+    try (CloseableIterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles()) {
+      for (FileScanTask fileScanTask : fileScanTasks) {
+        rewrite.deleteFile(fileScanTask.file());
+        fileScanTask.deletes().forEach(file -> deleteFiles.putIfAbsent(file.location(), file));
+      }
+    }
+    deleteFiles.values().forEach(rewrite::deleteFile);
+    writeAllDataFiles(groupRecordsForWritingByPartition(liveRecords)).forEach(rewrite::addFile);
+    rewrite.commit();
+  }
+
+  @SneakyThrows
+  private DeleteFile writePositionDeleteFile(DataFile dataFile, List<Long> positions) {
+    String deleteFilePath = dataFile.location().replace(".parquet", "-deletes.parquet");
+    PositionDeleteWriter<Record> writer =
+        Parquet.writeDeletes(icebergTable.io().newOutputFile(deleteFilePath))
+            .withSpec(icebergTable.specs().get(dataFile.specId()))
+            .withPartition(dataFile.partition())
+            .overwrite()
+            .buildPositionWriter();
+    PositionDelete<Record> positionDelete = PositionDelete.create();
+    try {
+      for (long position : positions) {
+        writer.write(positionDelete.set(dataFile.location(), position, null));
+      }
+    } finally {
+      writer.close();
+    }
+    return writer.toDeleteFile();
   }
 
   private void writeAllFilesByAppending(Map<StructLike, List<Record>> recordsByPartition) {

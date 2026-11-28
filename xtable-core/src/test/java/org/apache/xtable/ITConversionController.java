@@ -28,6 +28,7 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
@@ -86,6 +87,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.data.Record;
 import org.apache.iceberg.hadoop.HadoopTables;
 
 import org.apache.spark.sql.delta.DeltaLog;
@@ -103,6 +105,7 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.delta.DeltaConversionTargetConfig;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTargetConfig;
 import org.apache.xtable.hudi.HudiTestUtil;
@@ -1130,6 +1133,39 @@ public class ITConversionController {
       table.insertRows(10);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(SyncMode.class)
+  public void testIcebergSourceWithPositionDeletesFailsSync(SyncMode syncMode) {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(ICEBERG);
+    List<String> targetTableFormats = Arrays.asList(DELTA, HUDI);
+    try (TestIcebergTable table =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, "level", tempDir, jsc.hadoopConfiguration())) {
+      List<Record> insertedRecords = table.insertRows(50);
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(ICEBERG, syncMode, tableName, table, targetTableFormats, null, null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(ICEBERG, table, targetTableFormats, 50);
+
+      // The targets cannot apply delete files, so the sync must fail rather than report success
+      // with the deleted rows still visible in the targets.
+      table.deleteRowsWithPositionDeletes(insertedRecords.subList(0, 10));
+      assertThrows(
+          NotSupportedException.class,
+          () -> conversionController.sync(conversionConfig, conversionSourceProvider));
+
+      // Once the deletes are applied to the data files, a full sync brings the targets back in
+      // line with the source.
+      table.rewriteDataFilesWithDeletesApplied();
+      ConversionConfig fullSyncConfig =
+          getTableSyncConfig(
+              ICEBERG, SyncMode.FULL, tableName, table, targetTableFormats, null, null);
+      conversionController.sync(fullSyncConfig, conversionSourceProvider);
+      checkDatasetEquivalence(ICEBERG, table, targetTableFormats, 40);
     }
   }
 
