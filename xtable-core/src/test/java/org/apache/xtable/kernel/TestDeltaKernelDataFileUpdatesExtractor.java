@@ -74,6 +74,7 @@ import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 public class TestDeltaKernelDataFileUpdatesExtractor {
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @TempDir private Path tempDir;
 
@@ -244,14 +245,13 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     // id keeps its bounds, and its unknown null count is left out instead of written as 0. Kernel
     // does not write null values in the stats maps.
     AddFile addFile = (AddFile) actions.get(0);
-    ObjectMapper mapper = new ObjectMapper();
     assertEquals(
-        mapper.readTree(
+        MAPPER.readTree(
             "{\"numRecords\":10,"
                 + "\"minValues\":{\"id\":1,\"name\":\"a\"},"
                 + "\"maxValues\":{\"id\":9,\"name\":\"z\"},"
                 + "\"nullCount\":{\"name\":2}}"),
-        mapper.readTree(addFile.getStatsJson().get()));
+        MAPPER.readTree(addFile.getStatsJson().get()));
   }
 
   @Test
@@ -518,13 +518,10 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
                 schema,
                 null));
     assertEquals(1, actions.size());
-    JsonNode kernelStats =
-        new ObjectMapper().readTree(((AddFile) actions.get(0)).getStatsJson().get());
+    JsonNode kernelStats = MAPPER.readTree(((AddFile) actions.get(0)).getStatsJson().get());
     JsonNode standaloneStats =
-        new ObjectMapper()
-            .readTree(
-                DeltaStatsExtractor.getInstance()
-                    .convertStatsToDeltaFormat(schema, 10L, columnStats));
+        MAPPER.readTree(
+            DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 10L, columnStats));
 
     for (InternalField field : schema.getFields()) {
       for (String bound : Arrays.asList("minValues", "maxValues")) {
