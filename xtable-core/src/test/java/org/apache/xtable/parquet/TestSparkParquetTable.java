@@ -114,4 +114,9 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
   public String getFilterQuery() {
     return null;
   }
+
+  @Override
+  public String getTimestampColumn() {
+    return null;
+  }
 }

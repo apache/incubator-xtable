@@ -372,13 +372,7 @@ public class ITConversionController {
       // Delta readers skip files by the min and max stats in the Delta log, so a filter on a
       // timestamp-millis column drops rows if the target writes its stats in the wrong unit.
       checkDatasetEquivalenceWithFilter(
-          HUDI,
-          table,
-          targetTableFormats,
-          String.format(
-              "timestamp_millis_nullable_field >= timestamp_millis(%d)",
-              Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli()),
-          Collections.emptyMap());
+          HUDI, table, targetTableFormats, timestampFilter(table), Collections.emptyMap());
     }
 
     try (GenericTable tableWithUpdatedSchema =
@@ -458,6 +452,18 @@ public class ITConversionController {
           table,
           targetTableFormats,
           table.getFilterQuery(),
+          Collections.emptyMap());
+      // Iceberg's row-group filter misreads Hudi's millis Parquet stats as micros:
+      // https://github.com/apache/iceberg/issues/18173
+      List<String> timestampFilterTargets =
+          targetTableFormats.stream()
+              .filter(format -> !(sourceTableFormat.equals(HUDI) && format.equals(ICEBERG)))
+              .collect(Collectors.toList());
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat,
+          table,
+          timestampFilterTargets,
+          timestampFilter(table),
           Collections.emptyMap());
     }
 
@@ -1314,6 +1320,12 @@ public class ITConversionController {
         throw new IllegalArgumentException("Unknown table format: " + tableFormat);
     }
     return options;
+  }
+
+  private static String timestampFilter(GenericTable<?, ?> table) {
+    long cutoff =
+        Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli();
+    return String.format("%s >= timestamp_millis(%d)", table.getTimestampColumn(), cutoff);
   }
 
   private void checkDatasetEquivalenceWithFilter(

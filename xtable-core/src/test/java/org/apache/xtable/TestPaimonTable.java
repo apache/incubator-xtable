@@ -321,6 +321,11 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
     return "id % 2 = 0";
   }
 
+  @Override
+  public String getTimestampColumn() {
+    return "created_at";
+  }
+
   public FileStoreTable getPaimonTable() {
     return paimonTable;
   }

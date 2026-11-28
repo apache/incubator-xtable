@@ -18,6 +18,8 @@
  
 package org.apache.xtable.iceberg;
 
+import static org.apache.xtable.model.schema.InternalSchema.MetadataValue.MICROS;
+import static org.apache.xtable.model.schema.InternalSchema.MetadataValue.MILLIS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.ByteBuffer;
@@ -26,6 +28,8 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -273,6 +277,66 @@ public class TestIcebergColumnStatsConverter {
     assertEquals(expected.valueCounts(), actual.valueCounts());
     assertEquals(expected.upperBounds(), actual.upperBounds());
     assertEquals(expected.lowerBounds(), actual.lowerBounds());
+  }
+
+  @Test
+  public void testTimestampBoundsUseFieldPrecision() {
+    Instant min = Instant.parse("2024-03-15T10:20:30.123Z");
+    Instant max = Instant.parse("2024-03-16T11:22:33.456Z");
+    Schema icebergSchema =
+        new Schema(
+            Types.NestedField.optional(1, "ts_millis", Types.TimestampType.withZone()),
+            Types.NestedField.optional(2, "ts_micros", Types.TimestampType.withZone()),
+            Types.NestedField.optional(3, "ntz_millis", Types.TimestampType.withoutZone()),
+            Types.NestedField.optional(4, "ntz_micros", Types.TimestampType.withoutZone()));
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            timestampStat("ts_millis", InternalType.TIMESTAMP, MILLIS, min, max),
+            timestampStat("ts_micros", InternalType.TIMESTAMP, MICROS, min, max),
+            timestampStat("ntz_millis", InternalType.TIMESTAMP_NTZ, MILLIS, min, max),
+            timestampStat("ntz_micros", InternalType.TIMESTAMP_NTZ, MICROS, min, max));
+
+    Metrics actual =
+        IcebergColumnStatsConverter.getInstance().toIceberg(icebergSchema, 10L, columnStats);
+
+    for (Types.NestedField field : icebergSchema.columns()) {
+      assertEquals(
+          ChronoUnit.MICROS.between(Instant.EPOCH, min),
+          (long)
+              Conversions.fromByteBuffer(field.type(), actual.lowerBounds().get(field.fieldId())),
+          field.name());
+      assertEquals(
+          ChronoUnit.MICROS.between(Instant.EPOCH, max),
+          (long)
+              Conversions.fromByteBuffer(field.type(), actual.upperBounds().get(field.fieldId())),
+          field.name());
+    }
+  }
+
+  private static ColumnStat timestampStat(
+      String name,
+      InternalType type,
+      InternalSchema.MetadataValue precision,
+      Instant min,
+      Instant max) {
+    ChronoUnit unit = precision == MILLIS ? ChronoUnit.MILLIS : ChronoUnit.MICROS;
+    InternalField field =
+        InternalField.builder()
+            .name(name)
+            .schema(
+                InternalSchema.builder()
+                    .name(name)
+                    .dataType(type)
+                    .metadata(
+                        Collections.singletonMap(
+                            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precision))
+                    .build())
+            .build();
+    return ColumnStat.builder()
+        .field(field)
+        .numValues(10)
+        .range(Range.vector(unit.between(Instant.EPOCH, min), unit.between(Instant.EPOCH, max)))
+        .build();
   }
 
   @Test

@@ -315,6 +315,11 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return String.format("%s > 'aaa'", icebergDataHelper.getRecordKeyField());
   }
 
+  @Override
+  public String getTimestampColumn() {
+    return "timestamp_micros_nullable_field";
+  }
+
   public long getLastCommitTimestamp() {
     return getLatestSnapshot().timestampMillis();
   }
